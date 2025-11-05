@@ -1,0 +1,14 @@
+{
+  "executed": false,
+  "reason": "Validation pipeline requires project runtime; tool scaffolding prepared.",
+  "dashboard_endpoints_expected": [
+    "/workflows",
+    "/registry/agents",
+    "/status"
+  ],
+  "next_steps": [
+    "Start API as per RUN_WINDOWS.md",
+    "Run tools/endpoint_check.py --mode online to collect live responses",
+    "Trigger a small validation via POST /workflows/validate and verify dashboard views populate"
+  ]
+}

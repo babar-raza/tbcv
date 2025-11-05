@@ -1,0 +1,2 @@
+[console_scripts]
+tbcv = tbcv.__main__:main

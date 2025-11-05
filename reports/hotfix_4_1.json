@@ -1,0 +1,46 @@
+{
+  "hotfix_version": "4.1",
+  "title": "Critical API and Dashboard Fixes",
+  "fixes_applied": [
+    {
+      "issue": "/api/validations returning 500 error",
+      "root_cause": "SQLAlchemy DetachedInstanceError when accessing relationships in ValidationResult.to_dict()",
+      "fix": "Added exception handling in ValidationResult.to_dict() to safely handle detached instances",
+      "files_modified": ["core/database.py"],
+      "verification": "✅ /api/validations now returns 200 with validation data"
+    },
+    {
+      "issue": "/dashboard returning 404 Not Found",
+      "root_cause_1": "Dashboard module import failing due to missing 'tbcv' package reference",
+      "fix_1": "Fixed template directory resolution to use relative path instead of package import",
+      "root_cause_2": "Missing python-multipart dependency for form handling",
+      "fix_2": "Installed python-multipart package",
+      "files_modified": ["api/dashboard.py"],
+      "dependencies_added": ["python-multipart==0.0.20"],
+      "verification": "✅ /dashboard now returns 200 with HTML dashboard interface"
+    }
+  ],
+  "endpoints_now_working": [
+    {
+      "endpoint": "/api/validations",
+      "status": "✅ 200 OK",
+      "response_sample": "Returns JSON with validation results array and total count"
+    },
+    {
+      "endpoint": "/dashboard",
+      "status": "✅ 200 OK", 
+      "response_sample": "Returns HTML dashboard interface"
+    },
+    {
+      "endpoint": "/dashboard/",
+      "status": "✅ 200 OK",
+      "response_sample": "Returns HTML dashboard interface"
+    }
+  ],
+  "testing_commands": [
+    "curl http://127.0.0.1:8080/api/validations",
+    "curl http://127.0.0.1:8080/dashboard",
+    "python main.py --mode api --host 127.0.0.1 --port 8080"
+  ],
+  "generated_at": "2025-10-31T14:33:00Z"
+}

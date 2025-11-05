@@ -1,0 +1,21 @@
+[
+  {
+    "change_id": "DB_001_BOOTSTRAP_HELPERS",
+    "file": "core\\database.py",
+    "status": "ok",
+    "action": "insert"
+  },
+  {
+    "change_id": "HEALTH_001_STRICT_DB_REQUIRED",
+    "file": "api\\server.py",
+    "status": "ok",
+    "action": "insert"
+  },
+  {
+    "change_id": "WIRING_001_DB_INIT_PROBE",
+    "file": "api\\server.py",
+    "status": "error",
+    "reason": "anchor_not_found",
+    "anchor": "def create_app("
+  }
+]

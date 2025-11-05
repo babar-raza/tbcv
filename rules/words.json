@@ -1,0 +1,131 @@
+{
+  "plugin_aliases": {
+    "word_processor": ["Word Processor", "Words", "Document", "Aspose.Words"],
+    "pdf_processor": ["PDF Processor", "PDF", "Pdf"],
+    "document_converter": ["Document Converter", "Converter", "Convert"],
+    "document_printer": ["Document Printer", "Printer", "Print"],
+    "document_comparer": ["Document Comparer", "Comparer", "Compare"],
+    "document_watermark": ["Document Watermark", "Watermark"],
+    "linq_reporting_engine": ["LINQ Reporting Engine", "LINQ", "Reporting"],
+    "mail_merge": ["Mail Merge", "Merge"],
+    "document_merger": ["Document Merger", "Merger"],
+    "document_splitter": ["Document Splitter", "Splitter"],
+    "web_file_processor": ["Web File Processor", "HTML", "Web"],
+    "svg_file_processor": ["SVG File Processor", "SVG"],
+    "image_file_processor": ["Image File Processor", "Image"],
+    "markdown_file_processor": ["Markdown File Processor", "Markdown", "MD"]
+  },
+  "api_patterns": {
+    "document_creation": [
+      "new Document\\(",
+      "Document\\s+\\w+\\s*=",
+      "var\\s+\\w+\\s*=\\s*new Document"
+    ],
+    "save_operations": [
+      "\\.Save\\s*\\(",
+      "SaveFormat\\.",
+      "\\.save\\s*\\("
+    ],
+    "load_operations": [
+      "new Document\\s*\\(",
+      "Document\\.Load",
+      "LoadFormat\\."
+    ],
+    "pdf_operations": [
+      "SaveFormat\\.Pdf",
+      "PdfSaveOptions",
+      "\\.pdf\\b"
+    ],
+    "format_conversion": [
+      "SaveFormat\\.",
+      "LoadFormat\\.",
+      "ConvertUtil\\."
+    ],
+    "document_builder": [
+      "DocumentBuilder",
+      "builder\\."
+    ],
+    "aspose_imports": [
+      "using Aspose\\.Words",
+      "Aspose\\.Words\\."
+    ]
+  },
+  "dependencies": {
+    "document_converter": ["word_processor"],
+    "pdf_processor": ["document_converter"],
+    "document_printer": ["word_processor"],
+    "document_comparer": ["word_processor"],
+    "document_watermark": ["word_processor"],
+    "linq_reporting_engine": ["word_processor"],
+    "mail_merge": ["word_processor"],
+    "document_merger": ["word_processor"],
+    "document_splitter": ["word_processor"]
+  },
+  "non_editable_yaml_fields": [
+    "plugin_family",
+    "aspose_product"
+  ],
+  "validation_requirements": {
+    "required_imports": {
+      "csharp": ["using Aspose.Words;"],
+      "patterns": ["Aspose\\.Words"]
+    },
+    "plugin_usage_validation": {
+      "document_operations": {
+        "required_with": ["word_processor"],
+        "patterns": ["Document", "DocumentBuilder"]
+      },
+      "pdf_conversion": {
+        "required_with": ["word_processor", "pdf_processor", "document_converter"],
+        "patterns": ["SaveFormat\\.Pdf", "PdfSaveOptions"]
+      }
+    }
+  },
+  "code_quality_rules": {
+    "forbidden_patterns": {
+      "hardcoded_paths": [
+        "C:\\\\\\\\",
+        "/Users/",
+        "C:/temp",
+        "\\\\Documents\\\\\\\\",
+        "\\\\Desktop\\\\\\\\"
+      ],
+      "magic_numbers": [
+        "\\\\b\\\\d{3,}\\\\b(?!\\\\s*(px|em|%|ms|s|KB|MB))"
+      ],
+      "hardcoded_credentials": [
+        "password\\\\s*=\\\\s*[\"'][^\"']+[\"']",
+        "key\\\\s*=\\\\s*[\"'][^\"']+[\"']"
+      ]
+    },
+    "required_patterns": {
+      "error_handling": [
+        "try\\\\s*{",
+        "catch\\\\s*\\\\(",
+        "throw\\\\s+new"
+      ],
+      "resource_disposal": [
+        "using\\\\s*\\\\(",
+        "\\\\.Dispose\\\\(\\\\)",
+        "using\\\\s+var"
+      ]
+    },
+    "best_practices": {
+      "using_statements": {
+        "message": "Consider using 'using' statements for proper resource disposal",
+        "patterns": ["Document", "Stream", "FileStream"]
+      },
+      "exception_handling": {
+        "message": "Add appropriate exception handling for file operations",
+        "patterns": ["File\\\\.", "Directory\\\\.", "Path\\\\."]
+      }
+    }
+  },
+  "format_patterns": {
+    "word_formats": ["DOC", "DOCX", "RTF", "DOTX", "DOTM"],
+    "pdf_formats": ["PDF"],
+    "web_formats": ["HTML", "MHTML"],
+    "image_formats": ["PNG", "JPEG", "TIFF", "BMP", "GIF"],
+    "text_formats": ["TXT", "MD"]
+  }
+}

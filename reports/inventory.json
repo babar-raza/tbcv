@@ -1,0 +1,382 @@
+{
+  "root": "/mnt/data/workdir/tbcv",
+  "packages": [
+    ".",
+    "agents",
+    "core",
+    "rules"
+  ],
+  "routers": [
+    {
+      "module": "api/dashboard.py",
+      "routes": [
+        {
+          "path": "/",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/dashboard.py"
+        },
+        {
+          "path": "/validations",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/dashboard.py"
+        },
+        {
+          "path": "/validations/{validation_id}",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/dashboard.py"
+        },
+        {
+          "path": "/recommendations",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/dashboard.py"
+        },
+        {
+          "path": "/recommendations/{recommendation_id}",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/dashboard.py"
+        },
+        {
+          "path": "/recommendations/{recommendation_id}/review",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/dashboard.py"
+        },
+        {
+          "path": "/recommendations/bulk-review",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/dashboard.py"
+        },
+        {
+          "path": "/workflows",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/dashboard.py"
+        },
+        {
+          "path": "/workflows/{workflow_id}",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/dashboard.py"
+        },
+        {
+          "path": "/audit",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/dashboard.py"
+        }
+      ]
+    },
+    {
+      "module": "api/export_endpoints.py",
+      "routes": [
+        {
+          "path": "/validations.json",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/export_endpoints.py"
+        },
+        {
+          "path": "/validations.csv",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/export_endpoints.py"
+        },
+        {
+          "path": "/recommendations.json",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/export_endpoints.py"
+        },
+        {
+          "path": "/audit-logs.json",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/export_endpoints.py"
+        },
+        {
+          "path": "/report.md",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/export_endpoints.py"
+        },
+        {
+          "path": "/workflows.json",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/export_endpoints.py"
+        },
+        {
+          "path": "/validation/{validation_id}/diff.json",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/export_endpoints.py"
+        }
+      ]
+    },
+    {
+      "module": "api/server.py",
+      "routes": [
+        {
+          "path": "/health",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/health/live",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/health/ready",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/agents",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/agents/{agent_id}",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/registry/agents",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/agents/validate",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/api/validate/batch",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/api/detect-plugins",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/api/validations",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/api/validations/{validation_id}",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/api/recommendations",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/api/recommendations/{recommendation_id}",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/api/recommendations/{recommendation_id}/review",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/api/recommendations/bulk-review",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/agents/enhance",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/api/enhance/auto-apply",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/workflows/validate-directory",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/workflows",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/workflows/{workflow_id}",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/workflows/{workflow_id}/control",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/api/audit",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/validation-notes",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/enhance",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        },
+        {
+          "path": "/status",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server.py"
+        }
+      ]
+    },
+    {
+      "module": "api/server_extensions.py",
+      "routes": [
+        {
+          "path": "/{workflow_id}/pause",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server_extensions.py"
+        },
+        {
+          "path": "/{workflow_id}/resume",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server_extensions.py"
+        },
+        {
+          "path": "/{workflow_id}/cancel",
+          "methods": [
+            "POST"
+          ],
+          "module": "api/server_extensions.py"
+        },
+        {
+          "path": "/{workflow_id}/status",
+          "methods": [
+            "GET"
+          ],
+          "module": "api/server_extensions.py"
+        }
+      ]
+    }
+  ],
+  "models": [
+    "api/server.py",
+    "core/config.py",
+    "core/database.py",
+    "core/logging.py",
+    "core/validation_store.py"
+  ],
+  "services": [
+    "agents/code_analyzer.py",
+    "core/ollama_validator.py"
+  ],
+  "startup_hooks": [],
+  "env": {
+    "required": [
+      "TBCV_DATABASE_URL"
+    ],
+    "present": [],
+    "missing": [
+      "TBCV_DATABASE_URL"
+    ]
+  },
+  "problems": []
+}

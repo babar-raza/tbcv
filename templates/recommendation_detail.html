@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Recommendation Details - TBCV{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="/dashboard/recommendations" class="btn btn-secondary">← Back to Recommendations</a>
+</div>
+
+<div class="card">
+    <h2>Recommendation Details</h2>
+    
+    <div class="detail-grid">
+        <div class="detail-label">ID:</div>
+        <div class="detail-value"><code>{{ recommendation.id }}</code></div>
+        
+        <div class="detail-label">Status:</div>
+        <div class="detail-value">
+            <span class="badge badge-{{ recommendation.status }}">{{ recommendation.status }}</span>
+        </div>
+        
+        <div class="detail-label">Type:</div>
+        <div class="detail-value">
+            <span class="badge badge-secondary">{{ recommendation.type }}</span>
+        </div>
+        
+        <div class="detail-label">Priority:</div>
+        <div class="detail-value">
+            <span class="badge badge-warning">{{ recommendation.priority }}</span>
+        </div>
+        
+        <div class="detail-label">Confidence:</div>
+        <div class="detail-value">
+            <strong>{{ "%.1f"|format(recommendation.confidence * 100) }}%</strong>
+        </div>
+        
+        <div class="detail-label">Created:</div>
+        <div class="detail-value">{{ recommendation.created_at }}</div>
+        
+        {% if recommendation.reviewed_by %}
+        <div class="detail-label">Reviewed By:</div>
+        <div class="detail-value">{{ recommendation.reviewed_by }}</div>
+        
+        <div class="detail-label">Reviewed At:</div>
+        <div class="detail-value">{{ recommendation.reviewed_at }}</div>
+        {% endif %}
+        
+        {% if recommendation.applied_at %}
+        <div class="detail-label">Applied At:</div>
+        <div class="detail-value">{{ recommendation.applied_at }}</div>
+        
+        <div class="detail-label">Applied By:</div>
+        <div class="detail-value">{{ recommendation.applied_by }}</div>
+        {% endif %}
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <h3 style="margin-bottom: 10px;">Title</h3>
+        <p>{{ recommendation.title }}</p>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <h3 style="margin-bottom: 10px;">Description</h3>
+        <p>{{ recommendation.description }}</p>
+    </div>
+    
+    {% if recommendation.original_content %}
+    <div style="margin-top: 20px;">
+        <h3 style="margin-bottom: 10px;">Original Content</h3>
+        <pre>{{ recommendation.original_content }}</pre>
+    </div>
+    {% endif %}
+    
+    {% if recommendation.proposed_content %}
+    <div style="margin-top: 20px;">
+        <h3 style="margin-bottom: 10px;">Proposed Content</h3>
+        <pre>{{ recommendation.proposed_content }}</pre>
+    </div>
+    {% endif %}
+    
+    {% if recommendation.diff %}
+    <div style="margin-top: 20px;">
+        <h3 style="margin-bottom: 10px;">Diff</h3>
+        <pre>{{ recommendation.diff }}</pre>
+    </div>
+    {% endif %}
+    
+    {% if recommendation.review_notes %}
+    <div style="margin-top: 20px;">
+        <h3 style="margin-bottom: 10px;">Review Notes</h3>
+        <p>{{ recommendation.review_notes }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Review Form -->
+{% if recommendation.status == 'pending' %}
+<div class="card">
+    <h2>Review Recommendation</h2>
+    <form method="POST" action="/dashboard/recommendations/{{ recommendation.id }}/review">
+        <div style="margin-bottom: 15px;">
+            <label for="reviewer" style="display: block; margin-bottom: 5px; font-weight: 600;">Reviewer Name:</label>
+            <input type="text" id="reviewer" name="reviewer" value="dashboard_user" 
+                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="notes" style="display: block; margin-bottom: 5px; font-weight: 600;">Review Notes (Optional):</label>
+            <textarea id="notes" name="notes" rows="4" 
+                      style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+        </div>
+        
+        <div class="actions">
+            <button type="submit" name="action" value="accepted" class="btn btn-success">✓ Approve</button>
+            <button type="submit" name="action" value="rejected" class="btn btn-danger">✗ Reject</button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<!-- Related Validation -->
+{% if validation %}
+<div class="card">
+    <h2>Related Validation</h2>
+    <div class="detail-grid">
+        <div class="detail-label">File Path:</div>
+        <div class="detail-value">{{ validation.file_path }}</div>
+        
+        <div class="detail-label">Status:</div>
+        <div class="detail-value">
+            <span class="badge badge-{{ validation.status }}">{{ validation.status }}</span>
+        </div>
+        
+        <div class="detail-label">Severity:</div>
+        <div class="detail-value">
+            <span class="badge badge-{{ validation.severity }}">{{ validation.severity }}</span>
+        </div>
+    </div>
+    <div style="margin-top: 15px;">
+        <a href="/dashboard/validations/{{ validation.id }}" class="btn btn-primary">View Full Validation</a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Audit Trail -->
+{% if audit_logs %}
+<div class="card">
+    <h2>Audit Trail</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Action</th>
+                <th>Actor</th>
+                <th>Timestamp</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in audit_logs %}
+            <tr>
+                <td><span class="badge badge-secondary">{{ log.action }}</span></td>
+                <td>{{ log.actor or 'system' }} ({{ log.actor_type }})</td>
+                <td>{{ log.created_at }}</td>
+                <td class="truncate">{{ log.notes or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}

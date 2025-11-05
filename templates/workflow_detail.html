@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Workflow Details - TBCV{% endblock %}
+{% block content %}
+<div style="margin-bottom: 20px;"><a href="/dashboard/workflows" class="btn btn-secondary">← Back</a></div>
+<div class="card">
+    <h2>Workflow: {{ workflow.type }}</h2>
+    <div class="detail-grid">
+        <div class="detail-label">ID:</div><div class="detail-value"><code>{{ workflow.id }}</code></div>
+        <div class="detail-label">State:</div><div class="detail-value"><span class="badge badge-{{ workflow.state }}">{{ workflow.state }}</span></div>
+        <div class="detail-label">Progress:</div><div class="detail-value">{{ workflow.progress_percent }}%</div>
+        <div class="detail-label">Created:</div><div class="detail-value">{{ workflow.created_at }}</div>
+    </div>
+</div>
+{% if validations %}
+<div class="card"><h2>Validations ({{ validations|length }})</h2>
+    <table><thead><tr><th>File Path</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+        {% for v in validations %}
+        <tr><td>{{ v.file_path }}</td><td><span class="badge badge-{{ v.status }}">{{ v.status }}</span></td>
+        <td><a href="/dashboard/validations/{{ v.id }}" class="btn btn-primary">View</a></td></tr>
+        {% endfor %}
+    </tbody></table>
+</div>
+{% endif %}
+{% endblock %}

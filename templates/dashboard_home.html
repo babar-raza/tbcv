@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Home - TBCV{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: 30px;">Dashboard Overview</h1>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="value">{{ stats.total_validations }}</div>
+        <div class="label">Total Validations</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.pending_recommendations }}</div>
+        <div class="label">Pending Reviews</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.accepted_recommendations }}</div>
+        <div class="label">Accepted</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.applied_recommendations }}</div>
+        <div class="label">Applied</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.rejected_recommendations }}</div>
+        <div class="label">Rejected</div>
+    </div>
+</div>
+
+<!-- Recent Workflows -->
+<div class="card">
+    <h2>Recent Workflows</h2>
+    {% if workflows %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>State</th>
+                <th>Progress</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for workflow in workflows %}
+            <tr>
+                <td><code>{{ workflow.id[:8] }}...</code></td>
+                <td>{{ workflow.type }}</td>
+                <td><span class="badge badge-{{ workflow.state }}">{{ workflow.state }}</span></td>
+                <td>{{ workflow.progress_percent }}%</td>
+                <td>{{ workflow.created_at }}</td>
+                <td>
+                    <a href="/dashboard/workflows/{{ workflow.id }}" class="btn btn-primary">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No workflows found</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="recommendations-section">
+    <h3>Pending Recommendations</h3>
+    {% if recommendations %}
+        <div class="recommendation-list">
+            {% for rec in recommendations %}
+            <div class="recommendation-item" data-recommendation-id="{{ rec.id }}">
+                <div class="rec-header">
+                    <span class="rec-type">{{ rec.type }}</span>
+                    <span class="rec-confidence">{{ "%.1f" | format(rec.confidence * 100) }}% confidence</span>
+                </div>
+                <div class="rec-title">{{ rec.title }}</div>
+                <div class="rec-description">{{ rec.description[:100] }}{% if rec.description|length > 100 %}...{% endif %}</div>
+                <div class="rec-actions">
+                    <form method="post" action="/dashboard/recommendations/{{ rec.id }}/review" style="display: inline;">
+                        <input type="hidden" name="action" value="accepted">
+                        <button type="submit" class="btn btn-success btn-sm">Accept</button>
+                    </form>
+                    <form method="post" action="/dashboard/recommendations/{{ rec.id }}/review" style="display: inline;">
+                        <input type="hidden" name="action" value="rejected">
+                        <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                    </form>
+                    <a href="/dashboard/recommendations/{{ rec.id }}" class="btn btn-info btn-sm">Details</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No pending recommendations.</p>
+    {% endif %}
+</div>
+
+<!-- Recent Validations -->
+<div class="card">
+    <h2>Recent Validations</h2>
+    {% if validations %}
+    <table>
+        <thead>
+            <tr>
+                <th>File Path</th>
+                <th>Status</th>
+                <th>Severity</th>
+                <th>Recommendations</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for validation in validations %}
+            <tr>
+                <td class="truncate">{{ validation.file_path }}</td>
+                <td><span class="badge badge-{{ validation.status }}">{{ validation.status }}</span></td>
+                <td><span class="badge badge-{{ validation.severity }}">{{ validation.severity }}</span></td>
+                <td>{{ validation.recommendations_count }}</td>
+                <td>{{ validation.created_at }}</td>
+                <td>
+                    <a href="/dashboard/validations/{{ validation.id }}" class="btn btn-primary">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div style="margin-top: 15px;">
+        <a href="/dashboard/validations" class="btn btn-primary">View All Validations</a>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No validations found</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

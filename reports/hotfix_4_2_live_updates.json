@@ -1,0 +1,76 @@
+{
+  "hotfix_version": "4.2",
+  "title": "Live Updates and Real-Time Dashboard Fixes",
+  "issues_resolved": [
+    {
+      "issue": "Live updates disconnected message during bulk approval/rejection",
+      "root_cause": "MCP server was updating wrong database table (validation_records vs validation_results)",
+      "fix": "Updated MCP server to use correct ValidationResult model and database table",
+      "files_modified": ["svc/mcp_server.py", "core/database.py"]
+    },
+    {
+      "issue": "Dashboard status not updating after single approval/rejection",
+      "root_cause": "ValidationStatus enum missing approved/rejected/enhanced status values",
+      "fix": "Extended ValidationStatus enum and fixed MCP server to use enum values",
+      "files_modified": ["core/database.py", "svc/mcp_server.py"]
+    },
+    {
+      "issue": "Database model mismatch between API and MCP server",
+      "root_cause": "MCP server importing ValidationRecord from validation_store instead of ValidationResult from database",
+      "fix": "Fixed imports and queries to use correct ValidationResult model",
+      "files_modified": ["svc/mcp_server.py"]
+    }
+  ],
+  "technical_fixes": [
+    {
+      "component": "ValidationStatus enum",
+      "change": "Added APPROVED, REJECTED, ENHANCED status values",
+      "location": "core/database.py"
+    },
+    {
+      "component": "MCP Server imports",
+      "change": "Fixed to import ValidationResult from core.database instead of ValidationRecord from validation_store",
+      "location": "svc/mcp_server.py"
+    },
+    {
+      "component": "Database queries",
+      "change": "Updated to use db_manager.list_validation_results() instead of list_validation_records()",
+      "location": "svc/mcp_server.py"
+    },
+    {
+      "component": "Status updates",
+      "change": "Fixed to use ValidationStatus enum values instead of string literals",
+      "location": "svc/mcp_server.py"
+    },
+    {
+      "component": "DateTime handling",
+      "change": "Fixed to use datetime.utcnow() for consistency",
+      "location": "svc/mcp_server.py"
+    }
+  ],
+  "verification_results": {
+    "mcp_approve": "✅ Successfully approves validations and updates status in database",
+    "mcp_reject": "✅ Successfully rejects validations and updates status in database", 
+    "api_status_updates": "✅ API returns updated status after approval/rejection",
+    "end_to_end_workflow": "✅ Full approval workflow working from API to database",
+    "websocket_infrastructure": "✅ WebSocket code exists and sends updates"
+  },
+  "working_features": [
+    "Single validation approval via /api/validations/{id}/approve",
+    "Single validation rejection via /api/validations/{id}/reject",
+    "Bulk validation approval via /api/validations/bulk/approve",
+    "Bulk validation rejection via /api/validations/bulk/reject",
+    "Database status persistence",
+    "WebSocket update notifications",
+    "Dashboard real-time updates (when WebSocket connected)"
+  ],
+  "testing_commands": [
+    "# Test single approval",
+    "curl -X POST http://127.0.0.1:8080/api/validations/{validation_id}/approve",
+    "# Test bulk approval", 
+    "curl -X POST http://127.0.0.1:8080/api/validations/bulk/approve -H 'Content-Type: application/json' -d '{\"ids\":[\"id1\",\"id2\"]}'",
+    "# Check status updates",
+    "curl http://127.0.0.1:8080/api/validations"
+  ],
+  "generated_at": "2025-10-31T14:45:00Z"
+}

@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Home - TBCV{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: 30px;">Dashboard Overview</h1>
+
+<!-- Import Section -->
+<div class="card" style="margin-bottom: 30px;">
+    <h2>Import Validations</h2>
+    <p>Import markdown files for validation and enhancement.</p>
+    
+    <form id="importForm" style="display: flex; gap: 15px; align-items: end;">
+        <div style="flex: 1;">
+            <label for="folderPath">Folder Path:</label>
+            <input type="text" id="folderPath" placeholder="/path/to/markdown/files" 
+                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        <div>
+            <label>
+                <input type="checkbox" id="recursive" checked> Recursive
+            </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Import</button>
+    </form>
+    
+    <div id="importStatus" style="margin-top: 15px; display: none;"></div>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="value">{{ stats.total_validations }}</div>
+        <div class="label">Total Validations</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.pending_recommendations }}</div>
+        <div class="label">Pending Reviews</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.accepted_recommendations }}</div>
+        <div class="label">Accepted</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.applied_recommendations }}</div>
+        <div class="label">Applied</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.rejected_recommendations }}</div>
+        <div class="label">Rejected</div>
+    </div>
+</div>
+
+<!-- Recent Workflows -->
+<div class="card">
+    <h2>Recent Workflows</h2>
+    {% if workflows %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>State</th>
+                <th>Progress</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for workflow in workflows %}
+            <tr>
+                <td><code>{{ workflow.id[:8] }}...</code></td>
+                <td>{{ workflow.type }}</td>
+                <td><span class="badge badge-{{ workflow.state }}">{{ workflow.state }}</span></td>
+                <td>{{ workflow.progress_percent }}%</td>
+                <td>{{ workflow.created_at }}</td>
+                <td>
+                    <a href="/dashboard/workflows/{{ workflow.id }}" class="btn btn-primary">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No workflows found</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="recommendations-section">
+    <h3>Pending Recommendations</h3>
+    {% if recommendations %}
+        <div class="recommendation-list">
+            {% for rec in recommendations %}
+            <div class="recommendation-item" data-recommendation-id="{{ rec.id }}">
+                <div class="rec-header">
+                    <span class="rec-type">{{ rec.type }}</span>
+                    <span class="rec-confidence">{{ "%.1f" | format(rec.confidence * 100) }}% confidence</span>
+                </div>
+                <div class="rec-title">{{ rec.title }}</div>
+                <div class="rec-description">{{ rec.description[:100] }}{% if rec.description|length > 100 %}...{% endif %}</div>
+                <div class="rec-actions">
+                    <form method="post" action="/dashboard/recommendations/{{ rec.id }}/review" style="display: inline;">
+                        <input type="hidden" name="action" value="accepted">
+                        <button type="submit" class="btn btn-success btn-sm">Accept</button>
+                    </form>
+                    <form method="post" action="/dashboard/recommendations/{{ rec.id }}/review" style="display: inline;">
+                        <input type="hidden" name="action" value="rejected">
+                        <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                    </form>
+                    <a href="/dashboard/recommendations/{{ rec.id }}" class="btn btn-info btn-sm">Details</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No pending recommendations.</p>
+    {% endif %}
+</div>
+
+<!-- Recent Validations -->
+<div class="card">
+    <h2>Recent Validations</h2>
+    {% if validations %}
+    <table>
+        <thead>
+            <tr>
+                <th>File Path</th>
+                <th>Family</th>
+                <th>Status</th>
+                <th>Severity</th>
+                <th>Recommendations</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for validation in validations %}
+            <tr>
+                <td class="truncate">{{ validation.file_path }}</td>
+                <td>{{ validation.family or 'N/A' }}</td>
+                <td><span class="badge badge-{{ validation.status }}">{{ validation.status }}</span></td>
+                <td><span class="badge badge-{{ validation.severity }}">{{ validation.severity }}</span></td>
+                <td>{{ validation.recommendations_count }}</td>
+                <td>{{ validation.created_at }}</td>
+                <td>
+                    <a href="/dashboard/validations/{{ validation.id }}" class="btn btn-primary">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div style="margin-top: 15px;">
+        <a href="/dashboard/validations" class="btn btn-primary">View All Validations</a>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No validations found</p>
+        <p style="margin-top: 10px; color: #666;">Import some markdown files above to get started.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById('importForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const folderPath = document.getElementById('folderPath').value;
+    const recursive = document.getElementById('recursive').checked;
+    const statusDiv = document.getElementById('importStatus');
+    
+    if (!folderPath) {
+        alert('Please enter a folder path');
+        return;
+    }
+    
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '<div style="color: #007bff;">Importing validations...</div>';
+    
+    try {
+        const response = await fetch('/api/validations/import', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                folder: folderPath,
+                recursive: recursive
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            statusDiv.innerHTML = `
+                <div style="color: #28a745;">
+                    <strong>Import successful!</strong><br>
+                    Files processed: ${result.files_processed}<br>
+                    Validations created: ${result.validations_created}<br>
+                    Families detected: ${Object.keys(result.families_detected).join(', ') || 'None'}
+                </div>
+            `;
+            
+            // Refresh the page after a delay to show updated data
+            setTimeout(() => window.location.reload(), 2000);
+        } else {
+            const error = await response.json();
+            statusDiv.innerHTML = `<div style="color: #dc3545;">Error: ${error.detail}</div>`;
+        }
+    } catch (e) {
+        statusDiv.innerHTML = `<div style="color: #dc3545;">Error: ${e.message}</div>`;
+    }
+});
+
+// Set default folder path for testing
+document.getElementById('folderPath').value = '/home/claude/test_md_folder';
+</script>
+
+{% endblock %}

@@ -1,0 +1,10 @@
+{
+  "plugin_link_template": {
+    "description": "Template for generating plugin product URLs",
+    "template": "https://products.aspose.com/words/net/plugins/{slug}/"
+  },
+  "plugin_info_text_template": {
+    "description": "Template for generating plugin requirement info text",
+    "template": "*This code requires the **{plugin_name}** plugin.*"
+  }
+}

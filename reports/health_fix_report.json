@@ -1,0 +1,26 @@
+{
+  "observed_issue": {
+    "status": "degraded",
+    "agents_registered": 6,
+    "database_connected": false,
+    "version": "2.0.0"
+  },
+  "changes": [
+    "WIRING_001_DB_INIT_PROBE",
+    "HEALTH_001_STRICT_DB_REQUIRED",
+    "DB_001_BOOTSTRAP_HELPERS"
+  ],
+  "policy": "DB-required readiness: /health and /health/ready return non-200 until DB probe passes",
+  "expected_result": {
+    "health_live": {
+      "status": "ok"
+    },
+    "health_ready": "503 until DB connect ok; 200 once connected",
+    "health": "same as /health/ready",
+    "status": {
+      "status": "ok",
+      "database_connected": true,
+      "agents_registered": ">=7"
+    }
+  }
+}

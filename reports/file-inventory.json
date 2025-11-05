@@ -1,0 +1,808 @@
+{
+  "generated_at": "2025-11-03T07:42:05.493899Z",
+  "root_path": "/home/claude",
+  "counts": {
+    "files": 92,
+    "dirs": 22
+  },
+  "inventory": [
+    {
+      "path": ".npmrc",
+      "kind": "data",
+      "size": 74,
+      "purpose": "Data file: .npmrc",
+      "sha256": "9019d7a7d13f309e2f07fa7ae891cb429baabc0577e4ef177f84b0e4ca45714c"
+    },
+    {
+      "path": ".wget-hsts",
+      "kind": "data",
+      "size": 215,
+      "purpose": "Data file: .wget-hsts",
+      "sha256": "b1c06aabe4ec6d24f02d048dd828fc20e10cdb1a948c972c8f5225187999869a"
+    },
+    {
+      "path": "__init__.py",
+      "kind": "code",
+      "size": 1926,
+      "purpose": "Python package initializer for claude",
+      "sha256": "2b36404a6c3f5b0b972641e703787cf443447585902052353f3fd45266287a8e"
+    },
+    {
+      "path": "__main__.py",
+      "kind": "code",
+      "size": 1238,
+      "purpose": "Python module entry point",
+      "sha256": "99d3fb8ace5cf26f51efa8097a0baf7bf5d2b6805749c5d047ac227ee933c6fd"
+    },
+    {
+      "path": "agents",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Agent implementation modules",
+      "sha256": null
+    },
+    {
+      "path": "agents/__init__.py",
+      "kind": "code",
+      "size": 1950,
+      "purpose": "Python package initializer for agents",
+      "sha256": "3417879793da36cdac1292dbf1daedfc86b54758d5bf64b3de3770f7fd50db75"
+    },
+    {
+      "path": "agents/base.py",
+      "kind": "code",
+      "size": 17922,
+      "purpose": "Python module: base",
+      "sha256": "8c4df9757e65d1ba34cb18617cb904d9b70ad9ca4503bc85c4cba8770aa023da"
+    },
+    {
+      "path": "agents/code_analyzer.py",
+      "kind": "code",
+      "size": 46918,
+      "purpose": "Python module: code_analyzer",
+      "sha256": "d1cc6eaef362566e1e8abd8cb7f0db8bc7d70146c86e1dfdf2386bda0a7de379"
+    },
+    {
+      "path": "agents/content_enhancer.py",
+      "kind": "code",
+      "size": 19124,
+      "purpose": "Python module: content_enhancer",
+      "sha256": "9d2d875cd1a526a912bdc69ab7f4c87c5aba9cd8d77334d698931f936aacdcf5"
+    },
+    {
+      "path": "agents/content_validator.py",
+      "kind": "code",
+      "size": 23749,
+      "purpose": "Python module: content_validator",
+      "sha256": "89defdb773dbcaf494e10330b7184e9eafb38c6bf0e9f00ef4d8c918ae25c818"
+    },
+    {
+      "path": "agents/fuzzy_detector.py",
+      "kind": "code",
+      "size": 7853,
+      "purpose": "Python module: fuzzy_detector",
+      "sha256": "5b15619022ddf5d20576c991d0261e1e70e05c4980e5d336f7cd62194d36684f"
+    },
+    {
+      "path": "agents/orchestrator.py",
+      "kind": "code",
+      "size": 14846,
+      "purpose": "Python module: orchestrator",
+      "sha256": "19711f338aba842af3de539036cb8fb1dfd4aa2260dbe62be8ed859f035f7694"
+    },
+    {
+      "path": "agents/truth_manager.py",
+      "kind": "code",
+      "size": 28133,
+      "purpose": "Python module: truth_manager",
+      "sha256": "d194f387f6aa106d64b437c5823ad684c87d29def2b86d2aee6a93c5553620d4"
+    },
+    {
+      "path": "api",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "API-related modules",
+      "sha256": null
+    },
+    {
+      "path": "api/dashboard.py",
+      "kind": "code",
+      "size": 12973,
+      "purpose": "Python module: dashboard",
+      "sha256": "a9754be9a1e06ff8784250bc2ee8902f09e55bb7e8a0105f1a51a7664de5b77f"
+    },
+    {
+      "path": "api/export_endpoints.py",
+      "kind": "code",
+      "size": 14350,
+      "purpose": "Python module: export_endpoints",
+      "sha256": "1f9b7f116bcc9f1be34140e72b63ad1ef6c880d9c3c141138eeb6f51dca547ac"
+    },
+    {
+      "path": "api/server.py",
+      "kind": "code",
+      "size": 35753,
+      "purpose": "Python module: server",
+      "sha256": "86adb779eb3601ec18addfaa0cd678906e350189921a6be5b0ea74e60e55a2e6"
+    },
+    {
+      "path": "api/server_extensions.py",
+      "kind": "code",
+      "size": 6944,
+      "purpose": "Python module: server_extensions",
+      "sha256": "691903399e7c16c3aa3eb0bf350baf7338707c5b90750278185d547b848b126b"
+    },
+    {
+      "path": "api/websocket_endpoints.py",
+      "kind": "code",
+      "size": 8001,
+      "purpose": "Python module: websocket_endpoints",
+      "sha256": "b1001a226288096f613bff503d53384a49a162c4f224e1e191715a53f9f7b789"
+    },
+    {
+      "path": "artifacts",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "File: artifacts",
+      "sha256": null
+    },
+    {
+      "path": "artifacts/import_map.json",
+      "kind": "config",
+      "size": 227,
+      "purpose": "Configuration: import_map.json",
+      "sha256": "1e947f66503163036a4a7735dadf83adaf1110c91c68d5cb610d388f3c957fd5"
+    },
+    {
+      "path": "cli",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Command-line interface modules",
+      "sha256": null
+    },
+    {
+      "path": "cli/main.py",
+      "kind": "code",
+      "size": 29931,
+      "purpose": "Main application entry point",
+      "sha256": "ef90e6d0c9a39b50432f00b7944cad1fd44408350aa44c94fd7be1b9087f9b7f"
+    },
+    {
+      "path": "config",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Configuration files",
+      "sha256": null
+    },
+    {
+      "path": "config/main.yaml",
+      "kind": "config",
+      "size": 4046,
+      "purpose": "Configuration: main.yaml",
+      "sha256": "23d3b07474da7383ca312c3efaabe1fe0ec7fc707ce625be7feb7daa2f611644"
+    },
+    {
+      "path": "core",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Core application logic",
+      "sha256": null
+    },
+    {
+      "path": "core/__init__.py",
+      "kind": "code",
+      "size": 634,
+      "purpose": "Python package initializer for core",
+      "sha256": "6a86c97c8582c9e2bfda4d01a5de8aeb4ec2adb4aacce14139f0b030fea8af3e"
+    },
+    {
+      "path": "core/__main__.py",
+      "kind": "code",
+      "size": 161,
+      "purpose": "Python module entry point",
+      "sha256": "1c5835e148aa8ec27602d491fd18b3d904e495a4e80b25db93387365cec83247"
+    },
+    {
+      "path": "core/cache.py",
+      "kind": "code",
+      "size": 17462,
+      "purpose": "Python module: cache",
+      "sha256": "3e7c4e6ba747e959d59a2ea85bcd192e5bc1d89a896540f8e6af0ec4a9dd9f48"
+    },
+    {
+      "path": "core/config.py",
+      "kind": "code",
+      "size": 11162,
+      "purpose": "Python module: config",
+      "sha256": "8c8afb87299d4d06a7755ede9edfc6b4568825082d3bef05bca4fc76de7729dc"
+    },
+    {
+      "path": "core/database.py",
+      "kind": "code",
+      "size": 30935,
+      "purpose": "Python module: database",
+      "sha256": "efcd308214233cb120cb2df101f18f20fd40c4fc8eae520b228c678194fee12b"
+    },
+    {
+      "path": "core/logging.py",
+      "kind": "code",
+      "size": 15649,
+      "purpose": "Python module: logging",
+      "sha256": "607aa43b16b174950cf75d95adf841d402afac169b216b3eecf154b76eca5e43"
+    },
+    {
+      "path": "core/ollama.py",
+      "kind": "code",
+      "size": 15974,
+      "purpose": "Python module: ollama",
+      "sha256": "af3300f7ce184d6888935cb3df94f8930803d75330d6255c8b21c975a94dc208"
+    },
+    {
+      "path": "core/ollama_validator.py",
+      "kind": "code",
+      "size": 8187,
+      "purpose": "Python module: ollama_validator",
+      "sha256": "9437aa0b10d8924d84e68aa1419604fe76c362302719da712a8f563d2fa839c3"
+    },
+    {
+      "path": "core/prompt_loader.py",
+      "kind": "code",
+      "size": 9059,
+      "purpose": "Python module: prompt_loader",
+      "sha256": "9851ea8a9d335b9d16cf4561ca412b2ccd43e182e473e8eab4e3fdb14400b8fc"
+    },
+    {
+      "path": "core/rule_manager.py",
+      "kind": "code",
+      "size": 5854,
+      "purpose": "Python module: rule_manager",
+      "sha256": "b85ee7f5bec9ea24a5680d098e9d9c46b2d1c9dc8cd3796571ae0bb0eef73076"
+    },
+    {
+      "path": "core/utilities.py",
+      "kind": "code",
+      "size": 2479,
+      "purpose": "Python module: utilities",
+      "sha256": "27fee5d16e1a5029f2b93db289f9d2bcbaa6fc1ff43820761d8d6b1b1fe6c6bb"
+    },
+    {
+      "path": "core/validation_store.py",
+      "kind": "code",
+      "size": 5728,
+      "purpose": "Python module: validation_store",
+      "sha256": "dd08830ad4ded7fd3baad7ff4f280ca9b9693540a744efc057c23825a9bc3780"
+    },
+    {
+      "path": "data",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Data storage and files",
+      "sha256": null
+    },
+    {
+      "path": "data/cache",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "File: cache",
+      "sha256": null
+    },
+    {
+      "path": "data/logs",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "File: logs",
+      "sha256": null
+    },
+    {
+      "path": "data/logs/tbcv.log",
+      "kind": "data",
+      "size": 540315,
+      "purpose": "Data file: tbcv.log",
+      "sha256": "df697818b36c15777dc5143c1648b3b83d83b20c1fde0024b885e61ec8e708ed"
+    },
+    {
+      "path": "data/reports",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Generated reports and output",
+      "sha256": null
+    },
+    {
+      "path": "data/reports/endpoint_probe_20251028_151325.json",
+      "kind": "config",
+      "size": 20973,
+      "purpose": "Configuration: endpoint_probe_20251028_151325.json",
+      "sha256": "2ca74dfb71c2a236c3a15723e0b9a33c6990f29d25fbfb3a7b0d1d97c1883658"
+    },
+    {
+      "path": "data/reports/endpoint_probe_20251028_151325.md",
+      "kind": "docs",
+      "size": 9322,
+      "purpose": "Documentation: endpoint_probe_20251028_151325",
+      "sha256": "043ca88b13eef382904721b172d3e4aa3a6e9889bf94ddcf5408e743dba9f62f"
+    },
+    {
+      "path": "data/reports/endpoint_probe_20251028_151436.json",
+      "kind": "config",
+      "size": 19470,
+      "purpose": "Configuration: endpoint_probe_20251028_151436.json",
+      "sha256": "1efffc7f5454e3f02a142a6e10ee2779eb3c0d2e21217298b4624ce33694b4b1"
+    },
+    {
+      "path": "data/reports/endpoint_probe_20251028_151436.md",
+      "kind": "docs",
+      "size": 7394,
+      "purpose": "Documentation: endpoint_probe_20251028_151436",
+      "sha256": "389c7f060e7cdbe330c0a78d2bafcf20e0845f77b081a684599c44a68519b1d0"
+    },
+    {
+      "path": "data/tbcv.db",
+      "kind": "data",
+      "size": 266240,
+      "purpose": "Database file",
+      "sha256": "1696855c32f6bf8d566587f95fc92d8b85569857bf56256a9443f7d7f5d3f2be"
+    },
+    {
+      "path": "data/temp",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "File: temp",
+      "sha256": null
+    },
+    {
+      "path": "init.py",
+      "kind": "code",
+      "size": 1617,
+      "purpose": "Python module: init",
+      "sha256": "82637e4f05367b94dfa91d31d724cb240bda428b574351dc971bccedd5d17f56"
+    },
+    {
+      "path": "main.py",
+      "kind": "code",
+      "size": 8512,
+      "purpose": "Main application entry point",
+      "sha256": "95b542ebdcadfbbb6f7a81be9c6e0c8393ebfbf3fb97fd98334ddce04d2d6841"
+    },
+    {
+      "path": "patches",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "File: patches",
+      "sha256": null
+    },
+    {
+      "path": "prompts",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Prompt templates and configurations",
+      "sha256": null
+    },
+    {
+      "path": "prompts/code_analysis.json",
+      "kind": "config",
+      "size": 1249,
+      "purpose": "Configuration: code_analysis.json",
+      "sha256": "c69c08937249dab9c6ade12376c8419ddaa6aa796925d4ff9eea034349a1c999"
+    },
+    {
+      "path": "prompts/enhancer.json",
+      "kind": "config",
+      "size": 356,
+      "purpose": "Configuration: enhancer.json",
+      "sha256": "7741fc729013e1bb838144ce19463595785c839cbfff567689a901cd68e13d1f"
+    },
+    {
+      "path": "prompts/validator.json",
+      "kind": "config",
+      "size": 1427,
+      "purpose": "Configuration: validator.json",
+      "sha256": "46ef3100f7e8ec3b94f07590090ad58a0f53fd8cdacc0b04b67880169585fc7b"
+    },
+    {
+      "path": "pyproject.toml",
+      "kind": "config",
+      "size": 2677,
+      "purpose": "Python project configuration",
+      "sha256": "619a7fafe6ac2928df8da72a34fe30f1095f287d1f8277c8983947cca09c6a37"
+    },
+    {
+      "path": "pytest.ini",
+      "kind": "config",
+      "size": 317,
+      "purpose": "Pytest configuration",
+      "sha256": "a8c16cb5c5d0ca801e80c50d3291a905d776254c256db866b9d4c020d91c8c44"
+    },
+    {
+      "path": "reports",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Generated reports and output",
+      "sha256": null
+    },
+    {
+      "path": "reports/endpoint_mismatches.json",
+      "kind": "config",
+      "size": 310,
+      "purpose": "Configuration: endpoint_mismatches.json",
+      "sha256": "3cf81f10ee0e52e59ab8f7e8001e4a7aa5f3768a3a55f1ee38b1d1d53834c4b6"
+    },
+    {
+      "path": "reports/endpoints_offline.json",
+      "kind": "config",
+      "size": 6107,
+      "purpose": "Configuration: endpoints_offline.json",
+      "sha256": "2c677011aaf91be30952ed686e22a156cd5a5487fb20b46a07ca36634690f15a"
+    },
+    {
+      "path": "reports/health_fix_report.json",
+      "kind": "config",
+      "size": 654,
+      "purpose": "Configuration: health_fix_report.json",
+      "sha256": "c2995258513a636a3f3e5a990869eb27cb404d44cda1b8febb05a2c222680de6"
+    },
+    {
+      "path": "reports/inventory.json",
+      "kind": "config",
+      "size": 8151,
+      "purpose": "Configuration: inventory.json",
+      "sha256": "bb548d439c8b538664bce9d6a1bcdcb316c559c895e19b6fe933dca54d53d32a"
+    },
+    {
+      "path": "reports/patch_apply.json",
+      "kind": "config",
+      "size": 457,
+      "purpose": "Configuration: patch_apply.json",
+      "sha256": "75a3d5ca41596594f16adbcf0a26a445a4031a56df1ae0d7743c93a3cf32e27e"
+    },
+    {
+      "path": "reports/status_update.json",
+      "kind": "config",
+      "size": 440,
+      "purpose": "Configuration: status_update.json",
+      "sha256": "0c3b199017dac06634dc4928023baa89778a1cb2bf87a5acf0c6ca6fafff68ff"
+    },
+    {
+      "path": "reports/validation_run.json",
+      "kind": "config",
+      "size": 443,
+      "purpose": "Configuration: validation_run.json",
+      "sha256": "056ccac174dbc010d363ddebd7d9b4150de26babb8658ab249d38adfa9e505d2"
+    },
+    {
+      "path": "requirements.md",
+      "kind": "docs",
+      "size": 11479,
+      "purpose": "Documentation: requirements",
+      "sha256": "826260c72c5160f0b8928f7058251820b0151d26bd91ae2dc32e884be8ef3882"
+    },
+    {
+      "path": "requirements.txt",
+      "kind": "docs",
+      "size": 1587,
+      "purpose": "Python dependencies specification",
+      "sha256": "027179983adb4893617155bc8b6510aaa7f176677be60d84e456567aa3b72075"
+    },
+    {
+      "path": "requirements_mapping.md",
+      "kind": "docs",
+      "size": 14785,
+      "purpose": "Documentation: requirements_mapping",
+      "sha256": "eab9d1973d470557d7946febe535efbbd78aa42c6d0bd2ea41567c5e2fea63e3"
+    },
+    {
+      "path": "rules",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "File: rules",
+      "sha256": null
+    },
+    {
+      "path": "rules/__init__.py",
+      "kind": "code",
+      "size": 114,
+      "purpose": "Python package initializer for rules",
+      "sha256": "72b969dc7913d51c83cb8f0434c5b0a76f7aec6d489fc1c1a6d8e06fc527db44"
+    },
+    {
+      "path": "rules/words.json",
+      "kind": "config",
+      "size": 4156,
+      "purpose": "Configuration: words.json",
+      "sha256": "2805ca871a1763b78c0aa6e673cc5099244c6eea267257c12b3f7aaecdae2529"
+    },
+    {
+      "path": "stage1_inventory.py",
+      "kind": "code",
+      "size": 7579,
+      "purpose": "Python module: stage1_inventory",
+      "sha256": "433a550f49e4a8c6d91abf1ad1313baf37d31f4b25dccc8eab3a202a9454fcb1"
+    },
+    {
+      "path": "system.md",
+      "kind": "docs",
+      "size": 30223,
+      "purpose": "System architecture documentation",
+      "sha256": "7499b11e703148f98490aa1eb26333f0c0bc5ad43c28b04d915c05ca0cb55825"
+    },
+    {
+      "path": "tbcv.db",
+      "kind": "data",
+      "size": 266240,
+      "purpose": "Database file",
+      "sha256": "ae7cce4126b0cfc3502ac7078f6d02fe1d11784eba31e9b0e74b33a323a6a507"
+    },
+    {
+      "path": "tbcv.egg-info",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "File: tbcv.egg-info",
+      "sha256": null
+    },
+    {
+      "path": "tbcv.egg-info/PKG-INFO",
+      "kind": "data",
+      "size": 965,
+      "purpose": "Data file: pkg-info",
+      "sha256": "110394c6dce5b561ffb34bb9eefcc8ae047b8ed6926fa56bfdb251259ced0796"
+    },
+    {
+      "path": "tbcv.egg-info/SOURCES.txt",
+      "kind": "docs",
+      "size": 479,
+      "purpose": "Documentation: sources.txt",
+      "sha256": "d7f3c56f09dc78fac9bdcc17c1244c0c594bf96751e38b90720cc41ab9217598"
+    },
+    {
+      "path": "tbcv.egg-info/dependency_links.txt",
+      "kind": "docs",
+      "size": 1,
+      "purpose": "Documentation: dependency_links.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "tbcv.egg-info/entry_points.txt",
+      "kind": "docs",
+      "size": 44,
+      "purpose": "Documentation: entry_points.txt",
+      "sha256": "9355fcc3c7db5bb796cbb83b12cabbdefde0e174200da1e533e3e7a17be97fe1"
+    },
+    {
+      "path": "tbcv.egg-info/requires.txt",
+      "kind": "docs",
+      "size": 353,
+      "purpose": "Documentation: requires.txt",
+      "sha256": "f3004d9ed63f61056728acd1e6c60313748c9d6627313ec34e36af591e5e581f"
+    },
+    {
+      "path": "tbcv.egg-info/top_level.txt",
+      "kind": "docs",
+      "size": 1,
+      "purpose": "Documentation: top_level.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "templates",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Template files",
+      "sha256": null
+    },
+    {
+      "path": "templates/audit_logs.html",
+      "kind": "assets",
+      "size": 874,
+      "purpose": "File: audit_logs.html",
+      "sha256": null
+    },
+    {
+      "path": "templates/base.html",
+      "kind": "assets",
+      "size": 8826,
+      "purpose": "File: base.html",
+      "sha256": null
+    },
+    {
+      "path": "templates/dashboard_home.html",
+      "kind": "assets",
+      "size": 5230,
+      "purpose": "File: dashboard_home.html",
+      "sha256": null
+    },
+    {
+      "path": "templates/recommendation_detail.html",
+      "kind": "assets",
+      "size": 6234,
+      "purpose": "File: recommendation_detail.html",
+      "sha256": null
+    },
+    {
+      "path": "templates/recommendations_list.html",
+      "kind": "assets",
+      "size": 3556,
+      "purpose": "File: recommendations_list.html",
+      "sha256": null
+    },
+    {
+      "path": "templates/validation_detail.html",
+      "kind": "assets",
+      "size": 3030,
+      "purpose": "File: validation_detail.html",
+      "sha256": null
+    },
+    {
+      "path": "templates/validations_list.html",
+      "kind": "assets",
+      "size": 3355,
+      "purpose": "File: validations_list.html",
+      "sha256": null
+    },
+    {
+      "path": "templates/workflow_detail.html",
+      "kind": "assets",
+      "size": 1321,
+      "purpose": "File: workflow_detail.html",
+      "sha256": null
+    },
+    {
+      "path": "templates/workflows_list.html",
+      "kind": "assets",
+      "size": 1052,
+      "purpose": "File: workflows_list.html",
+      "sha256": null
+    },
+    {
+      "path": "tests",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Test files and fixtures",
+      "sha256": null
+    },
+    {
+      "path": "tests/conftest.py",
+      "kind": "code",
+      "size": 2086,
+      "purpose": "Python module: conftest",
+      "sha256": "f646f57521d399bd9ec8a88b3719d8c24eb60c017020b3cffe60874263c53fa3"
+    },
+    {
+      "path": "tests/fixtures",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "File: fixtures",
+      "sha256": null
+    },
+    {
+      "path": "tests/fixtures/multi_plugin_content.md",
+      "kind": "docs",
+      "size": 1754,
+      "purpose": "Documentation: multi_plugin_content",
+      "sha256": "dca591a4b48abd6102daf6e649f45b611f8db2611daa980ab1127ef3ab08b2cc"
+    },
+    {
+      "path": "tests/fixtures/truths_and_rules_test.md",
+      "kind": "docs",
+      "size": 2335,
+      "purpose": "Documentation: truths_and_rules_test",
+      "sha256": "8c959a157fd71ae3de3e6600b603da0a0c0de83232e6b1b8da5245af6b884055"
+    },
+    {
+      "path": "tests/fixtures/yaml_only_content.md",
+      "kind": "docs",
+      "size": 373,
+      "purpose": "Documentation: yaml_only_content",
+      "sha256": "dbab3ecb505285bf5263dfef78885e544be099c6e3545f0eaf2e24debea1df6f"
+    },
+    {
+      "path": "tests/startup",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "File: startup",
+      "sha256": null
+    },
+    {
+      "path": "tests/startup/test_rule_manager_imports.py",
+      "kind": "code",
+      "size": 1502,
+      "purpose": "Python module: test_rule_manager_imports",
+      "sha256": "ced395227851e49d522f610ce97b116a52ad7c78c70ed4d7d47fc1a7e0e49c39"
+    },
+    {
+      "path": "tests/test_endpoints_live.py",
+      "kind": "code",
+      "size": 4098,
+      "purpose": "Python module: test_endpoints_live",
+      "sha256": "920e95c6a34565039650766d7778383ea5eca23abf4fdb8b1b78d7c84c5e5256"
+    },
+    {
+      "path": "tests/test_endpoints_offline.py",
+      "kind": "code",
+      "size": 4521,
+      "purpose": "Python module: test_endpoints_offline",
+      "sha256": "974dc7b3028cdd6395a9aa36dccad10d76420df63982576d6f55584300807385"
+    },
+    {
+      "path": "tests/test_enhancer_consumes_validation.py",
+      "kind": "code",
+      "size": 785,
+      "purpose": "Python module: test_enhancer_consumes_validation",
+      "sha256": "0ef4d8612250257d7a9b10cd51c57d287b7d42a541fdfaaf165cc1084b2ca293"
+    },
+    {
+      "path": "tests/test_framework.py",
+      "kind": "code",
+      "size": 6164,
+      "purpose": "Python module: test_framework",
+      "sha256": "8940e11c24bfa797afccc68eae3c3588f3d34456919dc9bc4c0c45104cb8f3e4"
+    },
+    {
+      "path": "tests/test_generic_validator.py",
+      "kind": "code",
+      "size": 7275,
+      "purpose": "Python module: test_generic_validator",
+      "sha256": "0c3c20b5f736735d6ca5c665f9b82b7e99104b5cf07f7f84fdda195ad84cf219"
+    },
+    {
+      "path": "tests/test_idempotence_and_schemas.py",
+      "kind": "code",
+      "size": 12109,
+      "purpose": "Python module: test_idempotence_and_schemas",
+      "sha256": "09e704b1ca7d0f47a6977d118a744f568cd581e86c9843178d50e1ea8a045a32"
+    },
+    {
+      "path": "tests/test_performance.py",
+      "kind": "code",
+      "size": 14936,
+      "purpose": "Python module: test_performance",
+      "sha256": "bef8c821cddd9bbb531bc3ae86d10a87c44f358f16434853700ba09934bd668e"
+    },
+    {
+      "path": "tests/test_smoke_agents.py",
+      "kind": "code",
+      "size": 6778,
+      "purpose": "Python module: test_smoke_agents",
+      "sha256": "00e630aa893c9139eb53ebe0cdc02124b1d027d7403fd6e6b5d52e8ab89c7a44"
+    },
+    {
+      "path": "tests/test_truths_and_rules.py",
+      "kind": "code",
+      "size": 6905,
+      "purpose": "Python module: test_truths_and_rules",
+      "sha256": "42e273f5e8c40de72c88b703ff093b3e7b1cfffd4e878e3ee9c81b44f827ca8d"
+    },
+    {
+      "path": "tests/test_validation_persistence.py",
+      "kind": "code",
+      "size": 1466,
+      "purpose": "Python module: test_validation_persistence",
+      "sha256": "829814fcc72acdd06d939f95929f99264a937e7d634e81ed107796521faf7b15"
+    },
+    {
+      "path": "tools",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "Utility and helper tools",
+      "sha256": null
+    },
+    {
+      "path": "tools/endpoint_check.py",
+      "kind": "code",
+      "size": 5435,
+      "purpose": "Python module: endpoint_check",
+      "sha256": "7095a0db19a85c95272deef3fe9b18b05aa550ef9aa0389eab0ec066de906a00"
+    },
+    {
+      "path": "truth",
+      "kind": "directory",
+      "size": 4096,
+      "purpose": "File: truth",
+      "sha256": null
+    },
+    {
+      "path": "truth/words.json",
+      "kind": "config",
+      "size": 9760,
+      "purpose": "Configuration: words.json",
+      "sha256": "7eb0904d5134179a0b41b390d5fb18ea18c6e158abf641d41865364ec10c4369"
+    }
+  ]
+}

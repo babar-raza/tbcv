@@ -1,0 +1,11 @@
+{
+  "mode": "offline",
+  "timestamp": "2025-11-01T03:35:26.541912",
+  "checks": {
+    "import_failed": {
+      "status": "fail",
+      "error": "No module named 'fastapi'"
+    }
+  },
+  "overall_status": "fail"
+}

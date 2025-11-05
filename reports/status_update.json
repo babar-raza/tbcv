@@ -1,0 +1,17 @@
+{
+  "overall": "YELLOW",
+  "db_required_health": "enforced",
+  "agents_expected": 7,
+  "deliverables": [
+    "reports/inventory.json",
+    "tools/endpoint_check.py",
+    "reports/endpoints_offline.json",
+    "reports/endpoint_mismatches.json",
+    "reports/health_fix_report.json",
+    "reports/validation_run.json",
+    "patches/*.pat.json",
+    "tools/apply_patches.py",
+    "RUN_WINDOWS.md",
+    "fixed_project.zip (created below)"
+  ]
+}

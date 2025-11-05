@@ -1,0 +1,324 @@
+{
+  "generated_at": "2025-10-17",
+  "product": "Aspose.Words Plugins (.NET)",
+  "core_rules": [
+    "There are three paid action types: Load, Save, and Document Processing. DOM manipulation and creating a document from scratch are free.",
+    "Feature plugins NEVER work alone. At least one File Processor plugin (that supports the page’s formats) is required to load/save.",
+    "Current model requires the Converter feature plugin for cross-format saves (e.g., DOCX→PDF) in addition to the source and target Processor plugins.",
+    "From-scratch → PDF: needs only PDF Processor (because there is no Load).",
+    "Load DOCX → Save PDF: requires Word Processor + PDF Processor + Converter.",
+    ".NET Framework-only limitations: Document Printer works only on .NET Framework; PDF loading requires .NET Framework 4.6.1+ or supported platforms as noted.",
+    "Format families: 'Word 2003 XML' and 'Word 2007 XML' are covered by Word Processor, not XML File Processor (despite .xml extension).",
+    "SVG editing is NOT supported by Aspose.Words; only saving a document to SVG is supported via SVG File Processor.",
+    "Image File Processor does not 'create images' standalone; it saves a document to raster/vector image formats."
+  ],
+  "plugins": [
+    {
+      "name": "Document Printer",
+      "type": "feature",
+      "works_alone": false,
+      "requires": "At least one matching File Processor for the input format; .NET Framework only",
+      "load_formats": [],
+      "save_formats": [],
+      "notes": [
+        "Programmatic printing of supported documents.",
+        "Requires Word Processor for DOC/DOCX/RTF, ODT Processor for ODT, etc.",
+        "Available only in .NET Framework version of Aspose.Words."
+      ]
+    },
+    {
+      "name": "Document Comparer",
+      "type": "feature",
+      "works_alone": false,
+      "requires": "At least one matching File Processor for load/save of compared docs",
+      "load_formats": [],
+      "save_formats": [],
+      "notes": [
+        "Compares two documents and produces revisions in the primary document."
+      ]
+    },
+    {
+      "name": "Document Converter",
+      "type": "feature",
+      "works_alone": false,
+      "requires": "Source and target File Processor plugins for involved formats",
+      "load_formats": [],
+      "save_formats": [],
+      "notes": [
+        "Enables cross-format saving using other processor plugins.",
+        "Cannot function alone. For DOCX→PDF you need: Word Processor + PDF Processor + Converter."
+      ]
+    },
+    {
+      "name": "Document Watermark",
+      "type": "feature",
+      "works_alone": false,
+      "requires": "At least one matching File Processor for load/save",
+      "load_formats": [],
+      "save_formats": [],
+      "notes": [
+        "Add/remove watermarks.",
+        "Not all formats support watermarks."
+      ]
+    },
+    {
+      "name": "LINQ Reporting Engine",
+      "type": "feature",
+      "works_alone": false,
+      "requires": "At least one matching File Processor for load/save",
+      "load_formats": [],
+      "save_formats": [],
+      "notes": [
+        "Template-based reporting with LINQ."
+      ]
+    },
+    {
+      "name": "Mail Merge",
+      "type": "feature",
+      "works_alone": false,
+      "requires": "At least one matching File Processor for load/save",
+      "load_formats": [],
+      "save_formats": [],
+      "notes": [
+        "Classic Mail Merge."
+      ]
+    },
+    {
+      "name": "Document Merger",
+      "type": "feature",
+      "works_alone": false,
+      "requires": "At least one matching File Processor for load/save",
+      "load_formats": [],
+      "save_formats": [],
+      "notes": [
+        "Merge multiple documents into a single output."
+      ]
+    },
+    {
+      "name": "Document Splitter",
+      "type": "feature",
+      "works_alone": false,
+      "requires": "At least one matching File Processor for load/save",
+      "load_formats": [],
+      "save_formats": [],
+      "notes": [
+        "Split multi‑page documents."
+      ]
+    },
+    {
+      "name": "Word Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for listed formats; pair with other processors + Converter for cross-format saving",
+      "load_formats": [
+        "DOC",
+        "DOCX",
+        "RTF",
+        "DOT",
+        "DOTX",
+        "DOTM",
+        "DOCM",
+        "FlatOPC",
+        "FlatOpcMacroEnabled",
+        "FlatOpcTemplate",
+        "FlatOpcTemplateMacroEnabled",
+        "WordML"
+      ],
+      "save_formats": [
+        "DOC",
+        "DOCX",
+        "RTF",
+        "DOT",
+        "DOTX",
+        "DOTM",
+        "DOCM",
+        "FlatOPC",
+        "FlatOpcMacroEnabled",
+        "FlatOpcTemplate",
+        "FlatOpcTemplateMacroEnabled",
+        "WordML"
+      ],
+      "notes": [
+        "Covers MS Word family including Word 2003/2007 XML (WordML)."
+      ]
+    },
+    {
+      "name": "ODT File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for ODT/OTT; pair with other processors + Converter for cross-format saving",
+      "load_formats": [
+        "ODT",
+        "OTT"
+      ],
+      "save_formats": [
+        "ODT",
+        "OTT"
+      ],
+      "notes": [
+        "ODT→DOCX/PDF requires additional plugins (Word/PDF Processor + Converter)."
+      ]
+    },
+    {
+      "name": "eBook File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for EPUB/MOBI/AZW3; pair with others + Converter for cross-format saving",
+      "load_formats": [
+        "EPUB",
+        "MOBI",
+        "AZW3"
+      ],
+      "save_formats": [
+        "EPUB",
+        "MOBI",
+        "AZW3"
+      ],
+      "notes": []
+    },
+    {
+      "name": "CHM File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for load; pair with others + Converter for cross-format saving",
+      "load_formats": [
+        "CHM"
+      ],
+      "save_formats": [],
+      "notes": []
+    },
+    {
+      "name": "Markdown File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for MD; pair with others + Converter for cross-format saving",
+      "load_formats": [
+        "MD"
+      ],
+      "save_formats": [
+        "MD"
+      ],
+      "notes": []
+    },
+    {
+      "name": "Text File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for TXT; pair with others + Converter for cross-format saving",
+      "load_formats": [
+        "TXT"
+      ],
+      "save_formats": [
+        "TXT"
+      ],
+      "notes": []
+    },
+    {
+      "name": "PDF Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "Loading PDF supported in .NET 4.6.1+ and supported platforms; pair with others + Converter for cross-format saving",
+      "load_formats": [
+        "PDF"
+      ],
+      "save_formats": [
+        "PDF"
+      ],
+      "notes": [
+        "Required for Word→PDF conversion together with Word Processor + Converter."
+      ]
+    },
+    {
+      "name": "PostScript File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for saving; pair with source processor + Converter for cross-format saving",
+      "load_formats": [],
+      "save_formats": [
+        "PS",
+        "PCL"
+      ],
+      "notes": []
+    },
+    {
+      "name": "SVG File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for saving; pair with source processor + Converter for cross-format saving",
+      "load_formats": [],
+      "save_formats": [
+        "SVG"
+      ],
+      "notes": [
+        "Editing SVG is NOT supported; only saving documents to SVG."
+      ]
+    },
+    {
+      "name": "Web File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for HTML/MHTML; pair with others + Converter for cross-format saving",
+      "load_formats": [
+        "HTML",
+        "MHTML"
+      ],
+      "save_formats": [
+        "HTML",
+        "MHTML",
+        "Fixed Page HTML"
+      ],
+      "notes": []
+    },
+    {
+      "name": "XLSX File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for saving; pair with source processor + Converter for cross-format saving",
+      "load_formats": [],
+      "save_formats": [
+        "XLSX"
+      ],
+      "notes": []
+    },
+    {
+      "name": "XML File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for loading; pair with others + Converter for cross-format saving",
+      "load_formats": [
+        "XML"
+      ],
+      "save_formats": [
+        "XPS",
+        "XamlFixed",
+        "OpenXps",
+        "XamlFlow",
+        "XamlFlowPack"
+      ],
+      "notes": [
+        "MS Word 2003/2007 XML (WordML) handled by Word Processor, not this plugin."
+      ]
+    },
+    {
+      "name": "Image File Processor",
+      "type": "processor",
+      "works_alone": true,
+      "requires": "None for saving; pair with source processor + Converter for cross-format saving",
+      "load_formats": [],
+      "save_formats": [
+        "TIFF",
+        "PNG",
+        "BMP",
+        "JPEG",
+        "GIF",
+        "EPS",
+        "WebP",
+        "EMF"
+      ],
+      "notes": [
+        "Does not 'create images' standalone; saves documents to images.",
+        "WebP via SkiaSharp (not available on .NET Framework ≤ 4.0)."
+      ]
+    }
+  ]
+}

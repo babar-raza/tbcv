@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}Validations - TBCV{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: 30px;">Validations</h1>
+
+<div class="filter-bar">
+    <form method="GET" style="display: flex; gap: 15px; align-items: center;">
+        <label for="status">Status:</label>
+        <select name="status" id="status" onchange="this.form.submit()">
+            <option value="">All</option>
+            <option value="pass" {% if status_filter == 'pass' %}selected{% endif %}>Pass</option>
+            <option value="fail" {% if status_filter == 'fail' %}selected{% endif %}>Fail</option>
+            <option value="warning" {% if status_filter == 'warning' %}selected{% endif %}>Warning</option>
+            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+            <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+            <option value="enhanced" {% if status_filter == 'enhanced' %}selected{% endif %}>Enhanced</option>
+        </select>
+        
+        <label for="severity">Severity:</label>
+        <select name="severity" id="severity" onchange="this.form.submit()">
+            <option value="">All</option>
+            <option value="info" {% if severity_filter == 'info' %}selected{% endif %}>Info</option>
+            <option value="warning" {% if severity_filter == 'warning' %}selected{% endif %}>Warning</option>
+            <option value="error" {% if severity_filter == 'error' %}selected{% endif %}>Error</option>
+        </select>
+        
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+</div>
+
+<!-- Bulk Actions Bar -->
+<div class="bulk-actions" style="margin-bottom: 20px; display: none;" id="bulkActions">
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <span id="selectedCount">0 selected</span>
+        <button onclick="bulkApprove()" class="btn btn-success">Approve Selected</button>
+        <button onclick="bulkReject()" class="btn btn-danger">Reject Selected</button>
+        <button onclick="bulkEnhance()" class="btn btn-info">Enhance Selected</button>
+        <button onclick="clearSelection()" class="btn btn-secondary">Clear Selection</button>
+    </div>
+</div>
+
+<div class="card">
+    {% if validations %}
+    <table>
+        <thead>
+            <tr>
+                <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                <th>File Path</th>
+                <th>Family</th>
+                <th>Status</th>
+                <th>Severity</th>
+                <th>Recommendations</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for validation in validations %}
+            <tr>
+                <td><input type="checkbox" class="validation-checkbox" value="{{ validation.id }}" onchange="updateBulkActions()"></td>
+                <td class="truncate">{{ validation.file_path }}</td>
+                <td>{{ validation.family or 'N/A' }}</td>
+                <td><span class="badge badge-{{ validation.status }}">{{ validation.status }}</span></td>
+                <td><span class="badge badge-{{ validation.severity }}">{{ validation.severity }}</span></td>
+                <td>{{ validation.recommendations_count }}</td>
+                <td>{{ validation.created_at }}</td>
+                <td>
+                    <div style="display: flex; gap: 5px;">
+                        <a href="/dashboard/validations/{{ validation.id }}" class="btn btn-primary btn-sm">View</a>
+                        {% if validation.status == 'pending' %}
+                        <button onclick="approveValidation('{{ validation.id }}')" class="btn btn-success btn-sm">Approve</button>
+                        <button onclick="rejectValidation('{{ validation.id }}')" class="btn btn-danger btn-sm">Reject</button>
+                        {% elif validation.status == 'approved' %}
+                        <button onclick="enhanceValidation('{{ validation.id }}')" class="btn btn-info btn-sm">Enhance</button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    {% if has_prev or has_next %}
+    <div class="pagination">
+        {% if has_prev %}
+        <a href="?page={{ page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if severity_filter %}&severity={{ severity_filter }}{% endif %}" class="btn btn-secondary">← Previous</a>
+        {% endif %}
+        <span style="padding: 8px 16px;">Page {{ page }}</span>
+        {% if has_next %}
+        <a href="?page={{ page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if severity_filter %}&severity={{ severity_filter }}{% endif %}" class="btn btn-secondary">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state">
+        <p>No validations found</p>
+        <a href="/dashboard" class="btn btn-primary">Import Validations</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Live Refresh Indicator -->
+<div id="refreshIndicator" style="position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 10px; border-radius: 5px; display: none;">
+    <span id="refreshText">Updated</span>
+</div>
+
+<script>
+// WebSocket connection for live refresh
+let ws = null;
+let refreshTimer = null;
+
+function connectWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    try {
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = function() {
+            console.log('WebSocket connected');
+        };
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === 'validation_update') {
+                showRefreshIndicator('Validation updated - refreshing...');
+                setTimeout(() => window.location.reload(), 1000);
+            }
+        };
+        
+        ws.onclose = function() {
+            console.log('WebSocket disconnected, falling back to polling');
+            startPolling();
+        };
+        
+        ws.onerror = function() {
+            console.log('WebSocket error, falling back to polling');
+            startPolling();
+        };
+    } catch (e) {
+        console.log('WebSocket not available, using polling');
+        startPolling();
+    }
+}
+
+function startPolling() {
+    if (refreshTimer) return;
+    
+    refreshTimer = setInterval(async () => {
+        try {
+            const response = await fetch('/api/validations?limit=1');
+            const data = await response.json();
+            // Simple check - in a real app, you'd compare timestamps or hashes
+            showRefreshIndicator('Checking for updates...');
+        } catch (e) {
+            console.log('Polling failed:', e);
+        }
+    }, 10000); // Poll every 10 seconds
+}
+
+function showRefreshIndicator(text) {
+    const indicator = document.getElementById('refreshIndicator');
+    const textEl = document.getElementById('refreshText');
+    textEl.textContent = text;
+    indicator.style.display = 'block';
+    setTimeout(() => {
+        indicator.style.display = 'none';
+    }, 2000);
+}
+
+// Bulk selection functions
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.validation-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+    
+    updateBulkActions();
+}
+
+function updateBulkActions() {
+    const checkboxes = document.querySelectorAll('.validation-checkbox:checked');
+    const bulkActions = document.getElementById('bulkActions');
+    const selectedCount = document.getElementById('selectedCount');
+    
+    selectedCount.textContent = `${checkboxes.length} selected`;
+    bulkActions.style.display = checkboxes.length > 0 ? 'block' : 'none';
+}
+
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.validation-checkbox:checked')).map(cb => cb.value);
+}
+
+function clearSelection() {
+    document.querySelectorAll('.validation-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('selectAll').checked = false;
+    updateBulkActions();
+}
+
+// Single validation actions
+async function approveValidation(id) {
+    try {
+        const response = await fetch(`/api/validations/${id}/approve`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        if (response.ok) {
+            showRefreshIndicator('Validation approved');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function rejectValidation(id) {
+    try {
+        const response = await fetch(`/api/validations/${id}/reject`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        if (response.ok) {
+            showRefreshIndicator('Validation rejected');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function enhanceValidation(id) {
+    try {
+        const response = await fetch(`/api/enhance/${id}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        if (response.ok) {
+            showRefreshIndicator('Validation enhanced');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+// Bulk actions
+async function bulkApprove() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    
+    try {
+        const response = await fetch('/api/validations/bulk/approve', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids})
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showRefreshIndicator(`Approved ${result.approved_count} validations`);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function bulkReject() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    
+    try {
+        const response = await fetch('/api/validations/bulk/reject', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids})
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showRefreshIndicator(`Rejected ${result.rejected_count} validations`);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function bulkEnhance() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    
+    if (!confirm('Enhancement will modify the original files. Continue?')) return;
+    
+    try {
+        const response = await fetch('/api/validations/bulk/enhance', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids})
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showRefreshIndicator(`Enhanced ${result.enhanced_count} validations`);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+// Initialize WebSocket connection on page load
+window.addEventListener('load', connectWebSocket);
+</script>
+
+<style>
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.8em;
+}
+
+.bulk-actions {
+    background: #f5f5f5;
+    padding: 15px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+}
+
+.badge-pending { background-color: #6c757d; }
+.badge-approved { background-color: #28a745; }
+.badge-rejected { background-color: #dc3545; }
+.badge-enhanced { background-color: #17a2b8; }
+.badge-info { background-color: #17a2b8; }
+.badge-warning { background-color: #ffc107; color: #000; }
+.badge-error { background-color: #dc3545; }
+</style>
+
+{% endblock %}

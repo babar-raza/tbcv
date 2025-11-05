@@ -1,0 +1,14 @@
+{
+  "security_analysis": {
+    "description": "Prompt for analyzing code security issues",
+    "template": "Analyze the following code for security vulnerabilities:\n\nCODE:\n{code}\n\nLANGUAGE: {language}\n\nFocus on:\n1. Input validation issues\n2. SQL injection risks\n3. XSS vulnerabilities\n4. Insecure dependencies\n5. Authentication/authorization flaws\n\nProvide specific recommendations for each issue found."
+  },
+  "performance_analysis": {
+    "description": "Prompt for analyzing code performance issues",
+    "template": "Analyze the following code for performance issues:\n\nCODE:\n{code}\n\nLANGUAGE: {language}\n\nFocus on:\n1. Inefficient algorithms\n2. Memory leaks\n3. Unnecessary loops or iterations\n4. Database query optimization\n5. Resource management\n\nProvide specific optimization recommendations."
+  },
+  "style_analysis": {
+    "description": "Prompt for analyzing code style and quality",
+    "template": "Analyze the following code for style and quality issues:\n\nCODE:\n{code}\n\nLANGUAGE: {language}\n\nFocus on:\n1. Code organization and structure\n2. Naming conventions\n3. Documentation and comments\n4. Error handling patterns\n5. Best practices compliance\n\nProvide specific improvement suggestions."
+  }
+}

@@ -1,0 +1,368 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0 -- /usr/bin/python
+cachedir: .pytest_cache
+rootdir: /home/claude
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.11.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 46 items
+
+tests/startup/test_rule_manager_imports.py::test_import_rule_manager_top_level PASSED [  2%]
+tests/startup/test_rule_manager_imports.py::test_import_rule_manager_from_top_level PASSED [  4%]
+tests/startup/test_rule_manager_imports.py::test_import_rule_manager_from_core PASSED [  6%]
+tests/startup/test_rule_manager_imports.py::test_smoke_api_import PASSED [  8%]
+tests/test_endpoints_live.py::test_live_endpoint_probing SKIPPED (Li...) [ 10%]
+tests/test_endpoints_offline.py::test_offline_endpoint_probing FAILED    [ 13%]
+tests/test_enhancer_consumes_validation.py::test_enhancer_reads_validation_and_applies_style_fix FAILED [ 15%]
+tests/test_framework.py::test_system PASSED                              [ 17%]
+tests/test_generic_validator.py::TestRuleManager::test_load_family_rules_words PASSED [ 19%]
+tests/test_generic_validator.py::TestRuleManager::test_api_patterns_loaded PASSED [ 21%]
+tests/test_generic_validator.py::TestRuleManager::test_non_editable_fields_include_global PASSED [ 23%]
+tests/test_generic_validator.py::TestGenericContentValidator::test_validate_content_with_family FAILED [ 26%]
+tests/test_generic_validator.py::TestGenericContentValidator::test_yaml_validation_family_fields FAILED [ 28%]
+tests/test_generic_validator.py::TestGenericContentValidator::test_shortcode_preservation FAILED [ 30%]
+tests/test_generic_validator.py::TestGenericContentValidator::test_code_validation_no_hardcoded_patterns FAILED [ 32%]
+tests/test_generic_validator.py::TestGenericFuzzyDetector::test_detect_plugins_with_family FAILED [ 34%]
+tests/test_generic_validator.py::TestGenericFuzzyDetector::test_pattern_loading_fallback FAILED [ 36%]
+tests/test_generic_validator.py::TestOllamaIntegration::test_ollama_validator_offline_graceful PASSED [ 39%]
+tests/test_idempotence_and_schemas.py::test_idempotent_enhancement_a04 FAILED [ 41%]
+tests/test_idempotence_and_schemas.py::test_deterministic_hashing_a23 FAILED [ 43%]
+tests/test_idempotence_and_schemas.py::test_enhancement_marker_tracking FAILED [ 45%]
+tests/test_idempotence_and_schemas.py::test_schema_validation_success_a03 FAILED [ 47%]
+tests/test_idempotence_and_schemas.py::test_schema_validation_failure_a03 FAILED [ 50%]
+tests/test_idempotence_and_schemas.py::test_schema_validation_json_error_a03 FAILED [ 52%]
+tests/test_idempotence_and_schemas.py::test_enhancement_preserves_structure PASSED [ 54%]
+tests/test_idempotence_and_schemas.py::test_multiple_enhancement_runs_consistency FAILED [ 56%]
+tests/test_performance.py::test_first_run_performance_p01 FAILED         [ 58%]
+tests/test_performance.py::test_warm_run_performance_p02 PASSED          [ 60%]
+tests/test_performance.py::test_throughput_performance_p03 PASSED        [ 63%]
+tests/test_performance.py::test_cache_hit_rate_p04 PASSED                [ 65%]
+tests/test_performance.py::test_owner_accuracy_p05 FAILED                [ 67%]
+tests/test_performance.py::test_test_coverage_p06 PASSED                 [ 69%]
+tests/test_performance.py::test_structural_preservation_p07 PASSED       [ 71%]
+tests/test_performance.py::test_performance_regression PASSED            [ 73%]
+tests/test_performance.py::test_stress_test_large_files PASSED           [ 76%]
+tests/test_smoke_agents.py::test_agents_endpoint_registers_and_lists_agents FAILED [ 78%]
+tests/test_smoke_agents.py::test_baseagent_subclass_discovery_consistency PASSED [ 80%]
+tests/test_truths_and_rules.py::TestTruthsAndRulesIntegration::test_content_validator_loads_both_truths_and_rules FAILED [ 82%]
+tests/test_truths_and_rules.py::TestTruthsAndRulesIntegration::test_yaml_validation_against_truths FAILED [ 84%]
+tests/test_truths_and_rules.py::TestTruthsAndRulesIntegration::test_code_validation_with_api_patterns FAILED [ 86%]
+tests/test_truths_and_rules.py::TestTruthsAndRulesIntegration::test_orchestrator_directory_validation FAILED [ 89%]
+tests/test_truths_and_rules.py::TestCLIIntegration::test_cli_help_shows_directory_validation FAILED [ 91%]
+tests/test_truths_and_rules.py::TestCLIIntegration::test_cli_validate_directory_help FAILED [ 93%]
+tests/test_truths_and_rules.py::TestAPIIntegration::test_api_agents_endpoint_shows_orchestrator PASSED [ 95%]
+tests/test_truths_and_rules.py::TestAPIIntegration::test_workflow_validate_directory_endpoint_exists PASSED [ 97%]
+tests/test_validation_persistence.py::test_validation_persist_and_consume FAILED [100%]
+
+=================================== FAILURES ===================================
+________________________ test_offline_endpoint_probing _________________________
+tests/test_endpoints_offline.py:43: in test_offline_endpoint_probing
+    registered = discovery.discover_registered(app)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'EndpointDiscovery' object has no attribute 'discover_registered'
+_____________ test_enhancer_reads_validation_and_applies_style_fix _____________
+tests/test_enhancer_consumes_validation.py:15: in test_enhancer_reads_validation_and_applies_style_fix
+    assert e.status_code == 200, e.text
+E   AssertionError: {"detail":"Validation not found"}
+E   assert 404 == 200
+E    +  where 404 = <Response [404 Not Found]>.status_code
+________ TestGenericContentValidator.test_validate_content_with_family _________
+tests/test_generic_validator.py:52: in test_validate_content_with_family
+    from content_validator import ContentValidatorAgent
+E   ModuleNotFoundError: No module named 'content_validator'
+________ TestGenericContentValidator.test_yaml_validation_family_fields ________
+tests/test_generic_validator.py:83: in test_yaml_validation_family_fields
+    from content_validator import ContentValidatorAgent
+E   ModuleNotFoundError: No module named 'content_validator'
+___________ TestGenericContentValidator.test_shortcode_preservation ____________
+tests/test_generic_validator.py:109: in test_shortcode_preservation
+    from content_validator import ContentValidatorAgent
+E   ModuleNotFoundError: No module named 'content_validator'
+____ TestGenericContentValidator.test_code_validation_no_hardcoded_patterns ____
+tests/test_generic_validator.py:138: in test_code_validation_no_hardcoded_patterns
+    from content_validator import ContentValidatorAgent
+E   ModuleNotFoundError: No module named 'content_validator'
+___________ TestGenericFuzzyDetector.test_detect_plugins_with_family ___________
+tests/test_generic_validator.py:165: in test_detect_plugins_with_family
+    from fuzzy_detector import FuzzyDetectorAgent
+E   ModuleNotFoundError: No module named 'fuzzy_detector'
+____________ TestGenericFuzzyDetector.test_pattern_loading_fallback ____________
+tests/test_generic_validator.py:187: in test_pattern_loading_fallback
+    from fuzzy_detector import FuzzyDetectorAgent
+E   ModuleNotFoundError: No module named 'fuzzy_detector'
+_______________________ test_idempotent_enhancement_a04 ________________________
+tests/test_idempotence_and_schemas.py:77: in test_idempotent_enhancement_a04
+    assert result2["statistics"].get("already_enhanced", False), "Second run should detect content was already enhanced"
+E   AssertionError: Second run should detect content was already enhanced
+E   assert False
+E    +  where False = <built-in method get of dict object at 0x7ec4d188fc80>('already_enhanced', False)
+E    +    where <built-in method get of dict object at 0x7ec4d188fc80> = {'enhanced_length': 410, 'enhancement_types': ['plugin_links', 'info_text'], 'info_texts_added': 0, 'original_length': 322, ...}.get
+________________________ test_deterministic_hashing_a23 ________________________
+tests/test_idempotence_and_schemas.py:90: in test_deterministic_hashing_a23
+    hash1 = enhancer_agent._compute_content_hash(sample_content, detected_plugins, ["plugin_links"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'ContentEnhancerAgent' object has no attribute '_compute_content_hash'
+_______________________ test_enhancement_marker_tracking _______________________
+tests/test_idempotence_and_schemas.py:117: in test_enhancement_marker_tracking
+    assert not enhancer_agent._is_already_enhanced(sample_content, test_hash)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'ContentEnhancerAgent' object has no attribute '_is_already_enhanced'
+______________________ test_schema_validation_success_a03 ______________________
+tests/test_idempotence_and_schemas.py:174: in test_schema_validation_success_a03
+    with patch('tbcv.main.Path') as mock_path:
+/usr/lib/python3.12/unittest/mock.py:1442: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/usr/lib/python3.12/pkgutil.py:513: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1324: in _find_and_load_unlocked
+    ???
+E   ModuleNotFoundError: No module named 'tbcv'
+______________________ test_schema_validation_failure_a03 ______________________
+tests/test_idempotence_and_schemas.py:208: in test_schema_validation_failure_a03
+    with patch('tbcv.main.Path') as mock_path:
+/usr/lib/python3.12/unittest/mock.py:1442: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/usr/lib/python3.12/pkgutil.py:513: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1324: in _find_and_load_unlocked
+    ???
+E   ModuleNotFoundError: No module named 'tbcv'
+____________________ test_schema_validation_json_error_a03 _____________________
+tests/test_idempotence_and_schemas.py:231: in test_schema_validation_json_error_a03
+    with patch('tbcv.main.Path') as mock_path:
+/usr/lib/python3.12/unittest/mock.py:1442: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+/usr/lib/python3.12/pkgutil.py:513: in resolve_name
+    mod = importlib.import_module(modname)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1324: in _find_and_load_unlocked
+    ???
+E   ModuleNotFoundError: No module named 'tbcv'
+__________________ test_multiple_enhancement_runs_consistency __________________
+tests/test_idempotence_and_schemas.py:304: in test_multiple_enhancement_runs_consistency
+    assert results[i]["statistics"].get("already_enhanced", False), f"Run {i+1} should detect already enhanced content"
+E   AssertionError: Run 2 should detect already enhanced content
+E   assert False
+E    +  where False = <built-in method get of dict object at 0x7ec4d1809540>('already_enhanced', False)
+E    +    where <built-in method get of dict object at 0x7ec4d1809540> = {'enhanced_length': 322, 'enhancement_types': ['plugin_links', 'info_text'], 'info_texts_added': 0, 'original_length': 234, ...}.get
+________________________ test_first_run_performance_p01 ________________________
+tests/test_performance.py:203: in test_first_run_performance_p01
+    assert duration >= 1.0, f"First run took {duration:.2f}s, suspiciously fast"
+E   AssertionError: First run took 0.01s, suspiciously fast
+E   assert 0.012603282928466797 >= 1.0
+___________________________ test_owner_accuracy_p05 ____________________________
+tests/test_performance.py:320: in test_owner_accuracy_p05
+    assert owner_score >= 0.9, f"Owner accuracy: {owner_score:.1%}, expected ≥ 90%"
+E   AssertionError: Owner accuracy: 0.0%, expected ≥ 90%
+E   assert 0.0 >= 0.9
+_______________ test_agents_endpoint_registers_and_lists_agents ________________
+tests/test_smoke_agents.py:120: in test_agents_endpoint_registers_and_lists_agents
+    assert client.get("/health/ready").status_code == 200
+E   AssertionError: assert 503 == 200
+E    +  where 503 = <Response [503 Service Unavailable]>.status_code
+E    +    where <Response [503 Service Unavailable]> = get('/health/ready')
+E    +      where get = <starlette.testclient.TestClient object at 0x7ec4d17b0590>.get
+----------------------------- Captured stdout call -----------------------------
+{"timestamp": "2025-10-31T13:34:25.842Z", "level": "WARNING", "name": "core.database", "message": "Missing required table: metric_entries", "taskName": "anyio.from_thread.BlockingPortal._call_func"}
+{"timestamp": "2025-10-31T13:34:25.842Z", "level": "WARNING", "name": "core.database", "message": "Missing required table: metric_entries", "taskName": "anyio.from_thread.BlockingPortal._call_func"}
+{"timestamp": "2025-10-31T13:34:25.842Z", "level": "WARNING", "name": "core.database", "message": "Missing required table: metric_entries", "taskName": "anyio.from_thread.BlockingPortal._call_func"}
+------------------------------ Captured log call -------------------------------
+WARNING  core.database:logging.py:255 Missing required table: metric_entries
+_ TestTruthsAndRulesIntegration.test_content_validator_loads_both_truths_and_rules _
+tests/test_truths_and_rules.py:16: in test_content_validator_loads_both_truths_and_rules
+    from content_validator import ContentValidatorAgent
+E   ModuleNotFoundError: No module named 'content_validator'
+______ TestTruthsAndRulesIntegration.test_yaml_validation_against_truths _______
+tests/test_truths_and_rules.py:49: in test_yaml_validation_against_truths
+    from content_validator import ContentValidatorAgent
+E   ModuleNotFoundError: No module named 'content_validator'
+_____ TestTruthsAndRulesIntegration.test_code_validation_with_api_patterns _____
+tests/test_truths_and_rules.py:73: in test_code_validation_with_api_patterns
+    from content_validator import ContentValidatorAgent
+E   ModuleNotFoundError: No module named 'content_validator'
+_____ TestTruthsAndRulesIntegration.test_orchestrator_directory_validation _____
+tests/test_truths_and_rules.py:101: in test_orchestrator_directory_validation
+    from orchestrator import OrchestratorAgent
+E   ModuleNotFoundError: No module named 'orchestrator'
+_________ TestCLIIntegration.test_cli_help_shows_directory_validation __________
+tests/test_truths_and_rules.py:132: in test_cli_help_shows_directory_validation
+    from cli.main import cli
+cli/main.py:29: in <module>
+    from rich.console import Console
+E   ModuleNotFoundError: No module named 'rich'
+_____________ TestCLIIntegration.test_cli_validate_directory_help ______________
+tests/test_truths_and_rules.py:143: in test_cli_validate_directory_help
+    from cli.main import cli
+cli/main.py:29: in <module>
+    from rich.console import Console
+E   ModuleNotFoundError: No module named 'rich'
+_____________________ test_validation_persist_and_consume ______________________
+tests/test_validation_persistence.py:28: in test_validation_persist_and_consume
+    assert res.status_code == 200, res.text
+E   AssertionError: {"detail":"Content validator agent not available"}
+E   assert 500 == 200
+E    +  where 500 = <Response [500 Internal Server Error]>.status_code
+=============================== warnings summary ===============================
+core/config.py:27
+  /home/claude/core/config.py:27: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class BaseSettings(BaseModel):
+
+tests/test_endpoints_live.py:40
+  /home/claude/tests/test_endpoints_live.py:40: PytestUnknownMarkWarning: Unknown pytest.mark.live - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.live
+
+tests/test_enhancer_consumes_validation.py: 6 warnings
+tests/test_framework.py: 5 warnings
+tests/test_idempotence_and_schemas.py: 5 warnings
+tests/test_performance.py: 7 warnings
+tests/test_smoke_agents.py: 12 warnings
+tests/test_truths_and_rules.py: 12 warnings
+  /home/claude/agents/base.py:161: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self.last_heartbeat = datetime.utcnow()
+
+tests/test_enhancer_consumes_validation.py::test_enhancer_reads_validation_and_applies_style_fix
+tests/test_enhancer_consumes_validation.py::test_enhancer_reads_validation_and_applies_style_fix
+tests/test_framework.py::test_system
+tests/test_framework.py::test_system
+tests/test_smoke_agents.py::test_agents_endpoint_registers_and_lists_agents
+tests/test_smoke_agents.py::test_baseagent_subclass_discovery_consistency
+tests/test_truths_and_rules.py::TestAPIIntegration::test_api_agents_endpoint_shows_orchestrator
+tests/test_truths_and_rules.py::TestAPIIntegration::test_workflow_validate_directory_endpoint_exists
+  /home/claude/agents/truth_manager.py:579: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return TruthDataIndex(by_id, by_slug, by_family, by_pattern, combination_rules, version_hash, datetime.utcnow())
+
+tests/test_enhancer_consumes_validation.py: 8 warnings
+tests/test_framework.py: 16 warnings
+tests/test_performance.py: 210 warnings
+tests/test_truths_and_rules.py: 2 warnings
+  /home/claude/agents/base.py:65: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self.timestamp = datetime.utcnow().isoformat() + 'Z'
+
+tests/test_enhancer_consumes_validation.py: 7 warnings
+tests/test_framework.py: 13 warnings
+tests/test_idempotence_and_schemas.py: 6 warnings
+tests/test_performance.py: 176 warnings
+tests/test_truths_and_rules.py: 2 warnings
+  /home/claude/core/logging.py:344: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self.start_time = datetime.utcnow()
+
+tests/test_enhancer_consumes_validation.py: 4 warnings
+tests/test_framework.py: 8 warnings
+tests/test_performance.py: 105 warnings
+tests/test_truths_and_rules.py: 1 warning
+  /home/claude/agents/base.py:231: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    start_time = datetime.utcnow()
+
+tests/test_enhancer_consumes_validation.py: 7 warnings
+tests/test_framework.py: 13 warnings
+tests/test_idempotence_and_schemas.py: 6 warnings
+tests/test_performance.py: 176 warnings
+tests/test_truths_and_rules.py: 2 warnings
+  /home/claude/core/logging.py:353: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    end_time = datetime.utcnow()
+
+tests/test_enhancer_consumes_validation.py::test_enhancer_reads_validation_and_applies_style_fix
+tests/test_framework.py::test_system
+  /home/claude/core/cache.py:243: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expires_at = datetime.utcnow() + timedelta(seconds=int(ttl_seconds))
+
+tests/test_enhancer_consumes_validation.py::test_enhancer_reads_validation_and_applies_style_fix
+tests/test_framework.py::test_system
+  /home/claude/core/database.py:544: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    created_at=datetime.utcnow(),
+
+tests/test_enhancer_consumes_validation.py::test_enhancer_reads_validation_and_applies_style_fix
+tests/test_framework.py::test_system
+  /home/claude/core/database.py:546: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    last_accessed=datetime.utcnow(),
+
+tests/test_enhancer_consumes_validation.py: 4 warnings
+tests/test_framework.py: 8 warnings
+tests/test_performance.py: 105 warnings
+tests/test_truths_and_rules.py: 1 warning
+  /home/claude/agents/base.py:239: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    end_time = datetime.utcnow()
+
+tests/test_enhancer_consumes_validation.py: 2 warnings
+tests/test_framework.py: 2 warnings
+tests/test_performance.py: 70 warnings
+tests/test_truths_and_rules.py: 2 warnings
+  /usr/local/lib/python3.12/dist-packages/sqlalchemy/sql/schema.py:3624: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+
+tests/test_framework.py: 6 warnings
+tests/test_smoke_agents.py: 9 warnings
+  /home/claude/core/logging.py:64: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+
+tests/test_smoke_agents.py::test_agents_endpoint_registers_and_lists_agents
+  /home/claude/api/server.py:256: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow().isoformat(),
+
+tests/test_smoke_agents.py::test_agents_endpoint_registers_and_lists_agents
+  /home/claude/api/server.py:288: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow().isoformat(),
+
+tests/test_truths_and_rules.py::TestAPIIntegration::test_workflow_validate_directory_endpoint_exists
+tests/test_truths_and_rules.py::TestAPIIntegration::test_workflow_validate_directory_endpoint_exists
+  /home/claude/core/database.py:502: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    wf.updated_at = datetime.utcnow()
+
+tests/test_truths_and_rules.py::TestAPIIntegration::test_workflow_validate_directory_endpoint_exists
+  /home/claude/api/server.py:1274: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    completed_at=datetime.utcnow()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_endpoints_offline.py::test_offline_endpoint_probing - Attri...
+FAILED tests/test_enhancer_consumes_validation.py::test_enhancer_reads_validation_and_applies_style_fix
+FAILED tests/test_generic_validator.py::TestGenericContentValidator::test_validate_content_with_family
+FAILED tests/test_generic_validator.py::TestGenericContentValidator::test_yaml_validation_family_fields
+FAILED tests/test_generic_validator.py::TestGenericContentValidator::test_shortcode_preservation
+FAILED tests/test_generic_validator.py::TestGenericContentValidator::test_code_validation_no_hardcoded_patterns
+FAILED tests/test_generic_validator.py::TestGenericFuzzyDetector::test_detect_plugins_with_family
+FAILED tests/test_generic_validator.py::TestGenericFuzzyDetector::test_pattern_loading_fallback
+FAILED tests/test_idempotence_and_schemas.py::test_idempotent_enhancement_a04
+FAILED tests/test_idempotence_and_schemas.py::test_deterministic_hashing_a23
+FAILED tests/test_idempotence_and_schemas.py::test_enhancement_marker_tracking
+FAILED tests/test_idempotence_and_schemas.py::test_schema_validation_success_a03
+FAILED tests/test_idempotence_and_schemas.py::test_schema_validation_failure_a03
+FAILED tests/test_idempotence_and_schemas.py::test_schema_validation_json_error_a03
+FAILED tests/test_idempotence_and_schemas.py::test_multiple_enhancement_runs_consistency
+FAILED tests/test_performance.py::test_first_run_performance_p01 - AssertionE...
+FAILED tests/test_performance.py::test_owner_accuracy_p05 - AssertionError: O...
+FAILED tests/test_smoke_agents.py::test_agents_endpoint_registers_and_lists_agents
+FAILED tests/test_truths_and_rules.py::TestTruthsAndRulesIntegration::test_content_validator_loads_both_truths_and_rules
+FAILED tests/test_truths_and_rules.py::TestTruthsAndRulesIntegration::test_yaml_validation_against_truths
+FAILED tests/test_truths_and_rules.py::TestTruthsAndRulesIntegration::test_code_validation_with_api_patterns
+FAILED tests/test_truths_and_rules.py::TestTruthsAndRulesIntegration::test_orchestrator_directory_validation
+FAILED tests/test_truths_and_rules.py::TestCLIIntegration::test_cli_help_shows_directory_validation
+FAILED tests/test_truths_and_rules.py::TestCLIIntegration::test_cli_validate_directory_help
+FAILED tests/test_validation_persistence.py::test_validation_persist_and_consume
+=========== 25 failed, 20 passed, 1 skipped, 1039 warnings in 2.71s ============

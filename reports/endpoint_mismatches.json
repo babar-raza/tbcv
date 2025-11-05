@@ -1,0 +1,10 @@
+{
+  "declared_but_404": [],
+  "auth_blocked": [],
+  "method_not_allowed": [],
+  "schema_mismatch": [],
+  "degraded_health": [],
+  "unregistered_router": [],
+  "not_in_inventory": [],
+  "notes": "Online probe not executed in this environment; run tools/endpoint_check.py --mode online on Windows to populate."
+}

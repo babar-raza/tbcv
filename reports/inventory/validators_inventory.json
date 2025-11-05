@@ -1,0 +1,311 @@
+{
+  "content_validator": {
+    "name": "ContentValidatorAgent",
+    "file": "agents/content_validator.py",
+    "version": "1.0.0",
+    "status": "EXISTS_BUT_STUBS_ONLY",
+    "responsibilities": [
+      "Generic content validation using truths and rules",
+      "YAML/front-matter validation with schema checks",
+      "Markdown structure and quality validation",
+      "Code pattern validation",
+      "Link validation",
+      "Structure validation",
+      "LLM-based validation (contradictions, omissions)"
+    ],
+    "capabilities": {
+      "yaml_validation": {
+        "present": true,
+        "implemented": false,
+        "description": "YAML/front-matter validation with truths and rules",
+        "method": "_validate_yaml_with_truths_and_rules",
+        "features": [
+          "Schema validation (allowed fields, required fields)",
+          "Type checking",
+          "Format validation (dates, slugs)",
+          "Enum validation",
+          "Truth table cross-reference",
+          "Rule-based validation"
+        ],
+        "current_state": "STUB - returns success without validation"
+      },
+      "markdown_validation": {
+        "present": true,
+        "implemented": false,
+        "description": "Markdown structure and quality checks",
+        "method": "_validate_markdown_with_rules",
+        "features": [
+          "Heading hierarchy validation",
+          "Code block integrity",
+          "List structure validation",
+          "Duplicate content detection",
+          "Plugin context awareness",
+          "Rule-based checks"
+        ],
+        "current_state": "STUB - returns success without validation"
+      },
+      "code_validation": {
+        "present": true,
+        "implemented": false,
+        "description": "Code pattern and quality validation",
+        "method": "_validate_code_with_patterns",
+        "features": [
+          "API pattern matching",
+          "Code quality rules",
+          "Plugin-specific patterns",
+          "Family-based validation"
+        ],
+        "current_state": "STUB - returns success without validation"
+      },
+      "link_validation": {
+        "present": true,
+        "implemented": false,
+        "description": "Link integrity and format validation",
+        "method": "_validate_links",
+        "features": [
+          "Link pattern detection",
+          "URL format validation",
+          "Broken link detection"
+        ],
+        "current_state": "STUB - returns success without validation"
+      },
+      "structure_validation": {
+        "present": true,
+        "implemented": false,
+        "description": "Content structure validation",
+        "method": "_validate_structure",
+        "features": [
+          "Introduction length checks",
+          "Section length validation",
+          "Heading depth validation",
+          "Overall structure rules"
+        ],
+        "current_state": "STUB - returns success without validation"
+      },
+      "llm_validation": {
+        "present": true,
+        "implemented": true,
+        "description": "LLM-based semantic validation using Ollama",
+        "method": "_validate_with_llm",
+        "features": [
+          "Content contradiction detection",
+          "Content omission detection",
+          "Plugin context awareness",
+          "Rule-based context",
+          "Ollama mistral integration"
+        ],
+        "current_state": "FULLY IMPLEMENTED"
+      }
+    },
+    "inputs": {
+      "handle_validate_content": {
+        "content": "string - content to validate",
+        "file_path": "string - path to file",
+        "family": "string - content family (default: words)",
+        "validation_types": "array - types to run (yaml, markdown, code, links, structure, llm)"
+      }
+    },
+    "outputs": {
+      "structure": "ValidationResult with issues, confidence, metrics",
+      "issue_format": "ValidationIssue with level, category, message, line_number, column, suggestion, source"
+    },
+    "side_effects": [
+      "Loads truth context from truth_manager",
+      "Loads rule context from rule_manager",
+      "Gets plugin context from fuzzy_detector",
+      "Stores validation results in database via db_manager.create_validation_result",
+      "Creates recommendations in database via db_manager.create_recommendation",
+      "Calls Ollama LLM for validation (if llm type included)"
+    ],
+    "dependencies": [
+      "truth_manager",
+      "fuzzy_detector",
+      "rule_manager",
+      "db_manager",
+      "ollama (for LLM validation)"
+    ],
+    "database_writes": {
+      "validation_results": {
+        "table": "validation_results",
+        "method": "db_manager.create_validation_result",
+        "fields": [
+          "file_path",
+          "rules_applied",
+          "validation_results",
+          "notes",
+          "severity",
+          "status",
+          "content",
+          "run_id"
+        ]
+      },
+      "recommendations": {
+        "table": "recommendations",
+        "method": "db_manager.create_recommendation",
+        "conditions": "For issues with level error/warning and suggestion present",
+        "fields": [
+          "validation_id",
+          "type: validation_fix",
+          "title",
+          "description",
+          "suggestion",
+          "confidence",
+          "auto_apply",
+          "metadata (issue details)"
+        ]
+      }
+    },
+    "message_handlers": [
+      "ping",
+      "get_status",
+      "get_contract",
+      "validate_content",
+      "validate_yaml",
+      "validate_markdown",
+      "validate_code",
+      "validate_links",
+      "validate_structure"
+    ]
+  },
+  "llm_validator": {
+    "name": "LLMValidatorAgent",
+    "file": "agents/llm_validator.py",
+    "version": "1.0.0",
+    "status": "FULLY_IMPLEMENTED",
+    "responsibilities": [
+      "Semantic validation using LLM",
+      "Plugin requirement verification",
+      "Missing plugin detection",
+      "Incorrect plugin detection",
+      "Recommendation generation for plugin-related issues"
+    ],
+    "capabilities": {
+      "plugin_validation": {
+        "present": true,
+        "implemented": true,
+        "description": "LLM-based semantic plugin validation",
+        "method": "handle_validate_plugins",
+        "features": [
+          "Verifies fuzzy plugin detections against truth data",
+          "Detects missing required plugins based on content operations",
+          "Identifies incorrect plugin references",
+          "Generates specific recommendations for plugin issues",
+          "Understands cross-format conversion requirements",
+          "Recognizes feature plugin dependencies"
+        ],
+        "current_state": "FULLY IMPLEMENTED"
+      },
+      "llm_integration": {
+        "present": true,
+        "implemented": true,
+        "description": "Ollama LLM integration with detailed prompting",
+        "features": [
+          "Builds context-rich validation prompts",
+          "Includes fuzzy detections, core rules, plugin definitions",
+          "Structured JSON response parsing",
+          "Error handling and diagnostics",
+          "Connection status checking",
+          "Graceful degradation when LLM unavailable"
+        ],
+        "current_state": "FULLY IMPLEMENTED"
+      }
+    },
+    "inputs": {
+      "handle_validate_plugins": {
+        "content": "string - content to validate",
+        "fuzzy_detections": "array - pre-detected plugin patterns",
+        "family": "string - content family (default: words)"
+      }
+    },
+    "outputs": {
+      "structure": {
+        "requirements": "array of PluginRequirement objects",
+        "issues": "array of issue objects",
+        "confidence": "float - overall confidence"
+      },
+      "requirement_format": {
+        "plugin_id": "string",
+        "plugin_name": "string",
+        "confidence": "float",
+        "detection_type": "llm_verified | llm_missing | llm_suggested",
+        "reasoning": "string",
+        "validation_status": "mentioned_correctly | missing_required | mentioned_incorrectly",
+        "recommendation": "object or null",
+        "matched_context": "string or null"
+      },
+      "issue_format": {
+        "level": "info | warning | error | high",
+        "category": "missing_plugin | incorrect_plugin | llm_error | llm_disabled | llm_unavailable",
+        "message": "string",
+        "plugin_id": "string (optional)",
+        "auto_fixable": "boolean (optional)",
+        "fix_suggestion": "string (optional)",
+        "diagnostic": "object (optional)"
+      }
+    },
+    "side_effects": [
+      "Loads truth data from truth/{family}.json",
+      "Calls Ollama LLM via ollama.async_generate",
+      "No database writes (returns data only)"
+    ],
+    "dependencies": [
+      "ollama",
+      "truth data files (truth/{family}.json)"
+    ],
+    "database_writes": {
+      "none": "LLMValidatorAgent does not write to database directly"
+    },
+    "message_handlers": [
+      "ping",
+      "get_status",
+      "get_contract",
+      "validate_plugins"
+    ]
+  },
+  "comparison": {
+    "overlapping_capabilities": [
+      "LLM-based validation (both use Ollama)"
+    ],
+    "unique_to_content_validator": [
+      "YAML/front-matter validation (CRITICAL - currently stubbed)",
+      "Markdown structure validation (CRITICAL - currently stubbed)",
+      "Code pattern validation (currently stubbed)",
+      "Link validation (currently stubbed)",
+      "Structure validation (currently stubbed)",
+      "Database persistence of validation results",
+      "Database persistence of recommendations",
+      "Composite validation orchestration",
+      "Truth and rule context loading",
+      "Plugin context from fuzzy_detector"
+    ],
+    "unique_to_llm_validator": [
+      "Plugin requirement verification",
+      "Missing plugin detection",
+      "Incorrect plugin detection",
+      "Plugin-specific recommendations with detailed reasoning",
+      "Cross-format conversion understanding",
+      "Feature plugin dependency recognition",
+      "Structured LLM prompt building for plugins",
+      "No database coupling (pure validation logic)"
+    ],
+    "architectural_differences": {
+      "content_validator": {
+        "role": "Comprehensive validation orchestrator",
+        "pattern": "Composite validator with multiple validation types",
+        "database": "Writes results and recommendations directly",
+        "llm_usage": "For general contradictions and omissions"
+      },
+      "llm_validator": {
+        "role": "Specialized plugin validation",
+        "pattern": "Single-purpose semantic validator",
+        "database": "No direct writes, returns data only",
+        "llm_usage": "For plugin requirement analysis with detailed prompting"
+      }
+    }
+  },
+  "current_state_analysis": {
+    "problem": "content_validator has comprehensive scope but critical validations are STUBS; llm_validator is fully implemented but only handles plugins and doesn't persist to database",
+    "consequence": "YAML validation lost, Markdown validation lost, no structural checks, plugin validation not integrated with main pipeline",
+    "required_action": "Merge implementations to get all capabilities operational and integrated"
+  }
+}

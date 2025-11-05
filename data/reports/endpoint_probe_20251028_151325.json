@@ -1,0 +1,610 @@
+{
+  "timestamp": "2025-10-28T10:13:25.671196",
+  "mode": "offline",
+  "base_url": null,
+  "summary": {
+    "total_registered": 28,
+    "total_declared": 0,
+    "declared_only": 0,
+    "total_probed": 28,
+    "ok_count": 13,
+    "error_count": 15,
+    "declared_only_count": 0
+  },
+  "endpoints": {
+    "registered": [
+      {
+        "method": "GET",
+        "path": "/openapi.json",
+        "source": "registered",
+        "function_name": "openapi",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/docs",
+        "source": "registered",
+        "function_name": "swagger_ui_html",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/docs/oauth2-redirect",
+        "source": "registered",
+        "function_name": "swagger_ui_redirect",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/redoc",
+        "source": "registered",
+        "function_name": "redoc_html",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/health",
+        "source": "registered",
+        "function_name": "health_check",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/health/live",
+        "source": "registered",
+        "function_name": "health_live",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/health/ready",
+        "source": "registered",
+        "function_name": "health_ready",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/agents",
+        "source": "registered",
+        "function_name": "list_agents",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/agents/{agent_id}",
+        "source": "registered",
+        "function_name": "get_agent_info",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/registry/agents",
+        "source": "registered",
+        "function_name": "get_agent_registry",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/validate",
+        "source": "registered",
+        "function_name": "validate_content",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/validate/batch",
+        "source": "registered",
+        "function_name": "batch_validate_content",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/detect-plugins",
+        "source": "registered",
+        "function_name": "detect_plugins",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/validations",
+        "source": "registered",
+        "function_name": "list_validations",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/validations/{validation_id}",
+        "source": "registered",
+        "function_name": "get_validation",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/recommendations",
+        "source": "registered",
+        "function_name": "list_recommendations",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/recommendations/{recommendation_id}",
+        "source": "registered",
+        "function_name": "get_recommendation",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/recommendations/{recommendation_id}/review",
+        "source": "registered",
+        "function_name": "review_recommendation",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/recommendations/bulk-review",
+        "source": "registered",
+        "function_name": "bulk_review_recommendations",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/enhance",
+        "source": "registered",
+        "function_name": "enhance_content",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/enhance/auto-apply",
+        "source": "registered",
+        "function_name": "auto_apply_high_confidence_recommendations",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/workflows/validate-directory",
+        "source": "registered",
+        "function_name": "validate_directory_workflow",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/workflows",
+        "source": "registered",
+        "function_name": "list_workflows",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/workflows/{workflow_id}",
+        "source": "registered",
+        "function_name": "get_workflow_status",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/workflows/{workflow_id}/control",
+        "source": "registered",
+        "function_name": "control_workflow",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/audit",
+        "source": "registered",
+        "function_name": "list_audit_logs",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/",
+        "source": "registered",
+        "function_name": "root",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/status",
+        "source": "registered",
+        "function_name": "system_status",
+        "file_path": null,
+        "line_number": null
+      }
+    ],
+    "declared": [],
+    "declared_only": []
+  },
+  "probe_results": [
+    {
+      "method": "GET",
+      "path": "/openapi.json",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"openapi\": \"3.1.0\", \"info\": {\"title\": \"TBCV API\", \"description\": \"Truth-Based Content Validation and Enhancement System\", \"version\": \"2.0.0\"}, \"paths\": {\"/health\": {\"get\": {\"summary\": \"Health Check\",...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.867975"
+    },
+    {
+      "method": "GET",
+      "path": "/docs",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "\n    <!DOCTYPE html>\n    <html>\n    <head>\n    <link type=\"text/css\" rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css\">\n    <link rel=\"shortcut icon\" href=\"https://...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.867975"
+    },
+    {
+      "method": "GET",
+      "path": "/docs/oauth2-redirect",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "\n    <!doctype html>\n    <html lang=\"en-US\">\n    <head>\n        <title>Swagger UI: OAuth2 Redirect</title>\n    </head>\n    <body>\n    <script>\n        'use strict';\n        function run () {\n         ...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.867975"
+    },
+    {
+      "method": "GET",
+      "path": "/redoc",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "\n    <!DOCTYPE html>\n    <html>\n    <head>\n    <title>TBCV API - ReDoc</title>\n    <!-- needed for adaptive design -->\n    <meta charset=\"utf-8\"/>\n    <meta name=\"viewport\" content=\"width=device-width...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.873002"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"status\": \"degraded\", \"timestamp\": \"2025-10-28T10:13:23.873002\", \"agents_registered\": 0, \"database_connected\": false, \"version\": \"2.0.0\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.875010"
+    },
+    {
+      "method": "GET",
+      "path": "/health/live",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"status\": \"alive\", \"timestamp\": \"2025-10-28T10:13:23.875010\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.875010"
+    },
+    {
+      "method": "GET",
+      "path": "/health/ready",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"status\": \"not_ready\", \"timestamp\": \"2025-10-28T10:13:23.892883\", \"checks\": {\"database\": false, \"agents\": false}}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.894102"
+    },
+    {
+      "method": "GET",
+      "path": "/agents",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"agents\": [], \"total_count\": 0}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.896106"
+    },
+    {
+      "method": "GET",
+      "path": "/agents/{agent_id}",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 404,
+      "status": "not_found",
+      "ok": false,
+      "preview": "{\"detail\": \"Agent {agent_id} not found\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.897106"
+    },
+    {
+      "method": "GET",
+      "path": "/registry/agents",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"total_agents\": 0, \"agents\": {}, \"registry_status\": \"active\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.899106"
+    },
+    {
+      "method": "POST",
+      "path": "/api/validate",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"content\"], \"msg\": \"Field required\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.902105"
+    },
+    {
+      "method": "POST",
+      "path": "/api/validate/batch",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"files\"], \"msg\": \"Field required\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.905105"
+    },
+    {
+      "method": "POST",
+      "path": "/api/detect-plugins",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 500,
+      "status": "error",
+      "ok": false,
+      "preview": "{\"detail\": \"Fuzzy detector agent not available\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:23.906106"
+    },
+    {
+      "method": "GET",
+      "path": "/api/validations",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 500,
+      "status": "error",
+      "ok": false,
+      "preview": "{\"detail\": \"Failed to retrieve validations\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:24.812126"
+    },
+    {
+      "method": "GET",
+      "path": "/api/validations/{validation_id}",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": null,
+      "status": "error",
+      "ok": false,
+      "preview": "",
+      "error": "(sqlite3.OperationalError) no such column: validation_results.workflow_id\n[SQL: SELECT validation_results.id AS validation_results_id, validation_results.workflow_id AS validation_results_workflow_id, validation_results.file_path AS validation_results_file_path, validation_results.rules_applied AS validation_results_rules_applied, validation_results.validation_results AS validation_results_validation_results, validation_results.notes AS validation_results_notes, validation_results.severity AS validation_results_severity, validation_results.status AS validation_results_status, validation_results.content_hash AS validation_results_content_hash, validation_results.ast_hash AS validation_results_ast_hash, validation_results.run_id AS validation_results_run_id, validation_results.created_at AS validation_results_created_at, validation_results.updated_at AS validation_results_updated_at \nFROM validation_results \nWHERE validation_results.id = ?\n LIMIT ? OFFSET ?]\n[parameters: ('{validation_id}', 1, 0)]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:24.833345"
+    },
+    {
+      "method": "GET",
+      "path": "/api/recommendations",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"recommendations\": [], \"total\": 0}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:24.840037"
+    },
+    {
+      "method": "GET",
+      "path": "/api/recommendations/{recommendation_id}",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 404,
+      "status": "not_found",
+      "ok": false,
+      "preview": "{\"detail\": \"Recommendation not found\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:24.842039"
+    },
+    {
+      "method": "POST",
+      "path": "/api/recommendations/{recommendation_id}/review",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"status\"], \"msg\": \"Field required\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:24.844041"
+    },
+    {
+      "method": "POST",
+      "path": "/api/recommendations/bulk-review",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"action\"], \"msg\": \"Field required\", \"input\": null}, {\"type\": \"list_type\", \"loc\": [\"body\"], \"msg\": \"Input should be a valid list\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:24.847523"
+    },
+    {
+      "method": "POST",
+      "path": "/api/enhance",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"validation_id\"], \"msg\": \"Field required\", \"input\": {}}, {\"type\": \"missing\", \"loc\": [\"body\", \"file_path\"], \"msg\": \"Field required\", \"input\": {}}, {\"type...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:24.851266"
+    },
+    {
+      "method": "POST",
+      "path": "/api/enhance/auto-apply",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"validation_id\"], \"msg\": \"Field required\", \"input\": null}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:24.851266"
+    },
+    {
+      "method": "POST",
+      "path": "/workflows/validate-directory",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"directory_path\"], \"msg\": \"Field required\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:24.853271"
+    },
+    {
+      "method": "GET",
+      "path": "/workflows",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 500,
+      "status": "error",
+      "ok": false,
+      "preview": "{\"detail\": \"Failed to retrieve workflows\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:25.640137"
+    },
+    {
+      "method": "GET",
+      "path": "/workflows/{workflow_id}",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": null,
+      "status": "error",
+      "ok": false,
+      "preview": "",
+      "error": "(sqlite3.OperationalError) no such column: workflows.error_message\n[SQL: SELECT workflows.id AS workflows_id, workflows.type AS workflows_type, workflows.state AS workflows_state, workflows.input_params AS workflows_input_params, workflows.created_at AS workflows_created_at, workflows.updated_at AS workflows_updated_at, workflows.completed_at AS workflows_completed_at, workflows.metadata AS workflows_metadata, workflows.total_steps AS workflows_total_steps, workflows.current_step AS workflows_current_step, workflows.progress_percent AS workflows_progress_percent, workflows.error_message AS workflows_error_message \nFROM workflows \nWHERE workflows.id = ?\n LIMIT ? OFFSET ?]\n[parameters: ('{workflow_id}', 1, 0)]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:25.647727"
+    },
+    {
+      "method": "POST",
+      "path": "/workflows/{workflow_id}/control",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"action\"], \"msg\": \"Field required\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:25.665180"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"logs\": [], \"total\": 0}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:25.667182"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"name\": \"TBCV API\", \"version\": \"2.0.0\", \"description\": \"Truth-Based Content Validation and Enhancement System\", \"endpoints\": {\"health\": \"/health\", \"agents\": \"/agents\", \"validations\": \"/api/validation...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:25.669189"
+    },
+    {
+      "method": "GET",
+      "path": "/status",
+      "source": "registered",
+      "mode": "offline",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"status\": \"operational\", \"timestamp\": \"2025-10-28T10:13:25.669189\", \"version\": \"2.0.0\", \"components\": {\"database\": false, \"agents\": {\"total\": 0, \"registered\": []}, \"workflows\": {\"active\": 0, \"total\":...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:13:25.671196"
+    }
+  ]
+}

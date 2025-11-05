@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-11-03T16:05:28.879777",
+  "python_version": "3.12.9 | packaged by conda-forge | (main, Mar  4 2025, 22:37:18) [MSC v.1943 64 bit (AMD64)]",
+  "results": {
+    "all": {
+      "result": {
+        "returncode": 4,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.12.9, pytest-7.4.3, pluggy-1.6.0\nrootdir: D:\\\nconfigfile: pytest.ini\nplugins: anyio-4.11.0, langsmith-0.3.45, asyncio-0.21.1, cov-4.1.0, mock-3.15.1, timeout-2.4.0\nasyncio: mode=Mode.AUTO\ncollected 0 items\n\n============================ no tests ran in 0.01s ============================\n",
+        "stderr": "ERROR: file or directory not found: tests/test_everything.py\n\n",
+        "duration": 0.8261134624481201
+      },
+      "stats": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0,
+        "warnings": 0,
+        "duration": 0.0
+      }
+    }
+  },
+  "summary": {
+    "total_passed": 0,
+    "total_failed": 0,
+    "total_skipped": 0,
+    "total_duration": 0.0
+  }
+}

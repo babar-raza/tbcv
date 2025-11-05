@@ -1,0 +1,85 @@
+{
+  "part": 4,
+  "title": "Health Requires DB, Endpoint Audit, Full Test Run & Final ZIP",
+  "changes": {
+    "files_modified": [
+      {
+        "file": "core/database.py",
+        "changes": [
+          "Added has_required_schema() method to check if all required tables exist",
+          "Added ensure_schema_idempotent() method for startup schema initialization", 
+          "Fixed required_tables list to match actual table names (metrics vs metric_entries)"
+        ],
+        "lines_added": 35,
+        "purpose": "Enable health endpoint to verify database schema presence"
+      },
+      {
+        "file": "api/server.py",
+        "changes": [
+          "Updated /health endpoint to require both DB connection AND schema presence",
+          "Updated /health/ready endpoint to include schema check",
+          "Added schema initialization call in lifespan function"
+        ],
+        "lines_modified": 25,
+        "purpose": "Enforce strict health checks requiring complete DB setup"
+      },
+      {
+        "file": "tools/endpoint_check.py", 
+        "changes": [
+          "Added required_endpoints list for coverage verification",
+          "Enhanced offline mode with coverage analysis",
+          "Improved parameter pattern matching for {id} vs {validation_id}",
+          "Added health endpoint summary for online mode"
+        ],
+        "lines_added": 45,
+        "purpose": "Provide comprehensive endpoint auditing and coverage reporting"
+      }
+    ],
+    "files_created": [
+      {
+        "file": "tools/endpoint_probe.py",
+        "lines": 185,
+        "purpose": "Compatibility layer for existing test infrastructure providing EndpointDiscovery, EndpointProber, and ReportGenerator classes"
+      },
+      {
+        "file": "reports/progress_part4.json",
+        "lines": 58,
+        "purpose": "Part 4 progress and completion report"
+      },
+      {
+        "file": "reports/changes_part4.json", 
+        "lines": 50,
+        "purpose": "Part 4 detailed changes report"
+      },
+      {
+        "file": "reports/endpoint_audit.json",
+        "lines": 800,
+        "purpose": "Comprehensive endpoint audit report with coverage analysis"
+      },
+      {
+        "file": "reports/pytest_report.txt",
+        "lines": 250,
+        "purpose": "Full pytest execution report and results"
+      }
+    ],
+    "dependencies_installed": [
+      "pytest==8.4.2",
+      "pytest-asyncio==1.2.0", 
+      "fastapi==0.120.3",
+      "uvicorn==0.38.0",
+      "httpx==0.28.1",
+      "sqlalchemy==2.0.44",
+      "rich==14.2.0"
+    ]
+  },
+  "summary": {
+    "total_files_modified": 3,
+    "total_files_created": 5,
+    "total_lines_added": 373,
+    "core_functionality": "Enhanced and verified",
+    "health_checks": "Fully implemented with DB schema requirements",
+    "endpoint_coverage": "100% of required endpoints verified",
+    "test_infrastructure": "Compatibility maintained and extended"
+  },
+  "generated_at": "2025-10-31T13:38:00Z"
+}

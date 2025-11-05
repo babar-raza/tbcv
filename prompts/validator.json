@@ -1,0 +1,10 @@
+{
+  "contradiction_detection": {
+    "description": "Prompt for detecting contradictions in technical content",
+    "template": "Analyze this technical content for factual contradictions:\n\nCONTENT:\n{content}\n\nDETECTED PLUGINS:\n{plugin_info}\n\nAPI PATTERNS EXPECTED:\n{api_patterns}\n\nVALIDATION REQUIREMENTS:\n{validation_requirements}\n\nCheck for:\n1. Incorrect API usage patterns\n2. Wrong format claims  \n3. Incompatible plugin combinations\n4. Outdated method references\n5. Missing required imports or dependencies\n\nRespond with JSON: {{\"contradictions\": [{{\"issue\": \"description\", \"severity\": \"high|medium|low\", \"location\": \"code|text|yaml\"}}]}}"
+  },
+  "omission_detection": {
+    "description": "Prompt for detecting missing information in technical content",
+    "template": "Analyze this technical content for missing important information:\n\nCONTENT:\n{content}\n\nDETECTED PLUGINS:\n{plugin_info}\n\nVALIDATION REQUIREMENTS:\n{validation_requirements}\n\nCODE QUALITY RULES:\n{code_quality_rules}\n\nCheck for missing:\n1. Required using/import statements\n2. Error handling patterns\n3. Resource disposal (using statements)\n4. Plugin dependencies explanation\n5. Performance considerations\n6. Security best practices\n\nRespond with JSON: {{\"omissions\": [{{\"missing\": \"description\", \"importance\": \"critical|important|nice-to-have\", \"suggestion\": \"how to fix\"}}]}}"
+  }
+}

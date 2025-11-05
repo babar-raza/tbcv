@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Recommendations - TBCV{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: 30px;">Recommendations</h1>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <form method="GET" style="display: flex; gap: 15px; align-items: center; width: 100%;">
+        <label for="status">Status:</label>
+        <select name="status" id="status" onchange="this.form.submit()">
+            <option value="">All</option>
+            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="accepted" {% if status_filter == 'accepted' %}selected{% endif %}>Accepted</option>
+            <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+            <option value="applied" {% if status_filter == 'applied' %}selected{% endif %}>Applied</option>
+        </select>
+        
+        <label for="type">Type:</label>
+        <select name="type" id="type" onchange="this.form.submit()">
+            <option value="">All Types</option>
+            <option value="link_plugin" {% if type_filter == 'link_plugin' %}selected{% endif %}>Link Plugin</option>
+            <option value="fix_format" {% if type_filter == 'fix_format' %}selected{% endif %}>Fix Format</option>
+            <option value="add_info_text" {% if type_filter == 'add_info_text' %}selected{% endif %}>Add Info</option>
+        </select>
+        
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+</div>
+
+<!-- Recommendations Table -->
+<div class="card">
+    {% if recommendations %}
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Confidence</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rec in recommendations %}
+            <tr>
+                <td class="truncate">{{ rec.title }}</td>
+                <td><span class="badge badge-secondary">{{ rec.type }}</span></td>
+                <td><span class="badge badge-{{ rec.status }}">{{ rec.status }}</span></td>
+                <td><span class="badge badge-warning">{{ rec.priority }}</span></td>
+                <td>{{ "%.1f"|format(rec.confidence * 100) }}%</td>
+                <td>{{ rec.created_at }}</td>
+                <td class="actions">
+                    <a href="/dashboard/recommendations/{{ rec.id }}" class="btn btn-primary">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <!-- Pagination -->
+    {% if has_prev or has_next %}
+    <div class="pagination">
+        {% if has_prev %}
+        <a href="?page={{ page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}" class="btn btn-secondary">← Previous</a>
+        {% endif %}
+        <span style="padding: 8px 16px;">Page {{ page }}</span>
+        {% if has_next %}
+        <a href="?page={{ page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}" class="btn btn-secondary">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state">
+        <p>No recommendations found</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

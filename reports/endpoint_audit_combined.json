@@ -1,0 +1,451 @@
+{
+  "mode": "online",
+  "generated_at": "2025-10-31T13:37:44",
+  "routes": [
+    {
+      "path": "/stream",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 3,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/health",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/health/live",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/health/ready",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/agents",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/agents/{agent_id}",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/registry/agents",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/agents/validate",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/validate/batch",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/detect-plugins",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/validations",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/validations/{validation_id}",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/validations/import",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/validations/{validation_id}/approve",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/validations/{validation_id}/reject",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/enhance/{validation_id}",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/validations/bulk/approve",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/validations/bulk/reject",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/validations/bulk/enhance",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/recommendations",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/recommendations/{recommendation_id}",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/recommendations/{recommendation_id}/review",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/recommendations/bulk-review",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/agents/enhance",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/enhance/auto-apply",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/workflows/validate-directory",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/workflows",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/workflows/{workflow_id}",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/workflows/{workflow_id}/control",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/api/audit",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/validation-notes",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/enhance",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/status",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/{workflow_id}/pause",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/{workflow_id}/resume",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/{workflow_id}/cancel",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/{workflow_id}/status",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/validations",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/validations/{validation_id}",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/recommendations",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/recommendations/{recommendation_id}",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/recommendations/{recommendation_id}/review",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/recommendations/bulk-review",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/audit",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/validations.json",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/validations.csv",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/recommendations.json",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/audit-logs.json",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/report.md",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/workflows.json",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    },
+    {
+      "path": "/validation/{validation_id}/diff.json",
+      "probe": {
+        "status_code": null,
+        "elapsed_ms": 0,
+        "error": "[Errno 111] Connection refused"
+      }
+    }
+  ],
+  "required_endpoints": [
+    "/health",
+    "/health/live",
+    "/health/ready",
+    "/api/validations",
+    "/api/validations/{id}",
+    "/api/validations/{id}/approve",
+    "/api/validations/{id}/reject",
+    "/api/enhance/{id}",
+    "/api/validations/bulk/approve",
+    "/api/validations/bulk/reject",
+    "/api/validations/bulk/enhance",
+    "/api/validations/import"
+  ],
+  "source": "online-probe",
+  "health_summary": {
+    "/health": {
+      "status_code": null,
+      "response": null
+    },
+    "/health/live": {
+      "status_code": null,
+      "response": null
+    },
+    "/health/ready": {
+      "status_code": null,
+      "response": null
+    }
+  }
+}

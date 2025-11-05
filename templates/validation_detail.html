@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}Validation Details - TBCV{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="/dashboard/validations" class="btn btn-secondary">← Back to Validations</a>
+</div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>Validation Details</h2>
+        
+        <!-- Action Buttons -->
+        <div id="actionButtons" style="display: flex; gap: 10px;">
+            {% if validation.status not in ['approved', 'rejected', 'enhanced'] %}
+            <button class="btn btn-success" onclick="performAction('approve')">
+                Approve
+            </button>
+            <button class="btn btn-danger" onclick="performAction('reject')">
+                Reject
+            </button>
+            {% endif %}
+            {% if validation.status == 'approved' %}
+            <button class="btn btn-warning" onclick="performAction('enhance')">
+                Enhance
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="detail-grid">
+        <div class="detail-label">ID:</div>
+        <div class="detail-value"><code>{{ validation.id }}</code></div>
+        
+        <div class="detail-label">File Path:</div>
+        <div class="detail-value">{{ validation.file_path }}</div>
+        
+        <div class="detail-label">Status:</div>
+        <div class="detail-value">
+            <span id="statusBadge" class="badge badge-{{ validation.status }}">{{ validation.status }}</span>
+        </div>
+        
+        <div class="detail-label">Severity:</div>
+        <div class="detail-value">
+            <span class="badge badge-{{ validation.severity }}">{{ validation.severity }}</span>
+        </div>
+        
+        <div class="detail-label">Created:</div>
+        <div class="detail-value">{{ validation.created_at }}</div>
+        
+        <div class="detail-label">Updated:</div>
+        <div class="detail-value" id="updatedAt">{{ validation.updated_at }}</div>
+    </div>
+    
+    {% if validation.notes %}
+    <div style="margin-top: 20px;">
+        <h3 style="margin-bottom: 10px;">Notes</h3>
+        <p id="validationNotes">{{ validation.notes }}</p>
+    </div>
+    {% endif %}
+    
+    {% if validation.validation_results %}
+    <div style="margin-top: 20px;">
+        <h3 style="margin-bottom: 10px;">Validation Results</h3>
+        <pre>{{ validation.validation_results | tojson(indent=2) }}</pre>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Recommendations -->
+<div class="card">
+    <h2>Recommendations ({{ recommendations|length }})</h2>
+    {% if recommendations %}
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Confidence</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rec in recommendations %}
+            <tr>
+                <td class="truncate">{{ rec.title }}</td>
+                <td><span class="badge badge-secondary">{{ rec.type }}</span></td>
+                <td><span class="badge badge-{{ rec.status }}">{{ rec.status }}</span></td>
+                <td><span class="badge badge-warning">{{ rec.priority }}</span></td>
+                <td>{{ "%.1f"|format(rec.confidence * 100) }}%</td>
+                <td class="actions">
+                    <a href="/dashboard/recommendations/{{ rec.id }}" class="btn btn-primary">Review</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No recommendations for this validation</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Status Messages -->
+<div id="statusMessages" style="position: fixed; top: 20px; right: 20px; z-index: 1000;"></div>
+
+<script>
+const validationId = '{{ validation.id }}';
+let ws = null;
+
+// Initialize WebSocket connection for live updates
+function initWebSocket() {
+    ws = new WebSocket(`ws://${window.location.host}/ws/validation_updates`);
+    
+    ws.onopen = function() {
+        console.log('WebSocket connected for validation detail updates');
+    };
+    
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        console.log('Received update:', data);
+        
+        if (data.type === 'progress_update') {
+            handleValidationUpdate(data.data);
+        }
+    };
+    
+    ws.onclose = function() {
+        console.log('WebSocket disconnected');
+        // Attempt to reconnect after 5 seconds
+        setTimeout(initWebSocket, 5000);
+    };
+    
+    ws.onerror = function(error) {
+        console.error('WebSocket error:', error);
+    };
+}
+
+// Handle validation updates from WebSocket
+function handleValidationUpdate(data) {
+    const updateValidationId = data.validation_id || (data.validation_ids && data.validation_ids[0]);
+    
+    if (updateValidationId === validationId) {
+        const statusBadge = document.getElementById('statusBadge');
+        const actionButtons = document.getElementById('actionButtons');
+        
+        if (data.type.includes('approved')) {
+            statusBadge.textContent = 'approved';
+            statusBadge.className = 'badge badge-approved';
+            updateActionButtons('approved');
+            showMessage('Validation approved', 'success');
+        } else if (data.type.includes('rejected')) {
+            statusBadge.textContent = 'rejected';
+            statusBadge.className = 'badge badge-rejected';
+            updateActionButtons('rejected');
+            showMessage('Validation rejected', 'warning');
+        } else if (data.type.includes('enhanced')) {
+            statusBadge.textContent = 'enhanced';
+            statusBadge.className = 'badge badge-enhanced';
+            updateActionButtons('enhanced');
+            showMessage('Validation enhanced', 'success');
+            
+            // Update notes if enhancement details are available
+            if (data.enhancements && data.enhancements.length > 0) {
+                const notesElement = document.getElementById('validationNotes');
+                if (notesElement) {
+                    const enhancement = data.enhancements[0];
+                    notesElement.innerHTML += `<br><br><strong>Enhancement Applied:</strong> ${enhancement.timestamp}`;
+                }
+            }
+        }
+        
+        // Update timestamp
+        document.getElementById('updatedAt').textContent = new Date().toISOString();
+    }
+}
+
+// Update action buttons based on status
+function updateActionButtons(status) {
+    const actionButtons = document.getElementById('actionButtons');
+    actionButtons.innerHTML = '';
+    
+    if (status === 'approved') {
+        const enhanceBtn = document.createElement('button');
+        enhanceBtn.className = 'btn btn-warning';
+        enhanceBtn.textContent = 'Enhance';
+        enhanceBtn.onclick = () => performAction('enhance');
+        actionButtons.appendChild(enhanceBtn);
+    } else if (status === 'pass' || status === 'fail' || status === 'warning') {
+        const approveBtn = document.createElement('button');
+        approveBtn.className = 'btn btn-success';
+        approveBtn.textContent = 'Approve';
+        approveBtn.onclick = () => performAction('approve');
+        actionButtons.appendChild(approveBtn);
+        
+        const rejectBtn = document.createElement('button');
+        rejectBtn.className = 'btn btn-danger';
+        rejectBtn.textContent = 'Reject';
+        rejectBtn.onclick = () => performAction('reject');
+        actionButtons.appendChild(rejectBtn);
+    }
+}
+
+// Perform action on validation
+async function performAction(action) {
+    try {
+        let endpoint;
+        if (action === 'enhance') {
+            endpoint = `/api/enhance/${validationId}`;
+        } else {
+            endpoint = `/api/validations/${validationId}/${action}`;
+        }
+        
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showMessage(result.message, 'success');
+            // The WebSocket will handle the UI update
+        } else {
+            showMessage(`Failed to ${action}: ${result.errors?.join(', ') || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        console.error(`Error ${action}ing validation:`, error);
+        showMessage(`Error ${action}ing validation: ${error.message}`, 'error');
+    }
+}
+
+// Show status message
+function showMessage(message, type) {
+    const messagesContainer = document.getElementById('statusMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `alert alert-${type}`;
+    messageDiv.style.cssText = 'margin-bottom: 10px; padding: 10px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);';
+    messageDiv.textContent = message;
+    
+    messagesContainer.appendChild(messageDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.parentNode.removeChild(messageDiv);
+        }
+    }, 5000);
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initWebSocket();
+});
+</script>
+
+<style>
+.alert {
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
+.alert-error {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.badge-approved {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-rejected {
+    background-color: #dc3545;
+    color: white;
+}
+
+.badge-enhanced {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+.detail-label {
+    font-weight: bold;
+    color: #333;
+}
+
+.detail-value {
+    padding: 5px;
+}
+</style>
+
+{% endblock %}

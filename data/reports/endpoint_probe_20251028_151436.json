@@ -1,0 +1,610 @@
+{
+  "timestamp": "2025-10-28T10:14:36.829944",
+  "mode": "live",
+  "base_url": "http://127.0.0.1:8080",
+  "summary": {
+    "total_registered": 28,
+    "total_declared": 0,
+    "declared_only": 0,
+    "total_probed": 28,
+    "ok_count": 14,
+    "error_count": 14,
+    "declared_only_count": 0
+  },
+  "endpoints": {
+    "registered": [
+      {
+        "method": "GET",
+        "path": "/openapi.json",
+        "source": "registered",
+        "function_name": "openapi",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/docs",
+        "source": "registered",
+        "function_name": "swagger_ui_html",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/docs/oauth2-redirect",
+        "source": "registered",
+        "function_name": "swagger_ui_redirect",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/redoc",
+        "source": "registered",
+        "function_name": "redoc_html",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/health",
+        "source": "registered",
+        "function_name": "health_check",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/health/live",
+        "source": "registered",
+        "function_name": "health_live",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/health/ready",
+        "source": "registered",
+        "function_name": "health_ready",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/agents",
+        "source": "registered",
+        "function_name": "list_agents",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/agents/{agent_id}",
+        "source": "registered",
+        "function_name": "get_agent_info",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/registry/agents",
+        "source": "registered",
+        "function_name": "get_agent_registry",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/validate",
+        "source": "registered",
+        "function_name": "validate_content",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/validate/batch",
+        "source": "registered",
+        "function_name": "batch_validate_content",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/detect-plugins",
+        "source": "registered",
+        "function_name": "detect_plugins",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/validations",
+        "source": "registered",
+        "function_name": "list_validations",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/validations/{validation_id}",
+        "source": "registered",
+        "function_name": "get_validation",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/recommendations",
+        "source": "registered",
+        "function_name": "list_recommendations",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/recommendations/{recommendation_id}",
+        "source": "registered",
+        "function_name": "get_recommendation",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/recommendations/{recommendation_id}/review",
+        "source": "registered",
+        "function_name": "review_recommendation",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/recommendations/bulk-review",
+        "source": "registered",
+        "function_name": "bulk_review_recommendations",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/enhance",
+        "source": "registered",
+        "function_name": "enhance_content",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/enhance/auto-apply",
+        "source": "registered",
+        "function_name": "auto_apply_high_confidence_recommendations",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/workflows/validate-directory",
+        "source": "registered",
+        "function_name": "validate_directory_workflow",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/workflows",
+        "source": "registered",
+        "function_name": "list_workflows",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/workflows/{workflow_id}",
+        "source": "registered",
+        "function_name": "get_workflow_status",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "POST",
+        "path": "/workflows/{workflow_id}/control",
+        "source": "registered",
+        "function_name": "control_workflow",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/audit",
+        "source": "registered",
+        "function_name": "list_audit_logs",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/",
+        "source": "registered",
+        "function_name": "root",
+        "file_path": null,
+        "line_number": null
+      },
+      {
+        "method": "GET",
+        "path": "/status",
+        "source": "registered",
+        "function_name": "system_status",
+        "file_path": null,
+        "line_number": null
+      }
+    ],
+    "declared": [],
+    "declared_only": []
+  },
+  "probe_results": [
+    {
+      "method": "GET",
+      "path": "/openapi.json",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"openapi\": \"3.1.0\", \"info\": {\"title\": \"TBCV API\", \"description\": \"Truth-Based Content Validation and Enhancement System\", \"version\": \"2.0.0\"}, \"paths\": {\"/health\": {\"get\": {\"summary\": \"Health Check\",...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.006314"
+    },
+    {
+      "method": "GET",
+      "path": "/docs",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "\n    <!DOCTYPE html>\n    <html>\n    <head>\n    <link type=\"text/css\" rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css\">\n    <link rel=\"shortcut icon\" href=\"https://...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.008329"
+    },
+    {
+      "method": "GET",
+      "path": "/docs/oauth2-redirect",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "\n    <!doctype html>\n    <html lang=\"en-US\">\n    <head>\n        <title>Swagger UI: OAuth2 Redirect</title>\n    </head>\n    <body>\n    <script>\n        'use strict';\n        function run () {\n         ...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.009437"
+    },
+    {
+      "method": "GET",
+      "path": "/redoc",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "\n    <!DOCTYPE html>\n    <html>\n    <head>\n    <title>TBCV API - ReDoc</title>\n    <!-- needed for adaptive design -->\n    <meta charset=\"utf-8\"/>\n    <meta name=\"viewport\" content=\"width=device-width...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.010329"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"status\": \"degraded\", \"timestamp\": \"2025-10-28T10:14:34.012369\", \"agents_registered\": 6, \"database_connected\": false, \"version\": \"2.0.0\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.012369"
+    },
+    {
+      "method": "GET",
+      "path": "/health/live",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"status\": \"alive\", \"timestamp\": \"2025-10-28T10:14:34.013327\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.013327"
+    },
+    {
+      "method": "GET",
+      "path": "/health/ready",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"status\": \"not_ready\", \"timestamp\": \"2025-10-28T10:14:34.014335\", \"checks\": {\"database\": false, \"agents\": true}}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.015335"
+    },
+    {
+      "method": "GET",
+      "path": "/agents",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"agents\": [{\"agent_id\": \"truth_manager\", \"agent_type\": \"TruthManagerAgent\", \"status\": \"active\"}, {\"agent_id\": \"fuzzy_detector\", \"agent_type\": \"FuzzyDetectorAgent\", \"status\": \"active\"}, {\"agent_id\": \"...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.016335"
+    },
+    {
+      "method": "GET",
+      "path": "/agents/{agent_id}",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 404,
+      "status": "not_found",
+      "ok": false,
+      "preview": "{\"detail\": \"Agent {agent_id} not found\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.018375"
+    },
+    {
+      "method": "GET",
+      "path": "/registry/agents",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"total_agents\": 6, \"agents\": {\"truth_manager\": {\"type\": \"TruthManagerAgent\", \"contract\": \"TruthManagerAgent\", \"capabilities\": [\"load_truth_data\", \"get_plugin_info\", \"search_plugins\"]}, \"fuzzy_detecto...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.018375"
+    },
+    {
+      "method": "POST",
+      "path": "/api/validate",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"content\"], \"msg\": \"Field required\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.018375"
+    },
+    {
+      "method": "POST",
+      "path": "/api/validate/batch",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"files\"], \"msg\": \"Field required\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.018375"
+    },
+    {
+      "method": "POST",
+      "path": "/api/detect-plugins",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"detections\": [], \"detection_count\": 0, \"confidence\": 0.0, \"family\": \"words\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.018375"
+    },
+    {
+      "method": "GET",
+      "path": "/api/validations",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 500,
+      "status": "error",
+      "ok": false,
+      "preview": "{\"detail\": \"Failed to retrieve validations\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.043796"
+    },
+    {
+      "method": "GET",
+      "path": "/api/validations/{validation_id}",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 500,
+      "status": "error",
+      "ok": false,
+      "preview": "Internal Server Error",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:34.064789"
+    },
+    {
+      "method": "GET",
+      "path": "/api/recommendations",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"recommendations\": [], \"total\": 0}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.658791"
+    },
+    {
+      "method": "GET",
+      "path": "/api/recommendations/{recommendation_id}",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 404,
+      "status": "not_found",
+      "ok": false,
+      "preview": "{\"detail\": \"Recommendation not found\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.679701"
+    },
+    {
+      "method": "POST",
+      "path": "/api/recommendations/{recommendation_id}/review",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"status\"], \"msg\": \"Field required\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.683733"
+    },
+    {
+      "method": "POST",
+      "path": "/api/recommendations/bulk-review",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"action\"], \"msg\": \"Field required\", \"input\": null}, {\"type\": \"list_type\", \"loc\": [\"body\"], \"msg\": \"Input should be a valid list\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.686714"
+    },
+    {
+      "method": "POST",
+      "path": "/api/enhance",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"validation_id\"], \"msg\": \"Field required\", \"input\": {}}, {\"type\": \"missing\", \"loc\": [\"body\", \"file_path\"], \"msg\": \"Field required\", \"input\": {}}, {\"type...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.688700"
+    },
+    {
+      "method": "POST",
+      "path": "/api/enhance/auto-apply",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"validation_id\"], \"msg\": \"Field required\", \"input\": null}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.704477"
+    },
+    {
+      "method": "POST",
+      "path": "/workflows/validate-directory",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"directory_path\"], \"msg\": \"Field required\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.704477"
+    },
+    {
+      "method": "GET",
+      "path": "/workflows",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 500,
+      "status": "error",
+      "ok": false,
+      "preview": "{\"detail\": \"Failed to retrieve workflows\"}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.725952"
+    },
+    {
+      "method": "GET",
+      "path": "/workflows/{workflow_id}",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 500,
+      "status": "error",
+      "ok": false,
+      "preview": "Internal Server Error",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.736356"
+    },
+    {
+      "method": "POST",
+      "path": "/workflows/{workflow_id}/control",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 422,
+      "status": "unprocessable",
+      "ok": false,
+      "preview": "{\"detail\": [{\"type\": \"missing\", \"loc\": [\"body\", \"action\"], \"msg\": \"Field required\", \"input\": {}}]}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.743671"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"logs\": [], \"total\": 0}",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.776456"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"name\": \"TBCV API\", \"version\": \"2.0.0\", \"description\": \"Truth-Based Content Validation and Enhancement System\", \"endpoints\": {\"health\": \"/health\", \"agents\": \"/agents\", \"validations\": \"/api/validation...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.816609"
+    },
+    {
+      "method": "GET",
+      "path": "/status",
+      "source": "registered",
+      "mode": "live",
+      "status_code": 200,
+      "status": "ok",
+      "ok": true,
+      "preview": "{\"status\": \"operational\", \"timestamp\": \"2025-10-28T10:14:36.829944\", \"version\": \"2.0.0\", \"components\": {\"database\": false, \"agents\": {\"total\": 6, \"registered\": [\"truth_manager\", \"fuzzy_detector\", \"con...",
+      "error": null,
+      "allow_methods": null,
+      "timestamp": "2025-10-28T10:14:36.829944"
+    }
+  ]
+}

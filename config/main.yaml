@@ -1,0 +1,178 @@
+# TBCV Main Configuration File
+system:
+  name: "TBCV"
+  version: "2.0.0"
+  environment: "development"
+  debug: true
+  log_level: "info"
+  timezone: "UTC"
+  data_directory: "./data"
+  temp_directory: "./data/temp"
+
+server:
+  host: "localhost"
+  port: 8080
+  enable_cors: true
+  cors_origins: 
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+  request_timeout_seconds: 30
+  max_request_size_mb: 50
+  websocket_ping_interval: 30
+  websocket_ping_timeout: 10
+
+agents:
+  fuzzy_detector:
+    enabled: true
+    similarity_threshold: 0.85
+    context_window_chars: 200
+    max_patterns: 500
+    fuzzy_algorithms:
+      - "levenshtein"
+      - "jaro_winkler"
+    pattern_cache_size: 1000
+    
+  content_validator:
+    enabled: true
+    html_sanitization: true
+    link_validation: true
+    link_timeout_seconds: 5
+    image_validation: false
+    yaml_strict_mode: false
+    markdown_extensions:
+      - "tables"
+      - "fenced_code"
+      - "codehilite"
+    
+  content_enhancer:
+    enabled: true
+    auto_link_plugins: true
+    add_info_text: true
+    prevent_duplicate_links: true
+    link_template: "https://products.aspose.com/words/net/plugins/{slug}/"
+    info_text_template: "*This code requires the **{plugin_name}** plugin.*"
+    
+  orchestrator:
+    enabled: true
+    max_concurrent_workflows: 50
+    workflow_timeout_seconds: 3600
+    checkpoint_interval_seconds: 30
+    retry_attempts: 3
+    retry_backoff_base: 1.0
+    
+  truth_manager:
+    enabled: true
+    auto_reload: true
+    validation_strict: false
+    cache_ttl_seconds: 604800  # 7 days
+    truth_directories:
+      - "./truth"
+      - "./truth/words"
+      - "./truth/pdf"
+      - "./truth/cells"
+
+cache:
+  l1:
+    enabled: true
+    max_entries: 1000
+    max_memory_mb: 256
+    ttl_seconds: 3600
+    cleanup_interval_seconds: 300
+    eviction_policy: "LRU"
+    
+  l2:
+    enabled: true
+    database_path: "./data/cache/tbcv_cache.db"
+    max_size_mb: 1024
+    cleanup_interval_hours: 24
+    compression_enabled: true
+    compression_threshold_bytes: 1024
+
+truth:
+  default_family: "words"
+  truth_files:
+    words: "./truth/aspose_words_plugins_truth.json"
+    combinations: "./truth/aspose_words_plugins_combinations.json"
+  pattern_types:
+    - "format"
+    - "api"
+    - "method"
+  confidence_weights:
+    exact_match: 1.0
+    fuzzy_match: 0.8
+    context_match: 0.1
+
+performance:
+  max_concurrent_workflows: 50
+  worker_pool_size: 4
+  memory_limit_mb: 2048
+  cpu_limit_percent: 80
+  file_size_limits:
+    small_kb: 5
+    medium_kb: 50
+    large_kb: 1000
+  response_time_targets:
+    small_file_ms: 300
+    medium_file_ms: 1000
+    large_file_ms: 3000
+
+workflows:
+  types:
+    - "validate_file"
+    - "validate_directory"
+    - "full_validation"
+    - "content_update"
+  checkpoints:
+    - "workflow_start"
+    - "detection_start"
+    - "fuzzy_analysis"
+    - "context_analysis"
+    - "detection_complete"
+    - "validation_start"
+    - "validation_complete"
+    - "enhancement_start"
+    - "enhancement_complete"
+    - "workflow_complete"
+
+logging:
+  level: "INFO"
+  format: "json"
+  file_path: "./data/logs/tbcv.log"
+  max_file_size_mb: 100
+  backup_count: 5
+  console_output: true
+  structured_logging: true
+
+monitoring:
+  enabled: true
+  metrics_endpoint: "/metrics"
+  health_endpoint: "/health"
+  collect_system_metrics: true
+  collect_application_metrics: true
+  prometheus_port: 9090
+
+database:
+  url: "sqlite:///./data/tbcv.db"
+  echo: false
+  pool_size: 20
+  max_overflow: 30
+  pool_timeout: 30
+  pool_recycle: 3600
+  connect_args:
+    check_same_thread: false
+
+batch_processing:
+  default_workers: 4
+  max_workers: 16
+  worker_timeout_seconds: 300
+  queue_size_limit: 1000
+  memory_limit_per_worker_mb: 256
+  progress_reporting_interval_seconds: 5
+  file_patterns:
+    - "*.md"
+    - "*.markdown"
+  exclude_patterns:
+    - ".git/*"
+    - "node_modules/*"
+    - "*.tmp"
+    - "*~"
