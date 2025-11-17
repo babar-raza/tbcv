@@ -1,0 +1,14 @@
+TBCV Version 2.0.0 - Fixed & Enhanced
+Release Date: November 2025
+Build: Production-Ready
+
+Changes:
+- Fixed critical enhancement bug
+- Added path validation security
+- Completed context loading
+- Enhanced configuration
+- Added startup validation
+- Improved documentation
+
+For detailed changes, see CHANGELOG.md
+For setup instructions, see SETUP_GUIDE.md

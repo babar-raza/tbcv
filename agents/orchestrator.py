@@ -3,22 +3,28 @@
 OrchestratorAgent - Workflow coordination and batch processing.
 Manages complex workflows involving multiple agents and file processing.
 
-Rebased fixes:
-- Provide checkpoints=[] in AgentContract to satisfy base contract signature.
-- Register "get_contract" to the existing method (self.get_contract) instead of a non-existent handler.
-- Use structured project logger (get_logger) and avoid passing arbitrary keyword args to logging methods.
+Includes:
+- checkpoints=[] in AgentContract
+- register "get_contract" correctly
+- structured logger via get_logger
+- fuzzy detection optional (respects disabled/unregistered)
+- plugin_aliases/api_patterns derived from TruthManager
+- PER-AGENT CONCURRENCY GATES to avoid 'busy'
+- WAIT-UNTIL-READY with timeout + exponential backoff
+- TWO-STAGE GATING PIPELINE with mode switching (two_stage, heuristic_only, llm_only)
 """
 
 from __future__ import annotations
-
 import asyncio
 import glob
 import os
+import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
-from agents.base import BaseAgent, AgentContract, AgentCapability, agent_registry
+from core.config import get_settings
+from agents.base import BaseAgent, AgentContract, AgentCapability, agent_registry, AgentStatus
 from core.logging import PerformanceLogger, get_logger
 
 logger = get_logger(__name__)
@@ -26,7 +32,6 @@ logger = get_logger(__name__)
 
 @dataclass
 class WorkflowResult:
-    """Result of a workflow execution."""
     job_id: str
     workflow_type: str
     status: str
@@ -48,13 +53,116 @@ class OrchestratorAgent(BaseAgent):
 
     def __init__(self, agent_id: Optional[str] = None):
         self.active_workflows: Dict[str, WorkflowResult] = {}
+        # Per-agent semaphores to limit concurrency (configurable)
+        self._agent_semaphores: Dict[str, asyncio.Semaphore] = {}
         super().__init__(agent_id)
+        self._init_concurrency_controls()
+
+    def _init_concurrency_controls(self):
+        """
+        Build per-agent concurrency limits from config.
+        Example in main.yaml:
+
+        orchestrator:
+          max_file_workers: 4
+          retry_timeout_s: 120
+          retry_backoff_base: 0.5
+          retry_backoff_cap: 8
+          agent_limits:
+            llm_validator: 1
+            content_validator: 2
+            truth_manager: 4
+            fuzzy_detector: 2
+        """
+        settings = get_settings()
+        limits = getattr(settings.orchestrator, "agent_limits", {}) or {}
+
+        # Defaults if not present in config
+        defaults = {
+            "llm_validator": 1,
+            "content_validator": 2,
+            "truth_manager": 4,
+            "fuzzy_detector": 2,
+        }
+
+        # Support both dict-like and attr-like access
+        def _get_limit(name: str, default: int) -> int:
+            if isinstance(limits, dict) and name in limits:
+                try:
+                    return max(1, int(limits[name]))
+                except Exception:
+                    return default
+            # attr-style (pydantic settings)
+            try:
+                v = getattr(limits, name, None)
+                if v is not None:
+                    return max(1, int(v))
+            except Exception:
+                pass
+            return default
+
+        for agent_name, default in defaults.items():
+            self._agent_semaphores[agent_name] = asyncio.Semaphore(_get_limit(agent_name, default))
+
+    async def _call_agent_gated(self, agent_id: str, method: str, params: dict):
+        """
+        Queue calls per agent to avoid 'busy'. Within the gate, we also wait-until-ready with timeout.
+        """
+        sem = self._agent_semaphores.get(agent_id)
+        if sem is None:
+            # Default to single-worker if agent not preconfigured
+            sem = self._agent_semaphores[agent_id] = asyncio.Semaphore(1)
+
+        async with sem:
+            return await self._call_agent_with_wait(agent_id, method, params)
+
+    async def _call_agent_with_wait(self, agent_id: str, method: str, params: dict):
+        """
+        Wait for the agent to become READY and handle 'busy' responses with backoff until timeout.
+        """
+        settings = get_settings()
+        timeout_s = float(getattr(settings.orchestrator, "retry_timeout_s", 120.0))
+        backoff_base = float(getattr(settings.orchestrator, "retry_backoff_base", 0.5))
+        backoff_cap = float(getattr(settings.orchestrator, "retry_backoff_cap", 8.0))
+
+        agent = agent_registry.get_agent(agent_id)
+        if agent is None:
+            raise RuntimeError(f"Agent '{agent_id}' not registered")
+
+        deadline = time.monotonic() + max(1.0, timeout_s)
+        delay = max(0.05, backoff_base)
+
+        while True:
+            # If agent exposes status, prefer to wait for READY before calling
+            status = getattr(agent, "status", None)
+            if status == AgentStatus.READY or status is None:
+                try:
+                    return await agent.process_request(method, params)
+                except Exception as e:
+                    msg = str(e)
+                    # Only treat explicit 'busy' as retryable
+                    if "Agent not ready (status: busy)" not in msg:
+                        raise
+                    # fall through to sleep/backoff
+            else:
+                # Status indicates not ready; will wait below
+                pass
+
+            # Check timeout
+            now = time.monotonic()
+            if now >= deadline:
+                raise TimeoutError(
+                    f"Timed out waiting for agent '{agent_id}' to become READY "
+                    f"or accept requests within {timeout_s:.1f}s."
+                )
+
+            # Sleep with capped exponential backoff
+            await asyncio.sleep(delay)
+            delay = min(delay * 2.0, backoff_cap)
 
     def _register_message_handlers(self):
-        """Register workflow handlers."""
         self.register_handler("ping", self.handle_ping)
         self.register_handler("get_status", self.handle_get_status)
-        # FIX: register to the existing method rather than a non-existent handler
         self.register_handler("get_contract", self.get_contract)
         self.register_handler("validate_file", self.handle_validate_file)
         self.register_handler("validate_directory", self.handle_validate_directory)
@@ -62,11 +170,10 @@ class OrchestratorAgent(BaseAgent):
         self.register_handler("list_workflows", self.handle_list_workflows)
 
     def get_contract(self) -> AgentContract:
-        """Return agent contract."""
         return AgentContract(
             agent_id=self.agent_id,
             name="OrchestratorAgent",
-            version="1.0.0",
+            version="1.0.1",
             capabilities=[
                 AgentCapability(
                     name="validate_file",
@@ -80,260 +187,377 @@ class OrchestratorAgent(BaseAgent):
                         "required": ["file_path"]
                     },
                     output_schema={"type": "object"},
-                    side_effects=["read", "db_write"]
+                    side_effects=["read", "network"]
                 ),
                 AgentCapability(
                     name="validate_directory",
-                    description="Validate all files in a directory using multiple agents",
+                    description="Validate all files in a directory",
                     input_schema={
                         "type": "object",
                         "properties": {
                             "directory_path": {"type": "string"},
-                            "file_pattern": {"type": "string", "default": "*.md"},
-                            "max_workers": {"type": "integer", "default": 4},
+                            "pattern": {"type": "string", "default": "**/*.md"},
                             "family": {"type": "string", "default": "words"}
                         },
                         "required": ["directory_path"]
                     },
                     output_schema={"type": "object"},
-                    side_effects=["read", "db_write"]
+                    side_effects=["read", "network"]
                 )
             ],
-            max_runtime_s=600,  # 10 minutes for batch operations
-            confidence_threshold=0.7,
-            side_effects=["read", "db_write"],
-            dependencies=["content_validator", "fuzzy_detector", "llm_validator", "truth_manager"],
-            checkpoints=[]  # REQUIRED by AgentContract in your base.py
+            max_runtime_s=600,
+            confidence_threshold=0.0,
+            side_effects=["read", "network"],
+            dependencies=["content_validator", "truth_manager"],
+            checkpoints=[]
         )
 
-    def _validate_configuration(self):
-        """Validate orchestrator configuration."""
-        # No specific configuration needed
-        pass
-
     async def handle_validate_file(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate a single file using the validation pipeline."""
-        file_path = params.get("file_path")
-        family = params.get("family", "words")
+        with PerformanceLogger(self.logger, "validate_file"):
+            file_path = params.get("file_path")
+            family = params.get("family", "words")
 
-        if not file_path:
-            raise ValueError("file_path is required")
+            if not file_path or not os.path.exists(file_path):
+                return {"status": "error", "message": f"File not found: {file_path}"}
 
-        try:
-            # Read file content
-            path_obj = Path(file_path)
-            if not path_obj.exists():
-                raise FileNotFoundError(f"File not found: {file_path}")
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
 
-            with open(path_obj, 'r', encoding='utf-8') as f:
-                content = f.read()
+                result = await self._run_validation_pipeline(content, file_path, family)
+                result["status"] = "success"
+                return result
 
-            # Run validation pipeline
-            validation_result = await self._run_validation_pipeline(content, str(path_obj), family)
-
-            return {
-                "file_path": str(path_obj),
-                "family": family,
-                "validation_result": validation_result,
-                "status": "completed"
-            }
-
-        except Exception as e:
-            logger.exception("File validation failed")
-            return {
-                "file_path": file_path,
-                "family": family,
-                "status": "failed",
-                "error": str(e)
-            }
+            except Exception as e:
+                self.logger.exception("File validation failed")
+                return {"status": "error", "message": str(e), "file_path": file_path}
 
     async def handle_validate_directory(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate all files in a directory."""
-        directory_path = params.get("directory_path")
-        file_pattern = params.get("file_pattern", "*.md")
-        max_workers = int(params.get("max_workers", 4))
-        family = params.get("family", "words")
-
-        if not directory_path:
-            raise ValueError("directory_path is required")
-
         with PerformanceLogger(self.logger, "validate_directory"):
+            directory_path = params.get("directory_path")
+            pattern = params.get("pattern", "**/*.md")
+            family = params.get("family", "words")
+            max_workers = int(getattr(self.settings.orchestrator, "max_file_workers", 4))
+
+            if not directory_path or not os.path.isdir(directory_path):
+                return {"status": "error", "message": f"Directory not found: {directory_path}"}
+
+            # Generate job ID
+            job_id = f"batch_{int(time.time())}"
+
+            # Find files matching pattern
+            files = list(Path(directory_path).glob(pattern))
+            workflow_result = WorkflowResult(
+                job_id=job_id,
+                workflow_type="validate_directory",
+                status="running",
+                files_total=len(files)
+            )
+            self.active_workflows[job_id] = workflow_result
+
             try:
-                # Find matching files
-                dir_path = Path(directory_path)
-                if not dir_path.exists():
-                    raise FileNotFoundError(f"Directory not found: {directory_path}")
+                # Process files with limited concurrency
+                sem = asyncio.Semaphore(max_workers)
 
-                # Use glob to find files matching pattern
-                pattern_path = dir_path / file_pattern
-                matching_files = list(glob.glob(str(pattern_path), recursive=True))
+                async def process_file(file_path: Path):
+                    async with sem:
+                        try:
+                            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                                content = f.read()
+                            result = await self._run_validation_pipeline(content, str(file_path), family)
+                            workflow_result.files_validated += 1
+                            workflow_result.results.append(result)
+                        except Exception as e:
+                            workflow_result.files_failed += 1
+                            workflow_result.errors.append(f"{file_path}: {str(e)}")
+                            self.logger.warning(f"Failed to validate {file_path}: {e}")
 
-                # Also check subdirectories if pattern not already recursive
-                if "**" not in file_pattern:
-                    recursive_pattern = dir_path / "**" / file_pattern
-                    matching_files.extend(glob.glob(str(recursive_pattern), recursive=True))
+                # Run all file processing tasks
+                await asyncio.gather(*[process_file(f) for f in files])
 
-                # Remove duplicates and ensure they're files
-                unique_files: List[str] = []
-                seen = set()
-                for fp in matching_files:
-                    abs_path = os.path.abspath(fp)
-                    if abs_path not in seen and Path(abs_path).is_file():
-                        unique_files.append(abs_path)
-                        seen.add(abs_path)
-
-                logger.info(
-                    "Starting directory validation",
-                    extra={
-                        "directory": directory_path,
-                        "pattern": file_pattern,
-                        "files_found": len(unique_files),
-                        "family": family,
-                    },
-                )
-
-                # Process files concurrently
-                results = await self._process_files_concurrently(unique_files, family, max_workers)
-
-                # Compile summary
-                files_validated = len([r for r in results if r.get("status") == "completed"])
-                files_failed = len([r for r in results if r.get("status") == "failed"])
-                errors = [r.get("error", "") for r in results if r.get("error")]
-
+                workflow_result.status = "completed"
                 return {
-                    "directory_path": directory_path,
-                    "file_pattern": file_pattern,
-                    "family": family,
-                    "files_total": len(unique_files),
-                    "files_validated": files_validated,
-                    "files_failed": files_failed,
-                    "errors": errors[:10],  # Limit error list
-                    "results": results,
-                    "status": "completed"
+                    "status": "success",
+                    "job_id": job_id,
+                    "files_total": workflow_result.files_total,
+                    "files_validated": workflow_result.files_validated,
+                    "files_failed": workflow_result.files_failed,
+                    "results": workflow_result.results
                 }
 
             except Exception as e:
-                logger.exception("Directory validation failed")
-                return {
-                    "directory_path": directory_path,
-                    "file_pattern": file_pattern,
-                    "family": family,
-                    "files_total": 0,
-                    "files_validated": 0,
-                    "files_failed": 0,
-                    "errors": [str(e)],
-                    "status": "failed"
-                }
-
-    async def _process_files_concurrently(self, file_paths: List[str], family: str, max_workers: int) -> List[Dict[str, Any]]:
-        """Process multiple files concurrently."""
-        semaphore = asyncio.Semaphore(max_workers)
-
-        async def process_single_file(fp: str) -> Dict[str, Any]:
-            async with semaphore:
-                return await self.handle_validate_file({
-                    "file_path": fp,
-                    "family": family
-                })
-
-        tasks = [process_single_file(fp) for fp in file_paths]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        processed_results: List[Dict[str, Any]] = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                processed_results.append({
-                    "file_path": file_paths[i],
-                    "status": "failed",
-                    "error": str(result)
-                })
-            else:
-                processed_results.append(result)
-
-        return processed_results
+                workflow_result.status = "failed"
+                workflow_result.errors.append(str(e))
+                self.logger.exception("Directory validation failed")
+                return {"status": "error", "message": str(e), "job_id": job_id}
 
     async def _run_validation_pipeline(self, content: str, file_path: str, family: str) -> Dict[str, Any]:
-        """Run the complete validation pipeline for a file."""
+        """
+        Run validation pipeline based on configured mode:
+        - two_stage (default): run heuristic validation (stage 1), then LLM validation (stage 2) with gating
+        - heuristic_only: run only heuristic validation
+        - llm_only: run only LLM validation
+
+        When LLM is globally disabled, system behaves as heuristic_only regardless of mode.
+        """
+        settings = get_settings()
         pipeline_result: Dict[str, Any] = {
-            "truth_loading": None,
-            "plugin_detection": None,
-            "llm_validation": None,
-            "content_validation": None,
-            "overall_confidence": 0.0
+            "file_path": file_path,
+            "family": family,
         }
 
         try:
-            # Step 1: Load truth data
+            # Determine effective mode
+            configured_mode = getattr(settings.validation, "mode", "two_stage").lower()
+            llm_enabled = getattr(settings.llm, "enabled", True)
+            
+            # When LLM is disabled, fallback to heuristic_only
+            if not llm_enabled and configured_mode in {"two_stage", "llm_only"}:
+                effective_mode = "heuristic_only"
+                logger.info(
+                    f"LLM disabled, falling back to heuristic_only mode (configured: {configured_mode})",
+                    extra={"file_path": file_path}
+                )
+            else:
+                effective_mode = configured_mode
+
+            # Validate mode
+            if effective_mode not in {"two_stage", "heuristic_only", "llm_only"}:
+                logger.warning(
+                    f"Invalid validation mode '{effective_mode}', defaulting to two_stage",
+                    extra={"file_path": file_path}
+                )
+                effective_mode = "two_stage"
+
+            pipeline_result["validation_mode"] = effective_mode
+            pipeline_result["llm_enabled"] = llm_enabled
+
+            # Load plugin context from TruthManager
             truth_manager = agent_registry.get_agent("truth_manager")
+            plugin_aliases: List[str] = []
+            api_patterns: List[str] = []
             if truth_manager:
-                truth_result = await truth_manager.process_request("load_truth_data", {"family": family})
-                pipeline_result["truth_loading"] = truth_result
-                logger.debug("Truth data loaded", extra={"family": family, "success": truth_result.get("success", False)})
+                try:
+                    truth_result = await self._call_agent_gated(
+                        "truth_manager",
+                        "load_truth_data",
+                        {"family": family}
+                    )
+                    plugin_aliases = truth_result.get("plugin_aliases", [])
+                    api_patterns = truth_result.get("api_patterns", [])
+                except Exception as e:
+                    logger.warning(f"Failed to load truth data: {e}")
 
-            # Step 2: Detect plugins with fuzzy matching
-            fuzzy_detector = agent_registry.get_agent("fuzzy_detector")
-            fuzzy_detections = []
-            if fuzzy_detector:
-                detection_result = await fuzzy_detector.process_request("detect_plugins", {
-                    "text": content,
-                    "family": family,
-                    "confidence_threshold": 0.6
-                })
-                fuzzy_detections = detection_result.get("detections", [])
-                pipeline_result["plugin_detection"] = detection_result
-                logger.debug(
-                    "Plugin detection completed",
-                    extra={"file_path": file_path, "detections": detection_result.get("detection_count", 0)},
-                )
+            # ------------------------------------------------------------------
+            # STAGE 1: Heuristic validation (fuzzy + content validator)
+            # ------------------------------------------------------------------
+            fuzzy_detections: List[Dict[str, Any]] = []
+            heuristics_issues: List[Dict[str, Any]] = []
+            heuristics_confidence: float = 0.0
 
-            # Step 3: LLM validation (PRIORITY - verifies and finds missing plugins)
-            llm_validator = agent_registry.get_agent("llm_validator")
-            if llm_validator:
-                llm_result = await llm_validator.process_request("validate_plugins", {
-                    "content": content,
-                    "fuzzy_detections": fuzzy_detections,
-                    "family": family
-                })
-                pipeline_result["llm_validation"] = llm_result
-                logger.debug(
-                    "LLM validation completed",
-                    extra={
-                        "file_path": file_path,
-                        "requirements": len(llm_result.get("requirements", [])),
-                        "issues": len(llm_result.get("issues", [])),
-                    },
-                )
+            if effective_mode in {"two_stage", "heuristic_only"}:
+                # 1a) Fuzzy detection (optional, might not be registered)
+                fuzzy_detector = agent_registry.get_agent("fuzzy_detector")
+                if fuzzy_detector:
+                    try:
+                        fuzzy_result = await self._call_agent_gated(
+                            "fuzzy_detector",
+                            "detect_plugins",
+                            {
+                                "text": content,
+                                "family": family,
+                                "plugin_aliases": plugin_aliases,
+                                "api_patterns": api_patterns,
+                                "confidence_threshold": 0.6,
+                            }
+                        )
+                        pipeline_result["plugin_detection"] = fuzzy_result
+                        fuzzy_detections = fuzzy_result.get("detections", [])
+                        try:
+                            heuristics_confidence = float(fuzzy_result.get("confidence", 0.0))
+                        except Exception:
+                            heuristics_confidence = 0.0
+                        logger.debug(
+                            "Fuzzy detection completed",
+                            extra={
+                                "file_path": file_path,
+                                "detections": len(fuzzy_detections),
+                                "confidence": heuristics_confidence,
+                            },
+                        )
+                    except Exception as e:
+                        logger.warning(f"Fuzzy detection failed: {e}")
 
-            # Step 4: Validate content (uses both truths and rules)
-            content_validator = agent_registry.get_agent("content_validator")
-            if content_validator:
-                validation_result = await content_validator.process_request("validate_content", {
-                    "content": content,
-                    "file_path": file_path,
-                    "family": family,
-                    "validation_types": ["yaml", "markdown", "code", "links", "structure"]
-                })
-                pipeline_result["content_validation"] = validation_result
-                logger.debug(
-                    "Content validation completed",
-                    extra={
-                        "file_path": file_path,
-                        "confidence": validation_result.get("confidence", 0.0),
-                        "issues": len(validation_result.get("issues", [])),
-                    },
-                )
+                # 1b) Content validation (heuristic rules)
+                content_validator = agent_registry.get_agent("content_validator")
+                if content_validator:
+                    validation_result = await self._call_agent_gated(
+                        "content_validator",
+                        "validate_content",
+                        {
+                            "content": content,
+                            "file_path": file_path,
+                            "family": family,
+                            "validation_types": [
+                                "yaml",
+                                "markdown",
+                                "code",
+                                "links",
+                                "structure",
+                                "Truth",
+                                "FuzzyLogic",
+                            ],
+                        },
+                    )
+                    pipeline_result["content_validation"] = validation_result
+                    # Extract heuristic issues
+                    try:
+                        heuristics_issues = validation_result.get("issues", [])
+                    except Exception:
+                        heuristics_issues = []
+                    # Combine content validator confidence into heuristic score average
+                    try:
+                        cv_conf = float(validation_result.get("confidence", 0.0))
+                        # simple mean of detection and content confidences
+                        if heuristics_confidence > 0.0:
+                            heuristics_confidence = (heuristics_confidence + cv_conf) / 2.0
+                        else:
+                            heuristics_confidence = cv_conf
+                    except Exception:
+                        pass
+                    logger.debug(
+                        "Content validation completed",
+                        extra={
+                            "file_path": file_path,
+                            "confidence": float(validation_result.get("confidence", 0.0)) if isinstance(validation_result, dict) else 0.0,
+                            "issues": int(len(validation_result.get("issues", [])) if isinstance(validation_result, dict) else 0),
+                        },
+                    )
 
-            # Calculate overall confidence (give LLM higher weight)
+            # ------------------------------------------------------------------
+            # STAGE 2: LLM validation
+            # ------------------------------------------------------------------
+            llm_result: Dict[str, Any] | None = None
+            llm_confidence: float = 0.0
+            if effective_mode in {"two_stage", "llm_only"} and llm_enabled:
+                llm_validator = agent_registry.get_agent("llm_validator")
+                if llm_validator:
+                    # When in llm_only mode, pass empty heuristics detection lists
+                    llm_params = {
+                        "content": content,
+                        "family": family,
+                        "plugin_aliases": plugin_aliases,
+                        "api_patterns": api_patterns,
+                        "fuzzy_detections": fuzzy_detections if effective_mode == "two_stage" else [],
+                    }
+                    llm_result = await self._call_agent_gated(
+                        "llm_validator",
+                        "validate_plugins",
+                        llm_params,
+                    )
+                    pipeline_result["llm_validation"] = llm_result
+                    try:
+                        llm_confidence = float(llm_result.get("confidence", 0.0))
+                    except Exception:
+                        llm_confidence = 0.0
+                    logger.debug(
+                        "LLM validation completed",
+                        extra={
+                            "file_path": file_path,
+                            "requirements": int(len(llm_result.get("requirements", [])) if isinstance(llm_result, dict) else 0),
+                            "issues": int(len(llm_result.get("issues", [])) if isinstance(llm_result, dict) else 0),
+                        },
+                    )
+
+            # ------------------------------------------------------------------
+            # STAGE 3: Combine and gate issues
+            # ------------------------------------------------------------------
+            final_issues: List[Dict[str, Any]] = []
+            # Determine gating score: prefer LLM confidence when available, else heuristic confidence
+            gating_score: float = 0.0
+            if llm_result is not None:
+                gating_score = llm_confidence
+            else:
+                gating_score = heuristics_confidence
+
+            pipeline_result["gating_score"] = gating_score
+
+            # Retrieve thresholds from config
+            try:
+                thresholds = settings.validation.llm_thresholds
+                downgrade_th = float(getattr(thresholds, "downgrade_threshold", 0.2))
+                confirm_th = float(getattr(thresholds, "confirm_threshold", 0.5))
+                upgrade_th = float(getattr(thresholds, "upgrade_threshold", 0.8))
+            except Exception:
+                downgrade_th = 0.2
+                confirm_th = 0.5
+                upgrade_th = 0.8
+
+            # Helper to adjust issue severity
+            def _adjust_severity(issue: Dict[str, Any], decision: str) -> None:
+                level = issue.get("level", "info").lower()
+                new_level = level
+                if decision == "downgrade":
+                    if level == "error":
+                        new_level = "warning"
+                    elif level == "warning":
+                        new_level = "info"
+                elif decision == "upgrade":
+                    if level in ("info", "warning"):
+                        new_level = "error"
+                # else confirm: keep level
+                issue["level"] = new_level
+
+            # Decide gating action based on score
+            def _decide_action(score: float) -> str:
+                if score < downgrade_th:
+                    return "downgrade"
+                if score < confirm_th:
+                    return "confirm"
+                if score >= upgrade_th:
+                    return "upgrade"
+                return "confirm"
+
+            # Process heuristic issues (if any)
+            for issue in heuristics_issues or []:
+                # Copy to avoid mutating underlying objects
+                issue_copy = dict(issue)
+                issue_copy.setdefault("source_stage", "heuristic")
+                # Determine decision only in two_stage mode when LLM is available; else default to confirm
+                if llm_result is not None and effective_mode == "two_stage":
+                    decision = _decide_action(gating_score)
+                    issue_copy["llm_decision"] = decision
+                    _adjust_severity(issue_copy, decision)
+                else:
+                    # No LLM gating applied; mark decision as 'confirm'
+                    issue_copy["llm_decision"] = "confirm"
+                final_issues.append(issue_copy)
+
+            # Append LLM issues (if any)
+            if llm_result is not None:
+                for issue in llm_result.get("issues", []) or []:
+                    issue_copy = dict(issue)
+                    issue_copy.setdefault("source_stage", "llm")
+                    final_issues.append(issue_copy)
+
+            pipeline_result["final_issues"] = final_issues
+
+            # ------------------------------------------------------------------
+            # STAGE 4: Aggregate overall confidence
+            # ------------------------------------------------------------------
             confidences: List[float] = []
-            if pipeline_result["llm_validation"]:
-                # LLM gets double weight
-                llm_conf = float(pipeline_result["llm_validation"].get("confidence", 0.0))
-                confidences.extend([llm_conf, llm_conf])
-            if pipeline_result["plugin_detection"]:
-                confidences.append(float(pipeline_result["plugin_detection"].get("confidence", 0.0)))
-            if pipeline_result["content_validation"]:
-                confidences.append(float(pipeline_result["content_validation"].get("confidence", 0.0)))
-
+            if llm_result is not None:
+                confidences.extend([llm_confidence, llm_confidence])  # double weight
+            if pipeline_result.get("plugin_detection"):
+                try:
+                    confidences.append(float(pipeline_result["plugin_detection"].get("confidence", 0.0)))
+                except Exception:
+                    pass
+            if pipeline_result.get("content_validation"):
+                try:
+                    confidences.append(float(pipeline_result["content_validation"].get("confidence", 0.0)))
+                except Exception:
+                    pass
             pipeline_result["overall_confidence"] = sum(confidences) / len(confidences) if confidences else 0.0
 
             return pipeline_result
@@ -344,37 +568,25 @@ class OrchestratorAgent(BaseAgent):
             return pipeline_result
 
     async def handle_get_workflow_status(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Get status of a specific workflow."""
         job_id = params.get("job_id")
         if not job_id or job_id not in self.active_workflows:
             return {"found": False, "job_id": job_id}
-
         return {"found": True, "workflow": self.active_workflows[job_id]}
 
     async def handle_list_workflows(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """List all active workflows."""
-        return {
-            "workflows": list(self.active_workflows.values()),
-            "total_count": len(self.active_workflows)
-        }
+        return {"workflows": list(self.active_workflows.values()), "total_count": len(self.active_workflows)}
 
 
 # Self-test
 if __name__ == "__main__":
     async def _demo():
         orchestrator = OrchestratorAgent("test_orchestrator")
-
-        # Test file validation (optional, only if a test file exists)
         test_file = Path("test_content.md")
         if test_file.exists():
-            result = await orchestrator.handle_validate_file({
-                "file_path": str(test_file),
-                "family": "words"
-            })
+            result = await orchestrator.handle_validate_file({"file_path": str(test_file), "family": "words"})
             print("File validation result:", result.get("status"))
         else:
             print("Test file not found, skipping file validation test")
-
         print("Orchestrator agent ready")
 
     asyncio.run(_demo())

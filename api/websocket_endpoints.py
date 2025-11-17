@@ -1,19 +1,21 @@
+from __future__ import annotations
+
 # file: tbcv/api/websocket_endpoints.py
 """
 WebSocket endpoints for real-time progress updates (O05, I05, I20).
 This module provides WebSocket support for the TBCV system.
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Set
 from fastapi import WebSocket, WebSocketDisconnect
 from core.logging import get_logger
 
 logger = get_logger(__name__)
+
+PING_INTERVAL = 30  # seconds
 
 class ConnectionManager:
     """Manages WebSocket connections for real-time progress updates."""
@@ -99,6 +101,24 @@ async def websocket_endpoint(websocket: WebSocket, workflow_id: str):
     # Accept connection immediately to avoid 403
     await websocket.accept()
     
+    # Create a heartbeat task to keep connection alive
+    heartbeat_task = None
+    
+    async def send_heartbeat():
+        """Send periodic pings to keep connection alive"""
+        try:
+            while True:
+                await asyncio.sleep(30)  # Send heartbeat every 30 seconds
+                try:
+                    await websocket.send_text(json.dumps({
+                        "type": "heartbeat",
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }))
+                except Exception:
+                    break
+        except asyncio.CancelledError:
+            pass
+    
     try:
         # Register connection after accepting
         if workflow_id not in connection_manager.active_connections:
@@ -108,6 +128,9 @@ async def websocket_endpoint(websocket: WebSocket, workflow_id: str):
         connection_manager.connection_workflows[websocket] = workflow_id
         
         logger.info(f"WebSocket connected for workflow {workflow_id}")
+        
+        # Start heartbeat task
+        heartbeat_task = asyncio.create_task(send_heartbeat())
         
         # Send initial connection confirmation
         await websocket.send_text(json.dumps({
@@ -120,7 +143,8 @@ async def websocket_endpoint(websocket: WebSocket, workflow_id: str):
         while True:
             try:
                 # Wait for messages from client (e.g., pause/resume commands)
-                data = await websocket.receive_text()
+                # Use timeout to allow checking if connection is still alive
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=60.0)
                 message = json.loads(data)
                 
                 # Handle client commands
@@ -133,9 +157,16 @@ async def websocket_endpoint(websocket: WebSocket, workflow_id: str):
                 elif message.get("type") == "ping":
                     await websocket.send_text(json.dumps({
                         "type": "pong",
-                        "timestamp": str(datetime.utcnow())
+                        "timestamp": datetime.now(timezone.utc).isoformat()
                     }))
+                elif message.get("type") == "pong":
+                    # Client acknowledged heartbeat
+                    pass
                     
+            except asyncio.TimeoutError:
+                # No message received in timeout period, continue loop
+                # The heartbeat task will keep connection alive
+                continue
             except WebSocketDisconnect:
                 logger.info(f"WebSocket disconnected normally for workflow {workflow_id}")
                 break
@@ -155,6 +186,14 @@ async def websocket_endpoint(websocket: WebSocket, workflow_id: str):
     except Exception as e:
         logger.error(f"WebSocket error for workflow {workflow_id}: {e}", exc_info=True)
     finally:
+        # Cancel heartbeat task
+        if heartbeat_task:
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+        
         connection_manager.disconnect(websocket)
 
 async def handle_workflow_command(workflow_id: str, command: str):

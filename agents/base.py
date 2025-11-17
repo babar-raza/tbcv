@@ -13,7 +13,7 @@ import uuid
 import json
 import asyncio
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Union
 from enum import Enum
 from dataclasses import dataclass, asdict
@@ -62,7 +62,7 @@ class MCPMessage:
     def __post_init__(self):
         """Ensure timestamp & id exist for traceability and pairing."""
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow().isoformat() + 'Z'
+            self.timestamp = datetime.now(timezone.utc).isoformat() + 'Z'
         if self.id is None and self.type in [MessageType.REQUEST, MessageType.RESPONSE]:
             self.id = str(uuid.uuid4())
 
@@ -158,7 +158,7 @@ class BaseAgent(LoggerMixin, ABC):
         self.agent_id = agent_id or f"{self.__class__.__name__.lower()}_{uuid.uuid4().hex[:8]}"
         self.status = AgentStatus.STARTING
         self.settings = get_settings()
-        self.last_heartbeat = datetime.utcnow()
+        self.last_heartbeat = datetime.now(timezone.utc)
 
         # Basic statistics for monitoring/SLAs
         self.statistics = {
@@ -228,7 +228,7 @@ class BaseAgent(LoggerMixin, ABC):
         with PerformanceLogger(self.logger, f"handle_message_{message.method}") as perf:
             try:
                 self.status = AgentStatus.BUSY
-                start_time = datetime.utcnow()
+                start_time = datetime.now(timezone.utc)
 
                 if message.method in self.message_handlers:
                     handler = self.message_handlers[message.method]
@@ -236,7 +236,7 @@ class BaseAgent(LoggerMixin, ABC):
                     response = MCPMessage(type=MessageType.RESPONSE, id=message.id, result=result)
 
                     # Stats update
-                    end_time = datetime.utcnow()
+                    end_time = datetime.now(timezone.utc)
                     rt_ms = (end_time - start_time).total_seconds() * 1000
                     self._update_statistics(rt_ms, success=True)
                     perf.add_context(success=True, response_time_ms=rt_ms)
@@ -279,7 +279,7 @@ class BaseAgent(LoggerMixin, ABC):
     async def handle_ping(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Health probe hook; returns a quick pong with timestamps."""
         self.heartbeat()
-        return {"pong": True, "timestamp": datetime.utcnow().isoformat(), "agent_id": self.agent_id}
+        return {"pong": True, "timestamp": datetime.now(timezone.utc).isoformat(), "agent_id": self.agent_id}
 
     async def handle_get_status(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Return a snapshot of agent status + statistics."""
@@ -353,7 +353,7 @@ class BaseAgent(LoggerMixin, ABC):
 
     def heartbeat(self):
         """Update internal heartbeat to 'now'; used by /status endpoints."""
-        self.last_heartbeat = datetime.utcnow()
+        self.last_heartbeat = datetime.now(timezone.utc)
 
     def get_status(self) -> Dict[str, Any]:
         """Comprehensive agent status for debugging and dashboards."""

@@ -242,6 +242,8 @@ class ValidationResult(Base):
         Index('idx_validation_file_status', 'file_path', 'status'),
         Index('idx_validation_file_severity', 'file_path', 'severity'),
         Index('idx_validation_created', 'created_at'),
+        Index('idx_validation_run_id', 'run_id'),  # FIX: Added missing index
+        Index('idx_validation_workflow_status', 'workflow_id', 'status'),  # FIX: Added composite index
     )
 
     def to_dict(self) -> Dict[str, Any]:

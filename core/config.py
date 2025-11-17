@@ -72,6 +72,13 @@ class ContentEnhancerConfig(AgentConfig):
     prevent_duplicate_links: bool = True
     link_template: str = "https://products.aspose.com/words/net/plugins/{slug}/"
     info_text_template: str = "*This code requires the **{plugin_name}** plugin.*"
+    # Maximum allowed absolute rewrite ratio when enhancing content. A value of 0.3 means
+    # enhancements may increase or decrease the original length by up to 30%. Beyond this
+    # threshold, the enhancer will gate the changes and return the original content.
+    rewrite_ratio_threshold: float = 0.5
+    # List of case-insensitive phrases that must not appear in the enhanced content. If any
+    # blocked topic is found after applying enhancements, the enhancer will reject the result.
+    blocked_topics: List[str] = []
 
 class OrchestratorConfig(AgentConfig):
     max_concurrent_workflows: int = 50
@@ -136,6 +143,42 @@ class PerformanceConfig(BaseSettings):
     file_size_limits: Dict[str, int] = {"small_kb": 5, "medium_kb": 50, "large_kb": 1000}
     response_time_targets: Dict[str, int] = {"small_file_ms": 300, "medium_file_ms": 1000, "large_file_ms": 3000}
 
+class ValidationLLMThresholds(BaseSettings):
+    """
+    Thresholds for LLM gating decisions. Values must be between 0.0 and 1.0.
+
+    downgrade_threshold: issues with a score below this value will be downgraded.
+    confirm_threshold: scores between downgrade_threshold and this value are confirmed.
+    upgrade_threshold: scores above this value will be escalated.
+
+    Default values are chosen conservatively. You can override them in the
+    configuration file or via environment variables (e.g.,
+    TBCV_VALIDATION__LLM_THRESHOLDS__DOWNGRADE_THRESHOLD).
+    """
+    downgrade_threshold: float = 0.2
+    confirm_threshold: float = 0.5
+    upgrade_threshold: float = 0.8
+
+
+class LLMConfig(BaseSettings):
+    """Global toggle and settings for LLM validation."""
+    enabled: bool = True
+
+
+class ValidationConfig(BaseSettings):
+    """
+    Control the multi-stage validation pipeline.
+
+    mode:
+      - "two_stage": run heuristic/fuzzy validation first and then LLM validation (default).
+      - "heuristic_only": run only heuristic/fuzzy validation.
+      - "llm_only": run only LLM validation, skipping heuristics.
+    llm_thresholds: thresholds used to gate heuristic issues when LLM is available.
+    """
+    mode: str = "two_stage"
+    llm_thresholds: ValidationLLMThresholds = ValidationLLMThresholds()
+
+
 class TBCVSettings(BaseSettings):
     """Top-level settings composed of nested config models."""
     model_config = SettingsConfigDict(env_prefix="TBCV_", case_sensitive=False, env_file=".env")
@@ -150,6 +193,11 @@ class TBCVSettings(BaseSettings):
     content_enhancer: ContentEnhancerConfig = ContentEnhancerConfig()
     orchestrator: OrchestratorConfig = OrchestratorConfig()
     truth_manager: TruthManagerConfig = TruthManagerConfig()
+
+    # Global LLM settings (enable/disable)
+    llm: LLMConfig = LLMConfig()
+    # Validation pipeline settings
+    validation: ValidationConfig = ValidationConfig()
 
     truth_default_family: str = "words"
     truth_files: Dict[str, str] = {
@@ -235,20 +283,30 @@ def get_settings() -> TBCVSettings:
 
     merged_yaml = merge_configs(yaml_config, env_config)
 
-    # 2) Create settings (env vars already applied by pydantic)
+    # After: merged_yaml = merge_configs(app_yaml, env_yaml)
     settings = TBCVSettings()
 
-    # 3) Deep-apply YAML into the model graph
-    #    - Top-level sections in merged_yaml correspond to TBCVSettings fields
+    # Deep-apply YAML onto the model.
+    # 1) Special-case: support nested `agents:` sections (legacy & human-friendly shape)
+    agents_section = (merged_yaml or {}).get("agents", {})
+    if isinstance(agents_section, dict):
+        for agent_key, agent_cfg in agents_section.items():
+            if hasattr(settings, agent_key) and isinstance(agent_cfg, dict):
+                _deep_apply_dict_to_model(getattr(settings, agent_key), agent_cfg)
+
+    # 2) Apply regular top-level sections (performance, server, fuzzy_detector, etc.)
     for top_key, section in (merged_yaml or {}).items():
+        if top_key == "agents":
+            continue  # already handled above
         if hasattr(settings, top_key):
             target = getattr(settings, top_key)
             if isinstance(target, BaseSettings) and isinstance(section, dict):
-                _deep_apply_dict_to_model(target, section)  # ← preserves nested model types
+                _deep_apply_dict_to_model(target, section)
             else:
                 setattr(settings, top_key, section)
 
     return settings
+
 
 def get_config_value(key_path: str, default: Any = None) -> Any:
     """Dot-path lookup (e.g., 'cache.l1.ttl_seconds'), returns `default` if missing."""

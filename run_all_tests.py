@@ -1,524 +1,215 @@
 #!/usr/bin/env python3
 """
-Comprehensive Test Runner for TBCV System (Windows Compatible - v2)
-==========================================
+Comprehensive test runner for TBCV.
 
-Improved version with better diagnostics and error detection.
+Usage:
+    python run_all_tests.py                           # Run all tests (unit + integration, skip local_heavy)
+    python run_all_tests.py --all                     # Run ALL tests including local_heavy
+    python run_all_tests.py --local-only              # Run only local_heavy tests
+    python run_all_tests.py --unit                    # Run only unit tests
+    python run_all_tests.py --integration              # Run only integration tests
+    python run_all_tests.py --quick                   # Run smoke tests only
+    python run_all_tests.py --file tests/test_x.py    # Run specific test file
+
+Test categories:
+    - Unit tests: Fast tests with mocks, no external dependencies
+    - Integration tests: Tests with real agents but mocked LLM
+    - Local/heavy tests: Full-stack tests with real Ollama and services
+
+Prerequisites for local_heavy tests:
+    - Ollama server running: ollama serve
+    - Model available (check config/main.yaml)
+    - Database accessible
+    - All configuration files present
 """
 
-import argparse
-import json
+import sys
 import os
 import subprocess
-import sys
-import time
-from datetime import datetime
+import argparse
 from pathlib import Path
-from typing import Dict, List, Any
-
-# Colors for terminal output
-class Colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 
-def print_header(text: str):
-    """Print formatted header."""
-    print(f"\n{Colors.HEADER}{Colors.BOLD}{'=' * 80}{Colors.ENDC}")
-    print(f"{Colors.HEADER}{Colors.BOLD}{text:^80}{Colors.ENDC}")
-    print(f"{Colors.HEADER}{Colors.BOLD}{'=' * 80}{Colors.ENDC}\n")
-
-
-def print_success(text: str):
-    """Print success message."""
-    print(f"{Colors.OKGREEN}✓ {text}{Colors.ENDC}")
-
-
-def print_error(text: str):
-    """Print error message."""
-    print(f"{Colors.FAIL}✗ {text}{Colors.ENDC}")
-
-
-def print_warning(text: str):
-    """Print warning message."""
-    print(f"{Colors.WARNING}⚠ {text}{Colors.ENDC}")
-
-
-def print_info(text: str):
-    """Print info message."""
-    print(f"{Colors.OKBLUE}ℹ {text}{Colors.ENDC}")
-
-
-def check_dependencies() -> Dict[str, bool]:
-    """Check if all required dependencies are available."""
-    print_header("Checking Dependencies")
+class TestRunner:
+    def __init__(self):
+        self.base_cmd = [sys.executable, "-m", "pytest"]
+        self.failed_suites = []
     
-    dependencies = {
-        'pytest': False,
-        'pytest-asyncio': False,
-        'pytest-cov': False,
-        'fastapi': False,
-        'sqlalchemy': False,
-        'uvicorn': False,
-        'httpx': False
-    }
+    def run_command(self, cmd, description):
+        """Run a pytest command and track results."""
+        print(f"\n{'='*80}")
+        print(f"Running: {description}")
+        print(f"Command: {' '.join(cmd)}")
+        print(f"{'='*80}\n")
+        
+        result = subprocess.run(cmd)
+        
+        if result.returncode != 0:
+            self.failed_suites.append(description)
+            return False
+        return True
     
-    for dep in dependencies.keys():
+    def run_unit_tests(self):
+        """Run unit tests (fast, with mocks)."""
+        cmd = self.base_cmd + [
+            "tests/",
+            "-v",
+            "-m", "not local_heavy",
+            "-k", "not (two_stage or heuristic_only or llm_only or full_stack)",
+            "--tb=short"
+        ]
+        return self.run_command(cmd, "Unit Tests")
+    
+    def run_integration_tests(self):
+        """Run integration tests (mocked LLM but real agents)."""
+        cmd = self.base_cmd + [
+            "tests/test_truth_validation.py",
+            "-v",
+            "-k", "two_stage or heuristic_only or llm_only",
+            "--tb=short"
+        ]
+        return self.run_command(cmd, "Integration Tests (with mocks)")
+    
+    def run_smoke_tests(self):
+        """Run quick smoke tests."""
+        cmd = self.base_cmd + [
+            "tests/",
+            "-v",
+            "-m", "smoke",
+            "--tb=short"
+        ]
+        return self.run_command(cmd, "Smoke Tests")
+    
+    def run_local_heavy_tests(self):
+        """Run full-stack local tests with real dependencies."""
+        print(f"\n{'='*80}")
+        print("Running: Full-Stack Local Tests (requires Ollama)")
+        print(f"{'='*80}\n")
+        
+        # Check if Ollama is running
         try:
-            module_name = dep.replace('-', '_')
-            if dep == 'pytest-asyncio':
-                module_name = 'pytest_asyncio'
-            elif dep == 'pytest-cov':
-                module_name = 'pytest_cov'
-            __import__(module_name)
-            dependencies[dep] = True
-            print_success(f"{dep} is available")
-        except ImportError:
-            dependencies[dep] = False
-            print_error(f"{dep} is NOT available")
-    
-    return dependencies
-
-
-def check_ollama_service() -> bool:
-    """Check if Ollama service is running."""
-    try:
-        import requests
-        response = requests.get('http://localhost:11434/api/version', timeout=2)
-        if response.status_code == 200:
-            print_success("Ollama service is running")
-            return True
-    except:
-        pass
-    
-    print_warning("Ollama service is not running (will use mocks)")
-    return False
-
-
-def find_test_file() -> str:
-    """Find the test file (handles renamed files)."""
-    possible_names = [
-        'test_everything.py',
-        'test_comprehensive_integration.py',
-        'test_comprehensive.py',
-        'test_integration.py'
-    ]
-    
-    tests_dir = Path(__file__).parent / 'tests'
-    
-    for name in possible_names:
-        test_file = tests_dir / name
-        if test_file.exists():
-            return str(test_file)
-    
-    # If not found, return the first option as default
-    return str(tests_dir / possible_names[0])
-
-
-def run_pytest_command(args: List[str], test_file: str = None) -> Dict[str, Any]:
-    """Run pytest with given arguments using python -m pytest (Windows compatible)."""
-    # Use python -m pytest instead of pytest directly for Windows compatibility
-    cmd = [sys.executable, '-m', 'pytest']
-    
-    if test_file:
-        cmd.append(test_file)
-    else:
-        cmd.append(find_test_file())
-    
-    cmd.extend(args)
-    
-    # Convert Path objects to strings
-    cmd = [str(c) for c in cmd]
-    
-    print_info(f"Running: {' '.join(cmd)}")
-    
-    start_time = time.time()
-    
-    try:
-        result = subprocess.run(
-            cmd,
-            cwd=str(Path(__file__).parent),
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace'
-        )
-        duration = time.time() - start_time
+            import requests
+            response = requests.get("http://localhost:11434/api/tags", timeout=2)
+            if response.status_code != 200:
+                print("⚠ WARNING: Ollama not responding properly")
+                print("  Run: ollama serve")
+                return False
+        except Exception as e:
+            print(f"⚠ WARNING: Cannot connect to Ollama: {e}")
+            print("  Run: ollama serve")
+            return False
         
-        return {
-            'returncode': result.returncode,
-            'stdout': result.stdout,
-            'stderr': result.stderr,
-            'duration': duration,
-            'cmd': ' '.join(cmd)
-        }
-    except FileNotFoundError as e:
-        print_error(f"Failed to run pytest: {e}")
-        print_info("Make sure pytest is installed: pip install pytest")
-        return {
-            'returncode': 1,
-            'stdout': '',
-            'stderr': str(e),
-            'duration': 0,
-            'cmd': ' '.join(cmd)
-        }
-    except Exception as e:
-        print_error(f"Error running pytest: {e}")
-        return {
-            'returncode': 1,
-            'stdout': '',
-            'stderr': str(e),
-            'duration': 0,
-            'cmd': ' '.join(cmd)
-        }
-
-
-def parse_pytest_output(output: str) -> Dict[str, Any]:
-    """Parse pytest output to extract statistics."""
-    stats = {
-        'passed': 0,
-        'failed': 0,
-        'skipped': 0,
-        'errors': 0,
-        'warnings': 0,
-        'duration': 0.0,
-        'collected': 0
-    }
-    
-    # Look for collection info
-    for line in output.split('\n'):
-        if 'collected' in line.lower():
-            import re
-            match = re.search(r'collected (\d+) item', line)
-            if match:
-                stats['collected'] = int(match.group(1))
-    
-    # Parse summary line
-    for line in output.split('\n'):
-        if 'passed' in line.lower() or 'failed' in line.lower():
-            import re
-            # Look for patterns like "10 passed in 5.2s"
-            match = re.search(r'(\d+)\s+passed', line)
-            if match:
-                stats['passed'] = int(match.group(1))
-            
-            match = re.search(r'(\d+)\s+failed', line)
-            if match:
-                stats['failed'] = int(match.group(1))
-            
-            match = re.search(r'(\d+)\s+skipped', line)
-            if match:
-                stats['skipped'] = int(match.group(1))
-            
-            match = re.search(r'(\d+)\s+error', line)
-            if match:
-                stats['errors'] = int(match.group(1))
-            
-            match = re.search(r'in\s+([\d.]+)s', line)
-            if match:
-                stats['duration'] = float(match.group(1))
-    
-    return stats
-
-
-def run_all_tests(verbose: bool = False, coverage: bool = False) -> Dict[str, Any]:
-    """Run all comprehensive tests."""
-    print_header("Running All Comprehensive Tests")
-    
-    # First, do a dry run to collect tests
-    print_info("Collecting tests...")
-    collect_result = run_pytest_command(['--collect-only', '-q'])
-    collect_stats = parse_pytest_output(collect_result['stdout'])
-    
-    if collect_stats['collected'] == 0:
-        print_error("No tests discovered!")
-        print_warning("\nPossible reasons:")
-        print_info("  1. Import errors in test file")
-        print_info("  2. No functions starting with 'test_'")
-        print_info("  3. Test file is empty or has syntax errors")
-        print_info("  4. Wrong test file path")
-        print("\nCollection output:")
-        print(collect_result['stdout'])
-        if collect_result['stderr']:
-            print("\nCollection errors:")
-            print(collect_result['stderr'])
-        
-        return {
-            'result': collect_result,
-            'stats': collect_stats,
-            'no_tests_found': True
-        }
-    
-    print_success(f"Found {collect_stats['collected']} tests")
-    
-    # Now run the actual tests
-    args = [
-        '-v' if verbose else '',
-        '--tb=short',
-        '--maxfail=10'
-    ]
-    
-    if coverage:
-        reports_dir = Path(__file__).parent / 'tests' / 'reports'
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        
-        args.extend([
-            '--cov=.',
-            f'--cov-report=html:{reports_dir / "coverage"}',
-            f'--cov-report=json:{reports_dir / "coverage.json"}',
-            '--cov-report=term'
+        # Use the full-stack test runner
+        result = subprocess.run([
+            sys.executable,
+            "run_full_stack_test.py",
+            "--no-server"  # Assume server will be started separately
         ])
+        
+        if result.returncode != 0:
+            self.failed_suites.append("Full-Stack Local Tests")
+            return False
+        return True
     
-    # Remove empty strings
-    args = [a for a in args if a]
+    def run_specific_file(self, filepath):
+        """Run tests from a specific file."""
+        cmd = self.base_cmd + [
+            filepath,
+            "-v",
+            "--tb=short"
+        ]
+        return self.run_command(cmd, f"Tests in {filepath}")
     
-    result = run_pytest_command(args)
-    stats = parse_pytest_output(result['stdout'])
-    
-    if result['returncode'] != 0 and verbose:
-        print("\nTest Output:")
-        print(result['stdout'])
-        if result['stderr']:
-            print("\nErrors:")
-            print(result['stderr'])
-    
-    return {
-        'result': result,
-        'stats': stats,
-        'no_tests_found': False
-    }
-
-
-def run_test_category(category: str, verbose: bool = False) -> Dict[str, Any]:
-    """Run tests for a specific category."""
-    print_header(f"Running {category.upper()} Tests")
-    
-    args = [
-        '-v' if verbose else '-q',
-        '--tb=short',
-        '-k', category
-    ]
-    
-    result = run_pytest_command(args)
-    stats = parse_pytest_output(result['stdout'])
-    
-    if result['returncode'] == 0:
-        print_success(f"{category} tests passed")
-    else:
-        print_error(f"{category} tests failed")
-        if verbose:
-            print("\nOutput:")
-            print(result['stdout'])
-            if result['stderr']:
-                print("\nErrors:")
-                print(result['stderr'])
-    
-    print_info(f"Passed: {stats['passed']}, Failed: {stats['failed']}, Skipped: {stats['skipped']}")
-    print_info(f"Duration: {stats['duration']:.2f}s")
-    
-    return {
-        'category': category,
-        'result': result,
-        'stats': stats
-    }
-
-
-def run_performance_tests(verbose: bool = False) -> Dict[str, Any]:
-    """Run performance benchmark tests."""
-    print_header("Running Performance Tests")
-    
-    args = [
-        '-v' if verbose else '-q',
-        '--tb=short',
-        '-k', 'performance',
-        '--durations=10'
-    ]
-    
-    result = run_pytest_command(args)
-    stats = parse_pytest_output(result['stdout'])
-    
-    return {
-        'category': 'performance',
-        'result': result,
-        'stats': stats
-    }
-
-
-def generate_report(results: Dict[str, Any], output_file: Path):
-    """Generate JSON report of test results."""
-    report = {
-        'timestamp': datetime.now().isoformat(),
-        'python_version': sys.version,
-        'platform': sys.platform,
-        'results': results,
-        'summary': {
-            'total_passed': sum(r.get('stats', {}).get('passed', 0) for r in results.values() if isinstance(r, dict)),
-            'total_failed': sum(r.get('stats', {}).get('failed', 0) for r in results.values() if isinstance(r, dict)),
-            'total_skipped': sum(r.get('stats', {}).get('skipped', 0) for r in results.values() if isinstance(r, dict)),
-            'total_duration': sum(r.get('stats', {}).get('duration', 0) for r in results.values() if isinstance(r, dict))
-        }
-    }
-    
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(report, f, indent=2)
-    
-    print_success(f"Report generated: {output_file}")
-
-
-def print_summary(results: Dict[str, Any]):
-    """Print summary of all test results."""
-    print_header("Test Summary")
-    
-    total_passed = 0
-    total_failed = 0
-    total_skipped = 0
-    total_duration = 0.0
-    no_tests_found = False
-    
-    for category, result in results.items():
-        if isinstance(result, dict):
-            if result.get('no_tests_found'):
-                no_tests_found = True
-                
-            if 'stats' in result:
-                stats = result['stats']
-                print(f"\n{Colors.BOLD}{category.upper()}{Colors.ENDC}")
-                print(f"  Passed:   {stats.get('passed', 0)}")
-                print(f"  Failed:   {stats.get('failed', 0)}")
-                print(f"  Skipped:  {stats.get('skipped', 0)}")
-                print(f"  Duration: {stats.get('duration', 0):.2f}s")
-                
-                total_passed += stats.get('passed', 0)
-                total_failed += stats.get('failed', 0)
-                total_skipped += stats.get('skipped', 0)
-                total_duration += stats.get('duration', 0)
-    
-    print(f"\n{Colors.BOLD}OVERALL{Colors.ENDC}")
-    print(f"  Total Passed:  {total_passed}")
-    print(f"  Total Failed:  {total_failed}")
-    print(f"  Total Skipped: {total_skipped}")
-    print(f"  Total Time:    {total_duration:.2f}s")
-    
-    # Check if any tests actually ran
-    total_tests = total_passed + total_failed + total_skipped
-    
-    if no_tests_found or total_tests == 0:
-        print_error("\n✗ NO TESTS WERE DISCOVERED OR RUN!")
-        print_warning("\nTo diagnose:")
-        print_info("  1. Check if test file exists and has correct name")
-        print_info("  2. Run: python -m pytest tests/test_everything.py --collect-only")
-        print_info("  3. Check for import errors in test file")
-        print_info("  4. Ensure test functions start with 'test_'")
-        return 2  # Exit code 2 for no tests found
-    elif total_failed == 0:
-        print_success("\n✓ All tests passed!")
-        return 0
-    else:
-        print_error(f"\n✗ {total_failed} test(s) failed")
-        return 1
+    def print_summary(self):
+        """Print test run summary."""
+        print(f"\n{'='*80}")
+        print("TEST RUN SUMMARY")
+        print(f"{'='*80}")
+        
+        if not self.failed_suites:
+            print("✓ ALL TEST SUITES PASSED")
+        else:
+            print(f"✗ {len(self.failed_suites)} TEST SUITE(S) FAILED:")
+            for suite in self.failed_suites:
+                print(f"  - {suite}")
+        
+        print(f"{'='*80}\n")
+        
+        return len(self.failed_suites) == 0
 
 
 def main():
-    """Main entry point."""
     parser = argparse.ArgumentParser(
-        description='Run comprehensive TBCV integration tests'
+        description="Run TBCV tests",
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument(
-        '--category',
-        choices=['api', 'agents', 'database', 'integration', 'performance', 'all'],
-        default='all',
-        help='Test category to run'
-    )
-    parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Verbose output'
-    )
-    parser.add_argument(
-        '--coverage',
-        action='store_true',
-        help='Generate coverage report'
-    )
-    parser.add_argument(
-        '--fast',
-        action='store_true',
-        help='Skip slow tests'
-    )
-    parser.add_argument(
-        '--report',
-        type=Path,
-        default=Path('tests/reports/comprehensive_test_report.json'),
-        help='Output report file'
-    )
+    
+    parser.add_argument("--all", action="store_true",
+                       help="Run ALL tests including local_heavy")
+    parser.add_argument("--local-only", action="store_true",
+                       help="Run only local_heavy tests")
+    parser.add_argument("--unit", action="store_true",
+                       help="Run only unit tests")
+    parser.add_argument("--integration", action="store_true",
+                       help="Run only integration tests")
+    parser.add_argument("--quick", action="store_true",
+                       help="Run only smoke tests")
+    parser.add_argument("--file", type=str,
+                       help="Run specific test file")
+    parser.add_argument("--skip-local", action="store_true",
+                       help="Skip local_heavy tests (default)")
     
     args = parser.parse_args()
     
-    # Print banner
-    print_header("TBCV Comprehensive Test Suite")
-    print(f"Category: {args.category}")
-    print(f"Verbose:  {args.verbose}")
-    print(f"Coverage: {args.coverage}")
-    print(f"Report:   {args.report}")
+    runner = TestRunner()
+    success = True
     
-    # Check dependencies
-    deps = check_dependencies()
-    missing_deps = [dep for dep, available in deps.items() if not available]
+    # Determine what to run
+    if args.file:
+        # Run specific file
+        success = runner.run_specific_file(args.file)
     
-    if missing_deps:
-        print_error(f"Missing dependencies: {', '.join(missing_deps)}")
-        print_info("Install with: pip install -r requirements.txt")
-        return 1
+    elif args.local_only:
+        # Only local/heavy tests
+        success = runner.run_local_heavy_tests()
     
-    # Check Ollama
-    ollama_available = check_ollama_service()
-    if not ollama_available:
-        os.environ['OLLAMA_ENABLED'] = 'false'
+    elif args.unit:
+        # Only unit tests
+        success = runner.run_unit_tests()
     
-    # Check test file exists
-    test_file = find_test_file()
-    if not Path(test_file).exists():
-        print_error(f"Test file not found: {test_file}")
-        print_info("Expected one of: test_everything.py, test_comprehensive_integration.py")
-        return 1
+    elif args.integration:
+        # Only integration tests
+        success = runner.run_integration_tests()
+    
+    elif args.quick:
+        # Only smoke tests
+        success = runner.run_smoke_tests()
+    
+    elif args.all:
+        # Run everything
+        print("Running complete test suite (unit + integration + local_heavy)")
+        
+        runner.run_smoke_tests()
+        runner.run_unit_tests()
+        runner.run_integration_tests()
+        runner.run_local_heavy_tests()
+        
+        success = runner.print_summary()
+    
     else:
-        print_success(f"Found test file: {Path(test_file).name}")
+        # Default: unit + integration, skip local_heavy
+        print("Running standard test suite (unit + integration, skipping local_heavy)")
+        print("Use --all to include local_heavy tests")
+        print()
+        
+        runner.run_smoke_tests()
+        runner.run_unit_tests()
+        runner.run_integration_tests()
+        
+        success = runner.print_summary()
     
-    # Run tests based on category
-    results = {}
-    
-    try:
-        if args.category == 'all':
-            results['all'] = run_all_tests(args.verbose, args.coverage)
-        elif args.category == 'performance':
-            results['performance'] = run_performance_tests(args.verbose)
-        else:
-            results[args.category] = run_test_category(args.category, args.verbose)
-        
-        # Generate report
-        generate_report(results, args.report)
-        
-        # Print summary
-        exit_code = print_summary(results)
-        
-        return exit_code
-        
-    except KeyboardInterrupt:
-        print_warning("\n\nTests interrupted by user")
-        return 130
-    except Exception as e:
-        print_error(f"\n\nFatal error: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+    return 0 if success else 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -11,11 +11,11 @@ Purpose:
     handlers for orchestrator workflows via the MCP-compatible interface.
 
 Highlights:
-    ✅ Absolute imports (no relative paths)
-    ✅ Full BaseAgent compliance (implements get_contract + async handlers)
-    ✅ Uses cache_result decorator for efficient repeat lookups
-    ✅ Generic JSON structure handling with safe fallbacks
-    ✅ Family-agnostic truth data loading
+    [OK] Absolute imports (no relative paths)
+    [OK] Full BaseAgent compliance (implements get_contract + async handlers)
+    [OK] Uses cache_result decorator for efficient repeat lookups
+    [OK] Generic JSON structure handling with safe fallbacks
+    [OK] Family-agnostic truth data loading
 """
 
 import json
@@ -23,7 +23,7 @@ import hashlib
 import asyncio
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
 # ---------- Project Imports (absolute) ----------
@@ -98,11 +98,23 @@ class CombinationRule:
 @dataclass
 class TruthDataIndex:
     """In-memory structure for all loaded truths for fast lookup."""
+    # Primary plugin lookups
     by_id: Dict[str, PluginInfo]
     by_slug: Dict[str, PluginInfo]
+    by_name: Dict[str, PluginInfo]
+    # Alias lookup maps a normalized alias to one or more plugins
+    by_alias: Dict[str, List[PluginInfo]]
+    # Family grouping
     by_family: Dict[str, List[PluginInfo]]
+    # Pattern lookup by group:type and pattern string (lower-case)
     by_pattern: Dict[str, List[PluginInfo]]
+    # Combination rules loaded for this family
     combination_rules: List[CombinationRule]
+    # Combination index mapping sorted plugin id tuple → list[CombinationRule]
+    combination_index: Dict[tuple, List[CombinationRule]]
+    # Dependencies lookup for each plugin id
+    dependencies: Dict[str, List[str]]
+    # Unique hash of loaded truth data for change detection
     version_hash: str
     last_updated: datetime
 
@@ -327,6 +339,9 @@ class TruthManagerAgent(BaseAgent):
         self.register_handler("get_truth_statistics", self.handle_get_truth_statistics)
         self.register_handler("reload_truth_data", self.handle_reload_truth_data)
 
+        # Additional handler: check whether a set of plugins constitutes a valid combination
+        self.register_handler("check_plugin_combination", self.handle_check_plugin_combination)
+
     # ---------------------------------------------------
     # Agent Contract (required by BaseAgent)
     # ---------------------------------------------------
@@ -423,94 +438,117 @@ class TruthManagerAgent(BaseAgent):
         plugins = {}
         adapter = TruthDataAdapter(family)
         
-        # Try multiple possible truth file locations
-        truth_file_candidates = [
-            f"./{family}_plugins_truth.json",
-            f"./aspose_{family}_plugins_truth.json",
-            f"./truth/{family}.json",
-            f"./truth/aspose_{family}_plugins_truth.json",
-            f"../aspose_{family}_plugins_truth.json"
-        ]
-        
-        # Also check configured path
-        if hasattr(self.settings, 'truth_files'):
-            configured_path = self.settings.truth_files.get(family)
-            if configured_path:
-                truth_file_candidates.insert(0, configured_path)
-        
-        truth_file = None
+        # Determine candidate truth files. Prefer the Aspose-specific truth definitions located
+        # within the /truth directory, as those contain the canonical plugin IDs used by
+        # combination rules. Fallback to generic family truth files if no Aspose file exists.
+        truth_file_candidates: List[str] = []
+
+        # 1) Configured path via main configuration
+        try:
+            configured_path = getattr(self.settings, 'truth_files', {}).get(family)
+        except Exception:
+            configured_path = None
+        if configured_path:
+            truth_file_candidates.append(configured_path)
+
+        # 2) Aspose-specific truth file inside the truth directory
+        truth_file_candidates.append(str(Path("truth") / f"aspose_{family}_plugins_truth.json"))
+
+        # 3) Generic family truth file inside the truth directory
+        truth_file_candidates.append(str(Path("truth") / f"{family}.json"))
+
+        # 4) Root-level Aspose truth file (legacy)
+        truth_file_candidates.append(f"aspose_{family}_plugins_truth.json")
+
+        # 5) Generic family plugins truth at root
+        truth_file_candidates.append(f"{family}_plugins_truth.json")
+
+        truth_file: Optional[str] = None
         for candidate in truth_file_candidates:
-            if Path(candidate).exists():
+            if candidate and Path(candidate).exists():
                 truth_file = candidate
                 break
-        
+
+        # Load plugin definitions from the first existing truth file
         if truth_file:
             try:
                 with open(truth_file, "r", encoding="utf-8") as f:
                     raw_data = json.load(f)
-                    
-                # Adapt the JSON structure to normalized format
+                # Normalize the JSON structure
                 adapted_data = adapter.adapt_plugin_data(raw_data)
                 self._parse_plugins_data(adapted_data, family, plugins)
-                
                 self.logger.info(f"Loaded {len(plugins)} plugins from {truth_file}")
-                
             except Exception as e:
                 self.logger.error(f"Failed to load truth file {truth_file}: {e}")
         else:
+            # No truth file found; continue with empty plugin set
             self.logger.warning(f"No truth file found for family '{family}', using empty plugin set")
-            
+
         return plugins
 
     def _load_combination_rules(self, family: str) -> List[CombinationRule]:
         """Load combination rules for a family."""
         rules = []
         
-        # Try multiple possible combination file locations
-        combo_file_candidates = [
-            f"./{family}_plugins_combinations.json",
-            f"./aspose_{family}_plugins_combinations.json",
-            f"./truth/{family}_combinations.json",
-            f"../aspose_{family}_plugins_combinations.json"
-        ]
-        
-        # Also check configured path
-        if hasattr(self.settings, 'truth_files'):
-            configured_path = self.settings.truth_files.get("combinations")
-            if configured_path:
-                combo_file_candidates.insert(0, configured_path)
-        
-        combo_file = None
+        # Determine candidate combination files. Prefer Aspose-specific combinations within
+        # the truth directory, which correspond to the detailed plugin definitions.
+        combo_file_candidates: List[str] = []
+
+        # 1) Configured combinations path via main configuration
+        try:
+            configured_path = getattr(self.settings, 'truth_files', {}).get("combinations")
+        except Exception:
+            configured_path = None
+        if configured_path:
+            combo_file_candidates.append(configured_path)
+
+        # 2) Aspose-specific combinations file inside the truth directory
+        combo_file_candidates.append(str(Path("truth") / f"aspose_{family}_plugins_combinations.json"))
+
+        # 3) Generic combinations file inside the truth directory
+        combo_file_candidates.append(str(Path("truth") / f"{family}_combinations.json"))
+
+        # 4) Root-level Aspose combinations file
+        combo_file_candidates.append(f"aspose_{family}_plugins_combinations.json")
+
+        # 5) Generic family plugins combinations at root
+        combo_file_candidates.append(f"{family}_plugins_combinations.json")
+
+        combo_file: Optional[str] = None
         for candidate in combo_file_candidates:
-            if Path(candidate).exists():
+            if candidate and Path(candidate).exists():
                 combo_file = candidate
                 break
-        
+
         if combo_file:
             try:
                 with open(combo_file, "r", encoding="utf-8") as f:
                     raw_data = json.load(f)
-                    
-                # Adapt combination data
+
+                # Adapt combination data - support both "suites" and "combinations" keys
                 suites = raw_data.get("suites", [])
+                if not suites:
+                    suites = raw_data.get("combinations", [])
+
                 for suite in suites:
                     try:
+                        # Accept both "includes" and "plugins" keys for plugin list
+                        plugins_list = suite.get("includes", suite.get("plugins", []))
                         rule = CombinationRule(
                             name=suite.get("name", ""),
-                            plugins=[self._normalize_plugin_id(name) for name in suite.get("includes", [])],
-                            trigger_patterns=self._generate_trigger_patterns(suite),
-                            confidence_boost=0.2,
-                            required_all=False
+                            plugins=[self._normalize_plugin_id(name) for name in plugins_list],
+                            trigger_patterns=suite.get("trigger_patterns", self._generate_trigger_patterns(suite)),
+                            confidence_boost=suite.get("confidence_boost", 0.2),
+                            required_all=suite.get("required_all", False)
                         )
                         rules.append(rule)
                     except Exception as e:
                         self.logger.warning(f"Failed to parse combination rule {suite}: {e}")
-                        
+
                 self.logger.info(f"Loaded {len(rules)} combination rules from {combo_file}")
-                
             except Exception as e:
                 self.logger.error(f"Failed to load combinations file {combo_file}: {e}")
-        
+
         return rules
 
     def _normalize_plugin_id(self, name: str) -> str:
@@ -559,24 +597,92 @@ class TruthManagerAgent(BaseAgent):
                 self.logger.warning(f"Failed to parse plugin {entry}: {e}")
 
     def _build_index(self, plugins: Dict[str, PluginInfo], combination_rules: List[CombinationRule]) -> TruthDataIndex:
-        by_id = plugins.copy()
-        by_slug = {p.slug: p for p in plugins.values() if p.slug}
-        by_family = {}
-        by_pattern = {}
-        
+        # Build primary lookup maps
+        by_id: Dict[str, PluginInfo] = plugins.copy()
+        by_slug: Dict[str, PluginInfo] = {p.slug: p for p in plugins.values() if p.slug}
+        by_name: Dict[str, PluginInfo] = {p.name.lower(): p for p in plugins.values() if p.name}
+
+        by_family: Dict[str, List[PluginInfo]] = {}
+        by_pattern: Dict[str, List[PluginInfo]] = {}
+        by_alias: Dict[str, List[PluginInfo]] = {}
+        dependencies: Dict[str, List[str]] = {}
+
+        # Gather alias definitions from rule manager
+        # Use default empty dict if no rules for family
+        alias_overrides: Dict[str, List[str]] = {}
+        try:
+            # Build an alias override map per plugin id; there may be multiple families loaded but alias overrides apply by id
+            for fam in set(p.family for p in plugins.values()):
+                fr = rule_manager.get_family_rules(fam)
+                if fr.plugin_aliases:
+                    for pid, aliases in fr.plugin_aliases.items():
+                        alias_overrides.setdefault(pid, []).extend(aliases)
+        except Exception:
+            pass
+
         for p in plugins.values():
+            # family grouping
             by_family.setdefault(p.family, []).append(p)
+
+            # pattern indexing by group and pattern string
             for group, patterns in p.patterns.items():
                 for pat in patterns:
-                    if pat:  # Only add non-empty patterns
+                    if pat:
                         key = f"{group}:{pat.lower()}"
                         by_pattern.setdefault(key, []).append(p)
-                        
-        version_hash = hashlib.sha256(
-            json.dumps({k: v.to_dict() for k, v in plugins.items()}, sort_keys=True).encode()
-        ).hexdigest()[:16]
-        
-        return TruthDataIndex(by_id, by_slug, by_family, by_pattern, combination_rules, version_hash, datetime.utcnow())
+
+            # alias indexing: include id, slug, name, and rule manager aliases
+            aliases: List[str] = [p.id, p.slug, p.name]
+            # Additional alias sources: plugin type, version names etc. Not used for now
+            overrides = alias_overrides.get(p.id, [])
+            if overrides:
+                aliases.extend(overrides)
+            for alias in aliases:
+                if not alias:
+                    continue
+                alias_norm = alias.lower().replace(" ", "").replace("-", "").replace("_", "")
+                by_alias.setdefault(alias_norm, []).append(p)
+
+            # dependencies map
+            dependencies[p.id] = p.dependencies or []
+
+        # Build combination index: map sorted tuple of plugin ids → list of rules
+        combination_index: Dict[tuple, List[CombinationRule]] = {}
+        for rule in combination_rules:
+            try:
+                # Use sorted tuple of plugin ids as key
+                key = tuple(sorted(rule.plugins))
+                combination_index.setdefault(key, []).append(rule)
+            except Exception:
+                continue
+
+        # Generate version hash from plugins and combination rules for change detection
+        try:
+            plugins_serialized = {k: v.to_dict() for k, v in plugins.items()}
+            combos_serialized = [r.to_dict() for r in combination_rules]
+            version_blob = {
+                "plugins": plugins_serialized,
+                "combinations": combos_serialized,
+            }
+            version_hash = hashlib.sha256(
+                json.dumps(version_blob, sort_keys=True).encode()
+            ).hexdigest()[:16]
+        except Exception:
+            version_hash = "unknown"
+
+        return TruthDataIndex(
+            by_id=by_id,
+            by_slug=by_slug,
+            by_name=by_name,
+            by_alias=by_alias,
+            by_family=by_family,
+            by_pattern=by_pattern,
+            combination_rules=combination_rules,
+            combination_index=combination_index,
+            dependencies=dependencies,
+            version_hash=version_hash,
+            last_updated=datetime.now(timezone.utc),
+        )
 
     # ===================================================
     # Public async handlers (MCP API)
@@ -599,40 +705,76 @@ class TruthManagerAgent(BaseAgent):
         """Fetch plugin info by id or slug."""
         pid = params.get("plugin_id")
         slug = params.get("slug")
+        name = params.get("name")
+        query = None
         plugin = None
-        if self.truth_index:
-            if pid and pid in self.truth_index.by_id:
-                plugin = self.truth_index.by_id[pid]
-            elif slug and slug in self.truth_index.by_slug:
-                plugin = self.truth_index.by_slug[slug]
+        # If truth index is not loaded, return not found
+        if not self.truth_index:
+            return {"found": False, "plugin": None}
+
+        # Normalize queries
+        if pid:
+            query = pid
+        elif slug:
+            query = slug
+        elif name:
+            query = name
+
+        if query:
+            # Direct lookups by id, slug, or name
+            if query in self.truth_index.by_id:
+                plugin = self.truth_index.by_id.get(query)
+            elif query in self.truth_index.by_slug:
+                plugin = self.truth_index.by_slug.get(query)
+            elif query.lower() in self.truth_index.by_name:
+                plugin = self.truth_index.by_name.get(query.lower())
+            else:
+                # Fallback to alias lookup: normalize query by removing separators
+                alias_norm = query.lower().replace(" ", "").replace("-", "").replace("_", "")
+                matches = self.truth_index.by_alias.get(alias_norm, [])
+                # If multiple matches, select the one with exact id match or first
+                if matches:
+                    plugin = matches[0]
+
         return {"found": plugin is not None, "plugin": plugin.to_dict() if plugin else None}
 
     async def handle_search_plugins(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Search plugins with family-aware aliases."""
-        query = params.get("query", "").lower()
+        """Search plugins with family-aware aliases. If query is empty, returns all plugins for the family."""
+        # Normalise query and family
+        query_raw = params.get("query", "") or ""
         family = params.get("family", "words")
-        
-        if not query or not self.truth_index:
+        # Early exit if truth index is not loaded
+        if not self.truth_index:
             return {"results": [], "matches_count": 0}
-            
-        results = []
-        
-        # Direct name/id matching
+        # If no query, return all plugins for the family
+        if not query_raw:
+            family_plugins = self.truth_index.by_family.get(family, [])
+            # Sort results by plugin name for stable ordering
+            results = [p.to_dict() for p in sorted(family_plugins, key=lambda x: x.name.lower())]
+            return {"results": results, "matches_count": len(results)}
+
+        query_lower = query_raw.lower()
+        # Normalised query for alias matching (remove separators)
+        query_norm = query_lower.replace(" ", "").replace("-", "").replace("_", "")
+
+        matched_plugins: Dict[str, PluginInfo] = {}
+
+        # Search by id, name and slug
         for plugin in self.truth_index.by_id.values():
-            if query in plugin.name.lower() or query in plugin.id.lower():
-                results.append(plugin.to_dict())
-                
-        # Alias matching using family rules
-        family_rules = rule_manager.get_family_rules(family)
-        plugin_aliases = family_rules.plugin_aliases
-        
-        for plugin_id, aliases in plugin_aliases.items():
-            if plugin_id in self.truth_index.by_id:
-                plugin = self.truth_index.by_id[plugin_id]
-                if any(query in alias.lower() for alias in aliases):
-                    if plugin.to_dict() not in results:
-                        results.append(plugin.to_dict())
-        
+            if plugin.family != family:
+                continue
+            if query_lower in plugin.id.lower() or query_lower in plugin.name.lower() or query_lower in plugin.slug.lower():
+                matched_plugins[plugin.id] = plugin
+
+        # Search by alias map
+        for alias_key, plugin_list in self.truth_index.by_alias.items():
+            if query_norm in alias_key:
+                for plugin in plugin_list:
+                    if plugin.family == family:
+                        matched_plugins[plugin.id] = plugin
+
+        # Convert to list of dicts with stable ordering
+        results = [p.to_dict() for p in sorted(matched_plugins.values(), key=lambda x: x.name.lower())]
         return {"results": results, "matches_count": len(results)}
 
     async def handle_get_combination_rules(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -672,6 +814,72 @@ class TruthManagerAgent(BaseAgent):
         success = self._load_truth_data(family)
         return {"success": success, "reloaded": True, "family": family}
 
+    async def handle_check_plugin_combination(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Check whether a given set of plugin IDs constitutes a defined combination rule.
+
+        Parameters:
+            plugins: List[str] - list of plugin IDs or aliases
+            family: str - optional family to constrain search
+
+        Returns:
+            {
+                "valid": bool,
+                "rules": List[str],  # names of matched combination rules
+                "unknown_plugins": List[str]  # any plugin IDs that were not found in the truth index
+            }
+        """
+        if not self.truth_index:
+            return {"valid": False, "rules": [], "unknown_plugins": []}
+
+        plugin_ids_raw = params.get("plugins", []) or []
+        if not isinstance(plugin_ids_raw, list):
+            plugin_ids_raw = [plugin_ids_raw]
+        family = params.get("family", None)
+
+        # Resolve plugin IDs and detect unknown aliases
+        resolved_ids: List[str] = []
+        unknown_plugins: List[str] = []
+        for item in plugin_ids_raw:
+            if not item:
+                continue
+            # Normalize plugin id/name/alias
+            key = str(item)
+            found_plugin: Optional[PluginInfo] = None
+            # Check by id, slug, name
+            if key in self.truth_index.by_id:
+                found_plugin = self.truth_index.by_id[key]
+            elif key in self.truth_index.by_slug:
+                found_plugin = self.truth_index.by_slug[key]
+            elif key.lower() in self.truth_index.by_name:
+                found_plugin = self.truth_index.by_name[key.lower()]
+            else:
+                # Alias lookup
+                alias_norm = key.lower().replace(" ", "").replace("-", "").replace("_", "")
+                matches = self.truth_index.by_alias.get(alias_norm)
+                if matches:
+                    found_plugin = matches[0]
+            if found_plugin:
+                # Optionally enforce family constraint
+                if not family or found_plugin.family == family:
+                    resolved_ids.append(found_plugin.id)
+                else:
+                    # Wrong family counts as unknown for this context
+                    unknown_plugins.append(key)
+            else:
+                unknown_plugins.append(key)
+
+        # If any unknown plugins, return invalid
+        if unknown_plugins:
+            return {"valid": False, "rules": [], "unknown_plugins": unknown_plugins}
+
+        # Sort plugin IDs for combination index lookup
+        sorted_ids = tuple(sorted(resolved_ids))
+        rules = []
+        if sorted_ids in self.truth_index.combination_index:
+            rules = [r.name for r in self.truth_index.combination_index[sorted_ids]]
+        return {"valid": bool(rules), "rules": rules, "unknown_plugins": []}
+
 # =======================================================
 # Local Smoke Test
 # =======================================================
@@ -681,6 +889,6 @@ if __name__ == "__main__":
     async def _demo():
         agent = TruthManagerAgent()
         result = await agent.handle_load_truth_data({"family": "words"})
-        print("✅ Truth data load result:", result)
+        print("[OK] Truth data load result:", result)
 
     asyncio.run(_demo())

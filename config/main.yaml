@@ -9,6 +9,7 @@ system:
   data_directory: "./data"
   temp_directory: "./data/temp"
 
+
 server:
   host: "localhost"
   port: 8080
@@ -23,7 +24,7 @@ server:
 
 agents:
   fuzzy_detector:
-    enabled: true
+    enabled: false
     similarity_threshold: 0.85
     context_window_chars: 200
     max_patterns: 500
@@ -51,6 +52,12 @@ agents:
     prevent_duplicate_links: true
     link_template: "https://products.aspose.com/words/net/plugins/{slug}/"
     info_text_template: "*This code requires the **{plugin_name}** plugin.*"
+    # Maximum allowed rewrite ratio (relative change in content length) before gating.
+    # Example: 0.3 means changes cannot exceed ±30% of original size.
+    rewrite_ratio_threshold: 0.5
+    # Blocked phrases that must not appear in enhanced content.
+    blocked_topics:
+      - "forbidden"
     
   orchestrator:
     enabled: true
@@ -176,3 +183,20 @@ batch_processing:
     - "node_modules/*"
     - "*.tmp"
     - "*~"
+
+orchestrator:
+  # Cap how many files run in parallel (the agent gating still applies inside)
+  max_file_workers: 4
+
+  # How long we can wait for a busy agent to accept our call
+  retry_timeout_s: 120
+  # Backoff settings for the wait-until-ready loop
+  retry_backoff_base: 0.5
+  retry_backoff_cap: 8
+
+  # Per-agent concurrency limits (1 for LLM by default)
+  agent_limits:
+    llm_validator: 1
+    content_validator: 2
+    truth_manager: 4
+    fuzzy_detector: 2

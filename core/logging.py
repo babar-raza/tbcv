@@ -22,7 +22,7 @@ from logging import Handler
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
-from datetime import datetime
+from datetime import datetime, timezone
 
 import logging
 try:
@@ -61,7 +61,7 @@ class _FallbackJsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         # Base payload
         payload: Dict[str, Any] = {
-            "timestamp": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(timespec="milliseconds") + "Z",
             "level": record.levelname,
             "name": record.name,
             "message": record.getMessage(),
@@ -119,7 +119,7 @@ class TBCVProcessor:
 
     def __call__(self, logger, name: str, event_dict: Dict[str, Any]) -> Dict[str, Any]:
         # Ensure a timestamp exists
-        event_dict.setdefault("timestamp", datetime.utcnow().isoformat(timespec="milliseconds") + "Z")
+        event_dict.setdefault("timestamp", datetime.now(timezone.utc).isoformat(timespec="milliseconds") + "Z")
         # Attach logger name
         event_dict["logger"] = name
 
@@ -341,7 +341,7 @@ class PerformanceLogger:
         self.context: Dict[str, Any] = {}
 
     def __enter__(self) -> "PerformanceLogger":
-        self.start_time = datetime.utcnow()
+        self.start_time = datetime.now(timezone.utc)
         self.logger.info(
             f"Starting {self.operation}",
             operation=self.operation,
@@ -350,7 +350,7 @@ class PerformanceLogger:
         return self
 
     def __exit__(self, exc_type, exc_val, _exc_tb) -> None:
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         duration_ms = (end_time - (self.start_time or end_time)).total_seconds() * 1000.0
 
         if exc_type is None:

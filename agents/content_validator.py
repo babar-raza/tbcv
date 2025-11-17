@@ -13,6 +13,7 @@ Rebased fixes:
 from __future__ import annotations
 
 import re
+import os
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
@@ -103,6 +104,21 @@ class ContentValidatorAgent(BaseAgent):
                     },
                     output_schema={"type": "object"},
                     side_effects=["read", "cache", "db_write", "network"]
+                ),
+                AgentCapability(
+                    name="validate_plugins",
+                    description="Validate plugin requirements using LLM semantic analysis",
+                    input_schema={
+                        "type": "object",
+                        "properties": {
+                            "content": {"type": "string"},
+                            "fuzzy_detections": {"type": "array"},
+                            "family": {"type": "string", "default": "words"}
+                        },
+                        "required": ["content", "fuzzy_detections"]
+                    },
+                    output_schema={"type": "object"},
+                    side_effects=["read", "network"]
                 )
             ],
             max_runtime_s=120,
@@ -117,6 +133,7 @@ class ContentValidatorAgent(BaseAgent):
         self.register_handler("get_status", self.handle_get_status)
         self.register_handler("get_contract", self.get_contract)
         self.register_handler("validate_content", self.handle_validate_content)
+        self.register_handler("validate_plugins", self.handle_validate_plugins)
         # public per-scope handlers required by API and tests
         self.register_handler("validate_yaml", self.handle_validate_yaml)
         self.register_handler("validate_markdown", self.handle_validate_markdown)
@@ -145,7 +162,7 @@ class ContentValidatorAgent(BaseAgent):
             content = params.get("content", "")
             file_path = params.get("file_path", "unknown")
             family = params.get("family", "words")
-            validation_types = params.get("validation_types", ["yaml", "markdown", "code", "links", "structure"])
+            validation_types = params.get("validation_types", ["yaml", "markdown", "code", "links", "structure", "Truth", "FuzzyLogic"])
 
             all_issues: List[ValidationIssue] = []
             all_metrics: Dict[str, Any] = {
@@ -171,6 +188,10 @@ class ContentValidatorAgent(BaseAgent):
                         result = await self._validate_links(content)
                     elif vt == "structure":
                         result = await self._validate_structure(content)
+                    elif vt in ["Truth", "truth"]:
+                        result = await self._validate_yaml_with_truths_and_rules(content, family, truth_context, rule_context)
+                    elif vt in ["FuzzyLogic", "fuzzylogic", "fuzzy"]:
+                        result = await self._validate_with_fuzzy_logic(content, family, plugin_context)
                     elif vt == "llm":
                         result = await self._validate_with_llm(content, plugin_context, rule_context, truth_context)
                     else:
@@ -191,9 +212,32 @@ class ContentValidatorAgent(BaseAgent):
             overall_confidence = self._calculate_content_confidence(all_issues, all_metrics)
 
             await self._store_validation_result(
-                file_path, len(content), validation_types,
-                all_issues, overall_confidence, all_metrics, family
-            )
+            file_path, len(content), validation_types,
+            all_issues, overall_confidence, all_metrics, family
+        )
+
+        # Auto-generate recommendations for validation failures
+        try:
+            from agents.base import agent_registry
+            rec_agent = agent_registry.get_agent("recommendation_agent")
+            if rec_agent and all_issues:
+                for issue in all_issues:
+                    if issue.level in ["error", "warning"]:
+                        validation_dict = {
+                            "id": file_path,
+                            "validation_type": issue.category,
+                            "status": "fail",
+                            "message": issue.message,
+                            "details": {"line": issue.line_number, "category": issue.category}
+                        }
+                        await rec_agent.process_request("generate_recommendations", {
+                            "validation": validation_dict,
+                            "content": content,
+                            "context": {"family": family, "file_path": file_path},
+                            "persist": True
+                        })
+        except Exception as e:
+            self.logger.warning(f"Failed to auto-generate recommendations: {e}")
 
             return {
                 "confidence": overall_confidence,
@@ -347,10 +391,148 @@ class ContentValidatorAgent(BaseAgent):
     # ----------------------
     # Stub validators (safe)
     # ----------------------
+    async def _validate_against_truth_data(self, content: str, family: str, truth_context: Dict) -> List[ValidationIssue]:
+        """Validate content against truth data from /truth/{family}.json"""
+        issues: List[ValidationIssue] = []
+        
+        try:
+            # Get truth data
+            truth_data = truth_context.get("truth_data", {}) or truth_context.get("truths", {}) or {}
+            plugins = truth_data.get("plugins", [])
+            required_fields = truth_data.get("required_fields", [])
+            forbidden_patterns = truth_data.get("forbidden_patterns", [])
+            combination_rules = truth_data.get("combination_rules", [])
+            
+            # Parse content for YAML frontmatter
+            if frontmatter:
+                try:
+                    post = frontmatter.loads(content)
+                    yaml_data = post.metadata
+                    body = post.content
+                except:
+                    yaml_data = {}
+                    body = content
+            else:
+                yaml_data = {}
+                body = content
+            
+            # Check required fields from truth
+            for req_field in required_fields:
+                if req_field not in yaml_data or not yaml_data[req_field]:
+                    issues.append(ValidationIssue(
+                        level="error",
+                        category="truth_presence",
+                        message=f"Required field '{req_field}' missing (required by truth/{family}.json)",
+                        suggestion=f"Add '{req_field}: <value>' to front-matter",
+                        source="truth"
+                    ))
+            
+            # Check for forbidden patterns
+            for pattern in forbidden_patterns:
+                if re.search(pattern, body, re.IGNORECASE):
+                    issues.append(ValidationIssue(
+                        level="warning",
+                        category="truth_not_allowed",
+                        message=f"Forbidden pattern '{pattern}' found (disallowed by truth/{family}.json)",
+                        suggestion=f"Remove or replace pattern '{pattern}'",
+                        source="truth"
+                    ))
+            
+            # Validate plugin references
+            if plugins:
+                # Extract plugin references from content
+                detected_plugins = []
+                for plugin in plugins:
+                    plugin_id = plugin.get("id", "")
+                    plugin_name = plugin.get("name", "")
+                    patterns = plugin.get("patterns", {})
+                    
+                    # Check for class names
+                    for class_name in patterns.get("classNames", []):
+                        if re.search(rf'\b{re.escape(class_name)}\b', body):
+                            detected_plugins.append({
+                                "id": plugin_id,
+                                "name": plugin_name,
+                                "matched": class_name,
+                                "type": "className"
+                            })
+                    
+                    # Check for method names
+                    for method in patterns.get("methods", []):
+                        if re.search(rf'\b{re.escape(method)}\b', body):
+                            detected_plugins.append({
+                                "id": plugin_id,
+                                "name": plugin_name,
+                                "matched": method,
+                                "type": "method"
+                            })
+                    
+                    # Check for imports
+                    for import_pattern in patterns.get("imports", []):
+                        if import_pattern in body:
+                            detected_plugins.append({
+                                "id": plugin_id,
+                                "name": plugin_name,
+                                "matched": import_pattern,
+                                "type": "import"
+                            })
+                
+                # Validate detected plugins against declared plugins in YAML
+                declared_plugins = yaml_data.get("plugins", [])
+                if isinstance(declared_plugins, str):
+                    declared_plugins = [declared_plugins]
+                
+                for detected in detected_plugins:
+                    plugin_id = detected["id"]
+                    if plugin_id not in declared_plugins and detected["name"] not in declared_plugins:
+                        issues.append(ValidationIssue(
+                            level="warning",
+                            category="truth_mismatch",
+                            message=f"Plugin '{detected['name']}' detected but not declared in frontmatter",
+                            suggestion=f"Add 'plugins: [{plugin_id}]' to frontmatter or remove plugin usage",
+                            source="truth"
+                        ))
+                
+                # Check for declared plugins that aren't used
+                for declared in declared_plugins:
+                    found = False
+                    for plugin in plugins:
+                        if plugin.get("id") == declared or plugin.get("name") == declared:
+                            # Check if actually used
+                            patterns = plugin.get("patterns", {})
+                            all_patterns = (
+                                patterns.get("classNames", []) +
+                                patterns.get("methods", []) +
+                                patterns.get("imports", [])
+                            )
+                            for pattern in all_patterns:
+                                if re.search(rf'\b{re.escape(pattern)}\b', body):
+                                    found = True
+                                    break
+                            break
+                    
+                    if not found:
+                        issues.append(ValidationIssue(
+                            level="info",
+                            category="truth_mismatch",
+                            message=f"Plugin '{declared}' declared but not detected in content",
+                            suggestion=f"Remove '{declared}' from plugins list if not used",
+                            source="truth"
+                        ))
+        
+        except Exception as e:
+            self.logger.warning(f"Truth validation error: {e}")
+        
+        return issues
+    
     async def _validate_yaml_with_truths_and_rules(self, content: str, family: str, truth_context: Dict, rule_context: Dict) -> ValidationResult:
         """Validate YAML front-matter against truth and rule constraints."""
         issues: List[ValidationIssue] = []
         auto_fixable = 0
+        
+        # Add comprehensive truth validation
+        truth_issues = await self._validate_against_truth_data(content, family, truth_context)
+        issues.extend(truth_issues)
         
         # Parse front-matter
         if not frontmatter:
@@ -376,14 +558,34 @@ class ContentValidatorAgent(BaseAgent):
             return ValidationResult(confidence=0.0, issues=issues, auto_fixable_count=0, metrics={"yaml_valid": False, "parse_error": str(e)})
         
         # Get validation rules from rule_context
-        family_rules = rule_context.get("family_rules", {})
-        allowed_fields = family_rules.get("allowed_yaml_fields", [])
-        required_fields = family_rules.get("required_yaml_fields", [])
-        field_types = family_rules.get("yaml_field_types", {})
+        family_rules = rule_context.get("family_rules")
+        if family_rules is None:
+            allowed_fields = rule_context.get("allowed_yaml_fields", [])
+            required_fields = rule_context.get("required_yaml_fields", [])
+            field_types = rule_context.get("yaml_field_types", {})
+        else:
+            allowed_fields = getattr(family_rules, "allowed_yaml_fields", []) or getattr(family_rules, "allowed_fields", [])
+            required_fields = getattr(family_rules, "required_yaml_fields", []) or getattr(family_rules, "required_fields", [])
+            field_types = getattr(family_rules, "yaml_field_types", {}) or getattr(family_rules, "field_types", {})
         non_editable = rule_context.get("non_editable_fields", [])
-        
+                
         # Get truth constraints
-        truth_data = truth_context.get("truth_data", {})
+            # ---- hydrate context ----
+        truth_context = truth_context or {}
+        rule_context  = rule_context  or {}
+
+        # accept either *_data or legacy plural keys
+        truth_data = (
+            truth_context.get("truth_data", {})
+            or truth_context.get("truths", {})
+            or {}
+        )
+        rule_data = (
+            rule_context.get("rule_data", {})
+            or rule_context.get("rules", {})
+            or {}
+        )
+
         valid_categories = truth_data.get("valid_categories", [])
         valid_tags = truth_data.get("valid_tags", [])
         
@@ -863,6 +1065,275 @@ class ContentValidatorAgent(BaseAgent):
                 metrics={"llm_valid": False, "llm_error": str(e)}
             )
 
+    async def handle_validate_plugins(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate plugin requirements using LLM (merged from LLMValidatorAgent)."""
+        content = params.get("content", "")
+        fuzzy_detections = params.get("fuzzy_detections", [])
+        family = params.get("family", "words")
+
+        # Check Ollama availability with detailed diagnostics
+        try:
+            from core.ollama import ollama
+        except ImportError:
+            return {
+                "requirements": [],
+                "issues": [{
+                    "level": "info",
+                    "category": "llm_disabled",
+                    "message": "LLM validation disabled (Ollama not available)"
+                }],
+                "confidence": 0.0
+            }
+        
+        if not ollama.enabled:
+            return {
+                "requirements": [],
+                "issues": [{
+                    "level": "info",
+                    "category": "llm_disabled",
+                    "message": "LLM validation disabled (set OLLAMA_ENABLED=true to enable)"
+                }],
+                "confidence": 0.0
+            }
+        
+        try:
+            # Try to connect to Ollama
+            ollama.list_models()
+        except Exception as e:
+            error_msg = str(e)
+            if "Connection" in error_msg or "connect" in error_msg.lower():
+                message = f"Cannot connect to Ollama at {ollama.base_url}. Ensure 'ollama serve' is running."
+            elif "timeout" in error_msg.lower():
+                message = f"Ollama connection timeout at {ollama.base_url}. Check if server is responsive."
+            else:
+                message = f"Ollama error: {error_msg}"
+            
+            return {
+                "requirements": [],
+                "issues": [{
+                    "level": "warning",
+                    "category": "llm_unavailable",
+                    "message": message,
+                    "diagnostic": {
+                        "ollama_url": ollama.base_url,
+                        "ollama_model": ollama.model,
+                        "ollama_enabled": ollama.enabled,
+                        "error": error_msg
+                    }
+                }],
+                "confidence": 0.0
+            }
+
+        # Load truth data for plugin definitions
+        truth_context = await self._load_truth_context(family)
+        plugins = truth_context.get("plugins", [])
+
+        # Build LLM prompt
+        prompt = self._build_plugin_validation_prompt(content, fuzzy_detections, plugins, family)
+
+        try:
+            # Call LLM
+            response = await ollama.async_generate(
+                prompt=prompt,
+                options={
+                    "temperature": 0.1,
+                    "top_p": 0.9,
+                    "num_predict": 2000
+                }
+            )
+
+            # Parse LLM response
+            result = self._parse_llm_plugin_response(response.get('response', ''), plugins)
+            
+            return result
+
+        except Exception as e:
+            self.logger.warning(f"LLM plugin validation failed: {e}")
+            return {
+                "requirements": [],
+                "issues": [{
+                    "level": "error",
+                    "category": "llm_error",
+                    "message": f"LLM validation error: {str(e)}"
+                }],
+                "confidence": 0.0
+            }
+
+    def _build_plugin_validation_prompt(self, content: str, fuzzy_detections: List[Dict], 
+                                       plugins: List[Dict], family: str) -> str:
+        """Build prompt for LLM plugin validation."""
+        
+        # Extract first 2000 chars of content for context
+        content_excerpt = content[:2000] if len(content) > 2000 else content
+        
+        # Format fuzzy detections
+        fuzzy_list = "\n".join([
+            f"- {d.get('plugin_name', 'Unknown')} (ID: {d.get('plugin_id', 'unknown')})"
+            for d in fuzzy_detections
+        ])
+        
+        # Format plugin definitions (only processors and features)
+        plugin_list = []
+        for p in plugins:
+            if p.get("plugin_type") in ["processor", "feature"]:
+                plugin_list.append(
+                    f"- {p['name']} ({p.get('plugin_type', 'processor')}): "
+                    f"Load={p.get('load_formats', [])}, Save={p.get('save_formats', [])}"
+                )
+        plugins_text = "\n".join(plugin_list[:15])
+        
+        prompt = f"""You are a technical documentation validator for Aspose.{family.capitalize()} plugin system.
+
+CONTENT TO VALIDATE:
+{content_excerpt}
+
+FUZZY PATTERN DETECTIONS:
+{fuzzy_list if fuzzy_list else "None detected"}
+
+AVAILABLE PLUGINS:
+{plugins_text}
+
+TASK:
+Analyze the content and determine:
+1. Which plugins are REQUIRED based on the operations described
+2. Whether the fuzzy detections are correct (verify against actual plugin names)
+3. Any MISSING required plugins that should be mentioned
+4. Specific recommendations for improving plugin documentation
+
+IMPORTANT RULES:
+- Cross-format conversion (e.g., DOCXâ†'PDF) requires: source processor + target processor + conversion feature
+- Feature plugins cannot work alone - they need at least one processor
+- Focus ONLY on plugins explicitly needed for the operations in the content
+
+Respond ONLY with valid JSON in this exact format:
+{{
+  "required_plugins": [
+    {{
+      "plugin_id": "word_processor",
+      "plugin_name": "Document",
+      "confidence": 0.95,
+      "reasoning": "Content shows loading DOCX files",
+      "validation_status": "mentioned_correctly",
+      "matched_context": "The article explains loading .docx files"
+    }}
+  ],
+  "missing_plugins": [
+    {{
+      "plugin_id": "document_converter",
+      "plugin_name": "Document Converter",
+      "confidence": 0.9,
+      "reasoning": "DOCX to PDF conversion requires Document Converter",
+      "validation_status": "missing_required",
+      "recommendation": {{
+        "type": "add_plugin_mention",
+        "severity": "high",
+        "message": "Document Converter plugin is required but not mentioned",
+        "suggested_addition": "This conversion requires Document Converter plugin",
+        "location": "prerequisites_section"
+      }}
+    }}
+  ],
+  "incorrect_detections": [
+    {{
+      "detected_plugin_id": "words_save_operations",
+      "issue": "This is not a real plugin ID",
+      "correct_plugin_id": "word_processor",
+      "correct_plugin_name": "Document"
+    }}
+  ]
+}}"""
+        
+        return prompt
+
+    def _parse_llm_plugin_response(self, response: str, plugins: List[Dict]) -> Dict[str, Any]:
+        """Parse LLM response and structure plugin validation results."""
+        try:
+            import json as json_lib
+            
+            # Extract JSON from response
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            
+            if json_start >= 0 and json_end > json_start:
+                json_str = response[json_start:json_end]
+                data = json_lib.loads(json_str)
+                
+                requirements = []
+                issues = []
+                
+                # Process required plugins
+                for req in data.get('required_plugins', []):
+                    requirements.append({
+                        "plugin_id": req.get("plugin_id"),
+                        "plugin_name": req.get("plugin_name"),
+                        "confidence": req.get("confidence", 0.9),
+                        "detection_type": "llm_verified",
+                        "reasoning": req.get("reasoning", ""),
+                        "validation_status": req.get("validation_status", "mentioned_correctly"),
+                        "matched_context": req.get("matched_context"),
+                        "recommendation": None
+                    })
+                
+                # Process missing plugins (these become issues)
+                for missing in data.get('missing_plugins', []):
+                    requirements.append({
+                        "plugin_id": missing.get("plugin_id"),
+                        "plugin_name": missing.get("plugin_name"),
+                        "confidence": missing.get("confidence", 0.85),
+                        "detection_type": "llm_missing",
+                        "reasoning": missing.get("reasoning", ""),
+                        "validation_status": "missing_required",
+                        "matched_context": None,
+                        "recommendation": missing.get("recommendation")
+                    })
+                    
+                    # Add to issues list
+                    rec = missing.get("recommendation", {})
+                    issues.append({
+                        "level": rec.get("severity", "warning"),
+                        "category": "missing_plugin",
+                        "message": rec.get("message", f"{missing.get('plugin_name')} is required but not mentioned"),
+                        "plugin_id": missing.get("plugin_id"),
+                        "auto_fixable": True,
+                        "fix_suggestion": rec.get("suggested_addition", "")
+                    })
+                
+                # Process incorrect detections
+                for incorrect in data.get('incorrect_detections', []):
+                    issues.append({
+                        "level": "warning",
+                        "category": "incorrect_plugin",
+                        "message": f"Detected '{incorrect.get('detected_plugin_id')}' is not a real plugin",
+                        "fix_suggestion": f"Should be '{incorrect.get('correct_plugin_name')}'",
+                        "auto_fixable": False
+                    })
+                
+                # Calculate overall confidence
+                if requirements:
+                    avg_confidence = sum(r["confidence"] for r in requirements) / len(requirements)
+                else:
+                    avg_confidence = 0.5
+                
+                return {
+                    "requirements": requirements,
+                    "issues": issues,
+                    "confidence": avg_confidence
+                }
+        
+        except Exception as e:
+            self.logger.debug(f"Failed to parse LLM plugin response: {e}")
+        
+        # Fallback response
+        return {
+            "requirements": [],
+            "issues": [{
+                "level": "warning",
+                "category": "parse_error",
+                "message": "Could not parse LLM response"
+            }],
+            "confidence": 0.0
+        }
+
     # ----------------------
     # Utility helpers
     # ----------------------
@@ -871,6 +1342,94 @@ class ContentValidatorAgent(BaseAgent):
             return 1.0
         return 0.8
 
+    async def _validate_with_fuzzy_logic(self, content: str, family: str, plugin_context: Dict) -> ValidationResult:
+        """Validate content using fuzzy logic plugin detection."""
+        issues: List[ValidationIssue] = []
+        auto_fixable = 0
+        
+        try:
+            # Get fuzzy detector agent
+            from agents.base import agent_registry
+            fuzzy_detector = agent_registry.get_agent("fuzzy_detector")
+            
+            if not fuzzy_detector:
+                return ValidationResult(
+                    confidence=0.5,
+                    issues=[ValidationIssue(
+                        level="warning",
+                        category="fuzzy_logic_unavailable",
+                        message="FuzzyDetector agent not available",
+                        suggestion="Ensure fuzzy_detector agent is registered"
+                    )],
+                    auto_fixable_count=0,
+                    metrics={"fuzzy_available": False}
+                )
+            
+            # Detect plugins using fuzzy logic
+            result = await fuzzy_detector.process_request("detect_plugins", {
+                "text": content,
+                "family": family,
+                "confidence_threshold": 0.6
+            })
+            
+            detections = result.get("detections", [])
+            
+            # Check for plugin usage without declaration
+            if frontmatter:
+                try:
+                    post = frontmatter.loads(content)
+                    declared_plugins = post.metadata.get("plugins", [])
+                    if isinstance(declared_plugins, str):
+                        declared_plugins = [declared_plugins]
+                except:
+                    declared_plugins = []
+            else:
+                declared_plugins = []
+            
+            for detection in detections:
+                plugin_id = detection.get("plugin_id", "")
+                plugin_name = detection.get("plugin_name", "")
+                confidence = detection.get("confidence", 0.0)
+                
+                if confidence >= 0.6:
+                    if plugin_id not in declared_plugins and plugin_name not in declared_plugins:
+                        issues.append(ValidationIssue(
+                            level="warning" if confidence >= 0.7 else "info",
+                            category="fuzzy_logic_detection",
+                            message=f"Plugin '{plugin_name}' detected (confidence: {confidence:.2f}) but not declared",
+                            suggestion=f"Add 'plugins: [{plugin_id}]' to frontmatter if using this plugin",
+                            source="fuzzy"
+                        ))
+                        auto_fixable += 1
+            
+            # Calculate overall confidence
+            overall_confidence = 1.0 - (len([i for i in issues if i.level == "error"]) * 0.2)
+            
+            return ValidationResult(
+                confidence=max(0.0, overall_confidence),
+                issues=issues,
+                auto_fixable_count=auto_fixable,
+                metrics={
+                    "fuzzy_detections": len(detections),
+                    "high_confidence_detections": len([d for d in detections if d.get("confidence", 0) >= 0.7]),
+                    "issues_found": len(issues)
+                }
+            )
+            
+        except Exception as e:
+            self.logger.warning(f"Fuzzy logic validation failed: {e}")
+            return ValidationResult(
+                confidence=0.5,
+                issues=[ValidationIssue(
+                    level="warning",
+                    category="fuzzy_logic_error",
+                    message=f"Fuzzy logic validation error: {str(e)}",
+                    suggestion="Check fuzzy detector configuration"
+                )],
+                auto_fixable_count=0,
+                metrics={"error": str(e)}
+            )
+    
     async def _store_validation_result(
         self,
         file_path: str,
@@ -879,11 +1438,17 @@ class ContentValidatorAgent(BaseAgent):
         issues: List[ValidationIssue],
         confidence: float,
         metrics: Dict[str, Any],
-        family: str
-    ) -> None:
-        """Store validation results in database (best effort)."""
+        family: str,
+        workflow_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Store validation results in database and generate recommendations.
+        
+        Returns:
+            Dict with validation_id and recommendations_generated count
+        """
+        recommendations_generated = 0
         try:
-            # Store validation results in database and create recommendations
+            # Store validation results in database
             validation_result = db_manager.create_validation_result(
                 file_path=file_path,
                 rules_applied=validation_types,
@@ -892,29 +1457,68 @@ class ContentValidatorAgent(BaseAgent):
                 severity="info" if confidence > 0.7 else "warning" if confidence > 0.5 else "error",
                 status="pass" if confidence > 0.7 else "warning" if confidence > 0.5 else "fail",
                 content=f"Content length: {content_length}",
-                run_id=f"validation_{family}_{file_path.replace('/', '_').replace('\\', '_')}"
+                run_id=f"validation_{family}_{file_path.replace('/', '_').replace(chr(92), '_')}",
+                workflow_id=workflow_id
             )
 
-            # Create recommendations for high-value issues
-            for issue in issues:
-                if issue.level in ["error", "warning"] and issue.suggestion:
-                    db_manager.create_recommendation(
-                        validation_id=validation_result.id,
-                        type="validation_fix",
-                        title=f"Fix {issue.category}: {issue.message[:50]}...",
-                        description=issue.message,
-                        suggestion=issue.suggestion,
-                        confidence=confidence,
-                        auto_apply=issue.level == "info",
-                        metadata={
-                            "issue_level": issue.level,
-                            "issue_category": issue.category,
-                            "line_number": issue.line_number,
-                            "column": issue.column,
-                            "source": issue.source
-                        }
-                    )
+            # Generate recommendations using RecommendationAgent for failures/warnings
+            if confidence < 0.7 and issues:
+                try:
+                    from agents.recommendation_agent import RecommendationAgent
+                    rec_agent = RecommendationAgent()
+                    
+                    # Get content for recommendation generation (if available)
+                    content = ""
+                    try:
+                        if os.path.exists(file_path):
+                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                content = f.read()
+                    except Exception:
+                        pass
+                    
+                    # Generate recommendations for each issue
+                    for issue in issues:
+                        if issue.level in ["error", "warning"]:
+                            # Create a validation dict for the recommendation agent
+                            validation_dict = {
+                                "id": validation_result.id,
+                                "validation_type": issue.category,
+                                "status": "fail" if issue.level == "error" else "warning",
+                                "message": issue.message,
+                                "details": {
+                                    "line": issue.line_number,
+                                    "column": issue.column,
+                                    "source": issue.source,
+                                },
+                            }
+                            
+                            recommendations = await rec_agent.generate_recommendations(
+                                validation=validation_dict,
+                                content=content,
+                                context={"file_path": file_path, "family": family}
+                            )
+                            
+                            # Persist generated recommendations
+                            rec_ids = await rec_agent.persist_recommendations(
+                                recommendations,
+                                context={"file_path": file_path, "validation_id": validation_result.id}
+                            )
+                            recommendations_generated += len(rec_ids)
+                
+                except Exception as e:
+                    self.logger.warning(f"Failed to generate recommendations: {e}")
 
-            self.logger.debug("Validation results and recommendations stored for %s", file_path)
+            self.logger.debug("Validation results and recommendations stored for %s (generated %d recommendations)", 
+                            file_path, recommendations_generated)
+            
+            return {
+                "validation_id": validation_result.id,
+                "recommendations_generated": recommendations_generated,
+            }
+            
         except Exception as e:
             self.logger.exception("Failed to store validation results: %s", e)
+            return {
+                "validation_id": None,
+                "recommendations_generated": 0,
+            }

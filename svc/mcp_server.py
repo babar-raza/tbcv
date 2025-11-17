@@ -13,6 +13,7 @@ import asyncio
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.database import DatabaseManager, ValidationResult, ValidationStatus
+from core.path_validator import is_safe_path, validate_write_path
 from core.rule_manager import RuleManager
 from core.ingestion import MarkdownIngestion
 from core.validation_store import list_validation_records
@@ -187,6 +188,7 @@ class MCPServer:
             raise ValueError("ids parameter is required")
         enhanced_count = 0
         errors = []
+        enhancements = []  # FIX: Initialize the enhancements list
         for validation_id in ids:
             try:
                 # Get validation record
@@ -205,8 +207,19 @@ class MCPServer:
                     continue
                 # Load original markdown file
                 file_path = Path(validation.file_path)
+                
+                # FIX: Validate path safety
+                if not is_safe_path(file_path):
+                    errors.append(f"Unsafe file path: {file_path}")
+                    continue
+                
                 if not file_path.exists():
                     errors.append(f"File not found: {file_path}")
+                    continue
+                
+                # FIX: Validate write permissions
+                if not validate_write_path(file_path):
+                    errors.append(f"Cannot write to file: {file_path}")
                     continue
                 # Read original content
                 from core.io_win import read_text, write_text_crlf
@@ -268,7 +281,8 @@ Enhanced content:"""
         return {
             "success": True,
             "enhanced_count": enhanced_count,
-            "errors": errors
+            "errors": errors,
+            "enhancements": enhancements  # FIX: Return the enhancements list
         }
 class MCPStdioServer:
     """MCP server that communicates via stdin/stdout."""
@@ -331,4 +345,4 @@ async def main():
     server = MCPStdioServer()
     await server.run()
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main())
