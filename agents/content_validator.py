@@ -177,6 +177,7 @@ class ContentValidatorAgent(BaseAgent):
             plugin_context = await self._get_plugin_context(content, family)
 
             for vt in validation_types:
+                result = None
                 try:
                     if vt == "yaml":
                         result = await self._validate_yaml_with_truths_and_rules(content, family, truth_context, rule_context)
@@ -188,6 +189,10 @@ class ContentValidatorAgent(BaseAgent):
                         result = await self._validate_links(content)
                     elif vt == "structure":
                         result = await self._validate_structure(content)
+                    elif vt in ["seo_heading", "seo", "seo_headings"]:
+                        result = await self._validate_seo_headings(content)
+                    elif vt in ["heading_size", "heading_sizes", "size"]:
+                        result = await self._validate_heading_sizes(content)
                     elif vt in ["Truth", "truth"]:
                         result = await self._validate_yaml_with_truths_and_rules(content, family, truth_context, rule_context)
                     elif vt in ["FuzzyLogic", "fuzzylogic", "fuzzy"]:
@@ -198,16 +203,36 @@ class ContentValidatorAgent(BaseAgent):
                         self.logger.warning("Unknown validation type %s", vt)
                         continue
 
+                    if result is None:
+                        # Create a fallback result for unknown validation types
+                        result = ValidationResult(
+                            confidence=0.0,
+                            issues=[ValidationIssue(level="error", category="system", message=f"Validation method for {vt} returned None")],
+                            auto_fixable_count=0,
+                            metrics={"error": f"Validation method for {vt} returned None"}
+                        )
+
                     all_issues.extend(result.issues)
                     all_metrics[f"{vt}_metrics"] = result.metrics
                     total_auto_fixable += result.auto_fixable_count
 
-                except Exception:
-                    self.logger.exception("Validation type failed")
+                except Exception as e:
+                    self.logger.exception("Validation type failed: %s", str(e))
                     all_issues.append(ValidationIssue(
                         level="error", category="system",
-                        message=f"Validation failed for {vt}"
+                        message=f"Validation failed for {vt}: {str(e)}"
                     ))
+                    # Create a fallback result for metrics
+                    if result is None:
+                        result = ValidationResult(
+                            confidence=0.0,
+                            issues=[ValidationIssue(level="error", category="system", message=f"Validation failed for {vt}")],
+                            auto_fixable_count=0,
+                            metrics={"error": str(e)}
+                        )
+                    all_issues.extend(result.issues)
+                    all_metrics[f"{vt}_metrics"] = result.metrics
+                    total_auto_fixable += result.auto_fixable_count
 
             overall_confidence = self._calculate_content_confidence(all_issues, all_metrics)
 
@@ -239,14 +264,14 @@ class ContentValidatorAgent(BaseAgent):
         except Exception as e:
             self.logger.warning(f"Failed to auto-generate recommendations: {e}")
 
-            return {
-                "confidence": overall_confidence,
-                "issues": [issue.to_dict() for issue in all_issues],
-                "auto_fixable_count": total_auto_fixable,
-                "metrics": all_metrics,
-                "file_path": file_path,
-                "family": family
-            }
+        return {
+            "confidence": overall_confidence,
+            "issues": [issue.to_dict() for issue in all_issues],
+            "auto_fixable_count": total_auto_fixable,
+            "metrics": all_metrics,
+            "file_path": file_path,
+            "family": family
+        }
 
     # ----------------------
     # Public per-scope APIs
@@ -671,10 +696,33 @@ class ContentValidatorAgent(BaseAgent):
                         source="truth"
                     ))
                     auto_fixable += 1
-        
+
+        # LLM Semantic Validation (NEW!)
+        semantic_issues = []
+        llm_validation_enabled = False
+        try:
+            # Check if LLM validation is enabled in config
+            llm_validation_enabled = getattr(self.settings, 'llm_validation', {}).get('enabled', True) if hasattr(self.settings, 'llm_validation') else True
+
+            if llm_validation_enabled:
+                self.logger.debug("Running LLM semantic truth validation")
+                semantic_issues = await self._validate_truth_with_llm(
+                    content=content,
+                    family=family,
+                    truth_context=truth_context,
+                    heuristic_issues=truth_issues
+                )
+                issues.extend(semantic_issues)
+
+                # Count auto-fixable semantic issues
+                auto_fixable += len([i for i in semantic_issues if hasattr(i, 'auto_fixable') and i.auto_fixable])
+        except Exception as e:
+            self.logger.warning(f"LLM semantic validation failed: {e}")
+            # Continue with heuristic results only
+
         # Calculate confidence
         confidence = 1.0 if not issues else max(0.3, 1.0 - (len([i for i in issues if i.level == "error"]) * 0.2))
-        
+
         return ValidationResult(
             confidence=confidence,
             issues=issues,
@@ -683,6 +731,9 @@ class ContentValidatorAgent(BaseAgent):
                 "yaml_valid": len([i for i in issues if i.level == "error"]) == 0,
                 "fields_checked": len(yaml_data),
                 "required_fields_count": len(required_fields),
+                "heuristic_issues": len(truth_issues),
+                "semantic_issues": len(semantic_issues),
+                "llm_validation_enabled": llm_validation_enabled,
                 "issues_count": len(issues)
             }
         )
@@ -989,6 +1040,332 @@ class ContentValidatorAgent(BaseAgent):
             }
         )
 
+    async def _validate_seo_headings(self, content: str) -> ValidationResult:
+        """Validate SEO-friendly heading structure."""
+        import yaml
+        import os
+
+        issues: List[ValidationIssue] = []
+        auto_fixable = 0
+
+        # Load SEO configuration
+        config_path = os.path.join("config", "seo.yaml")
+        seo_config = {
+            "seo": {
+                "headings": {
+                    "h1": {
+                        "required": True,
+                        "unique": True,
+                        "min_length": 20,
+                        "max_length": 70,
+                        "recommended_min": 30,
+                        "recommended_max": 60
+                    },
+                    "allow_empty_headings": False,
+                    "enforce_hierarchy": True,
+                    "max_depth": 6,
+                    "h1_must_be_first": True
+                },
+                "strictness": {
+                    "h1_violations": "error",
+                    "hierarchy_skip": "error",
+                    "empty_heading": "warning",
+                    "h1_length": "warning"
+                }
+            }
+        }
+
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    loaded_config = yaml.safe_load(f)
+                    if loaded_config and "seo" in loaded_config:
+                        seo_config = loaded_config
+            except Exception as e:
+                logger.warning(f"Failed to load SEO config: {e}, using defaults")
+
+        heading_config = seo_config["seo"]["headings"]
+        strictness = seo_config["seo"]["strictness"]
+
+        # Extract headings
+        lines = content.split('\n')
+        headings = []
+        for i, line in enumerate(lines):
+            if line.strip().startswith('#'):
+                level = len(line) - len(line.lstrip('#'))
+                text = line.lstrip('#').strip()
+                headings.append({"level": level, "text": text, "line": i + 1})
+
+        if not headings:
+            return ValidationResult(
+                confidence=1.0,
+                issues=[],
+                auto_fixable_count=0,
+                metrics={"has_headings": False}
+            )
+
+        # Check H1 requirements
+        h1_config = heading_config.get("h1", {})
+        h1_headings = [h for h in headings if h["level"] == 1]
+        h1_count = len(h1_headings)
+
+        # H1 Required check
+        if h1_config.get("required", True) and h1_count == 0:
+            issues.append(ValidationIssue(
+                level=strictness.get("h1_violations", "error"),
+                category="missing_h1",
+                message="Document is missing an H1 heading (required for SEO)",
+                line_number=1,
+                suggestion="Add an H1 heading at the beginning of your document"
+            ))
+            auto_fixable += 1
+
+        # H1 Unique check
+        if h1_config.get("unique", True) and h1_count > 1:
+            issues.append(ValidationIssue(
+                level=strictness.get("h1_violations", "error"),
+                category="multiple_h1",
+                message=f"Multiple H1 headings found ({h1_count}). Only one H1 is recommended for SEO",
+                line_number=h1_headings[1]["line"],
+                suggestion="Use H2 or lower for subsequent main headings"
+            ))
+            auto_fixable += 1
+
+        # H1 Length check
+        if h1_count == 1:
+            h1 = h1_headings[0]
+            h1_length = len(h1["text"])
+            min_len = h1_config.get("min_length", 20)
+            max_len = h1_config.get("max_length", 70)
+
+            if h1_length < min_len:
+                issues.append(ValidationIssue(
+                    level=strictness.get("h1_length", "warning"),
+                    category="h1_too_short",
+                    message=f"H1 heading is too short ({h1_length} chars). SEO recommends {min_len}-{max_len} characters",
+                    line_number=h1["line"],
+                    suggestion=f"Expand H1 to at least {min_len} characters for better SEO"
+                ))
+                auto_fixable += 1
+
+            elif h1_length > max_len:
+                issues.append(ValidationIssue(
+                    level=strictness.get("h1_length", "warning"),
+                    category="h1_too_long",
+                    message=f"H1 heading is too long ({h1_length} chars). SEO recommends {min_len}-{max_len} characters",
+                    line_number=h1["line"],
+                    suggestion=f"Shorten H1 to {max_len} characters or less for better SEO"
+                ))
+                auto_fixable += 1
+
+        # Check H1 position (should come first)
+        if heading_config.get("h1_must_be_first", True) and h1_count > 0:
+            first_h1_idx = next((i for i, h in enumerate(headings) if h["level"] == 1), None)
+            if first_h1_idx is not None and first_h1_idx > 0:
+                first_heading = headings[0]
+                issues.append(ValidationIssue(
+                    level="info",
+                    category="h1_not_first",
+                    message=f"H1 should be the first heading. Found H{first_heading['level']} before H1",
+                    line_number=first_heading["line"],
+                    suggestion="Move H1 to be the first heading in the document"
+                ))
+
+        # Check heading hierarchy (no skipping levels)
+        if heading_config.get("enforce_hierarchy", True):
+            for i in range(1, len(headings)):
+                prev_level = headings[i-1]["level"]
+                curr_level = headings[i]["level"]
+
+                if curr_level > prev_level + 1:
+                    issues.append(ValidationIssue(
+                        level=strictness.get("hierarchy_skip", "error"),
+                        category="heading_hierarchy_skip",
+                        message=f"Heading hierarchy skip: H{prev_level} → H{curr_level}. Use H{prev_level + 1} instead",
+                        line_number=headings[i]["line"],
+                        suggestion=f"Change to H{prev_level + 1} to maintain proper heading hierarchy"
+                    ))
+                    auto_fixable += 1
+
+        # Check for empty headings
+        if not heading_config.get("allow_empty_headings", False):
+            for h in headings:
+                if not h["text"]:
+                    issues.append(ValidationIssue(
+                        level=strictness.get("empty_heading", "warning"),
+                        category="empty_heading",
+                        message=f"Empty H{h['level']} heading found",
+                        line_number=h["line"],
+                        suggestion="Add text to the heading or remove it"
+                    ))
+                    auto_fixable += 1
+
+        # Check heading depth
+        max_depth = heading_config.get("max_depth", 6)
+        for h in headings:
+            if h["level"] > max_depth:
+                issues.append(ValidationIssue(
+                    level="info",
+                    category="excessive_heading_depth",
+                    message=f"Heading level H{h['level']} exceeds recommended depth (max: H{max_depth})",
+                    line_number=h["line"],
+                    suggestion=f"Consider using H{max_depth} or restructuring content"
+                ))
+
+        # Calculate confidence
+        error_count = len([i for i in issues if i.level == "error"])
+        confidence = 1.0 if error_count == 0 else max(0.5, 1.0 - (error_count * 0.2))
+
+        return ValidationResult(
+            confidence=confidence,
+            issues=issues,
+            auto_fixable_count=auto_fixable,
+            metrics={
+                "seo_compliant": error_count == 0,
+                "h1_count": h1_count,
+                "heading_count": len(headings),
+                "max_heading_level": max([h["level"] for h in headings]) if headings else 0,
+                "hierarchy_valid": len([i for i in issues if i.category == "heading_hierarchy_skip"]) == 0
+            }
+        )
+
+    async def _validate_heading_sizes(self, content: str) -> ValidationResult:
+        """Validate heading text lengths against configured size requirements."""
+        import yaml
+        import os
+
+        issues: List[ValidationIssue] = []
+        auto_fixable = 0
+
+        # Load heading size configuration
+        config_path = os.path.join("config", "heading_sizes.yaml")
+        default_config = {
+            "heading_sizes": {
+                "h1": {"min_length": 20, "max_length": 70, "recommended_min": 30, "recommended_max": 60},
+                "h2": {"min_length": 10, "max_length": 100, "recommended_min": 20, "recommended_max": 80},
+                "h3": {"min_length": 5, "max_length": 100, "recommended_min": 15, "recommended_max": 70},
+                "h4": {"min_length": 5, "max_length": 80, "recommended_min": 10, "recommended_max": 60},
+                "h5": {"min_length": 3, "max_length": 70, "recommended_min": 8, "recommended_max": 50},
+                "h6": {"min_length": 3, "max_length": 60, "recommended_min": 8, "recommended_max": 40},
+                "severity": {
+                    "below_min": "error",
+                    "above_max": "warning",
+                    "below_recommended": "info",
+                    "above_recommended": "info"
+                }
+            }
+        }
+
+        size_config = default_config["heading_sizes"]
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    loaded_config = yaml.safe_load(f)
+                    if loaded_config and "heading_sizes" in loaded_config:
+                        size_config = loaded_config["heading_sizes"]
+            except Exception as e:
+                logger.warning(f"Failed to load heading sizes config: {e}, using defaults")
+
+        severity = size_config.get("severity", default_config["heading_sizes"]["severity"])
+
+        # Extract headings
+        lines = content.split('\n')
+        headings = []
+        for i, line in enumerate(lines):
+            if line.strip().startswith('#'):
+                level = len(line) - len(line.lstrip('#'))
+                text = line.lstrip('#').strip()
+                headings.append({"level": level, "text": text, "line": i + 1})
+
+        if not headings:
+            return ValidationResult(
+                confidence=1.0,
+                issues=[],
+                auto_fixable_count=0,
+                metrics={"has_headings": False}
+            )
+
+        # Validate each heading size
+        total_violations = 0
+        for heading in headings:
+            level = heading["level"]
+            text = heading["text"]
+            length = len(text)
+            line = heading["line"]
+
+            # Skip empty headings (handled by SEO validation)
+            if length == 0:
+                continue
+
+            # Get rules for this heading level
+            rules = size_config.get(f"h{level}", {})
+            if not rules:
+                continue
+
+            min_len = rules.get("min_length")
+            max_len = rules.get("max_length")
+            rec_min = rules.get("recommended_min")
+            rec_max = rules.get("recommended_max")
+
+            # Check hard minimum
+            if min_len and length < min_len:
+                issues.append(ValidationIssue(
+                    level=severity.get("below_min", "error"),
+                    category="heading_too_short",
+                    message=f"H{level} heading too short ({length} chars, minimum: {min_len})",
+                    line_number=line,
+                    suggestion=f"Expand heading to at least {min_len} characters"
+                ))
+                auto_fixable += 1
+                total_violations += 1
+
+            # Check hard maximum
+            elif max_len and length > max_len:
+                issues.append(ValidationIssue(
+                    level=severity.get("above_max", "warning"),
+                    category="heading_too_long",
+                    message=f"H{level} heading too long ({length} chars, maximum: {max_len})",
+                    line_number=line,
+                    suggestion=f"Shorten heading to {max_len} characters or less"
+                ))
+                auto_fixable += 1
+                total_violations += 1
+
+            # Check recommended minimum (only if within hard limits)
+            elif rec_min and length < rec_min:
+                issues.append(ValidationIssue(
+                    level=severity.get("below_recommended", "info"),
+                    category="heading_below_recommended",
+                    message=f"H{level} heading below recommended length ({length} chars, recommended: {rec_min}-{rec_max})",
+                    line_number=line,
+                    suggestion=f"Consider expanding to at least {rec_min} characters for better readability"
+                ))
+
+            # Check recommended maximum (only if within hard limits)
+            elif rec_max and length > rec_max:
+                issues.append(ValidationIssue(
+                    level=severity.get("above_recommended", "info"),
+                    category="heading_above_recommended",
+                    message=f"H{level} heading above recommended length ({length} chars, recommended: {rec_min}-{rec_max})",
+                    line_number=line,
+                    suggestion=f"Consider shortening to {rec_max} characters or less for better scannability"
+                ))
+
+        # Calculate confidence
+        error_count = len([i for i in issues if i.level == "error"])
+        confidence = 1.0 if error_count == 0 else max(0.6, 1.0 - (error_count * 0.15))
+
+        return ValidationResult(
+            confidence=confidence,
+            issues=issues,
+            auto_fixable_count=auto_fixable,
+            metrics={
+                "headings_checked": len(headings),
+                "size_violations": total_violations,
+                "all_within_limits": total_violations == 0
+            }
+        )
+
     async def _validate_with_llm(self, content: str, plugin_context: Dict, rule_context: Dict, truth_context: Dict) -> ValidationResult:
         """Validate content using Ollama LLM with mistral model."""
         try:
@@ -1064,6 +1441,255 @@ class ContentValidatorAgent(BaseAgent):
                 auto_fixable_count=0,
                 metrics={"llm_valid": False, "llm_error": str(e)}
             )
+
+    async def _validate_truth_with_llm(
+        self,
+        content: str,
+        family: str,
+        truth_context: Dict[str, Any],
+        heuristic_issues: List[ValidationIssue]
+    ) -> List[ValidationIssue]:
+        """
+        Semantic validation of content against truth data using LLM.
+
+        This method uses Ollama to perform semantic validation of content
+        against truth data (plugins, rules, combinations) to catch issues
+        that heuristic pattern matching cannot detect.
+
+        Args:
+            content: Content to validate
+            family: Product family (words, cells, pdf, slides)
+            truth_context: Truth data including plugins, rules, combinations
+            heuristic_issues: Issues found by heuristic validation
+
+        Returns:
+            List of semantic validation issues found by LLM
+        """
+        try:
+            from core.ollama import ollama
+
+            # Check if Ollama is available with detailed logging
+            self.logger.debug(f"Ollama check: enabled={ollama.enabled}, base_url={ollama.base_url}, model={ollama.model}")
+
+            if not ollama.enabled:
+                self.logger.info("Ollama disabled via configuration, skipping LLM truth validation")
+                return []
+
+            is_available = ollama.is_available()
+            self.logger.debug(f"Ollama availability check result: {is_available}")
+
+            if not is_available:
+                self.logger.info("Ollama not available (connection failed), skipping LLM truth validation")
+                return []
+
+            self.logger.info("Ollama is available, proceeding with LLM truth validation")
+
+            # Extract truth data
+            truth_data = truth_context.get("truth_data", {}) or truth_context.get("truths", {}) or {}
+            plugins = truth_data.get("plugins", []) or truth_context.get("plugins", [])
+            core_rules = truth_data.get("core_rules", [])
+            combination_rules = truth_data.get("combination_rules", [])
+            required_fields = truth_data.get("required_fields", [])
+
+            # Build truth-aware prompt
+            prompt = self._build_truth_llm_prompt(
+                content=content,
+                family=family,
+                plugins=plugins,
+                core_rules=core_rules,
+                combination_rules=combination_rules,
+                required_fields=required_fields,
+                heuristic_issues=heuristic_issues
+            )
+
+            # Call LLM with optimized parameters for validation
+            response = await ollama.async_generate(
+                prompt=prompt,
+                options={
+                    "temperature": 0.1,  # Low temperature for consistent validation
+                    "top_p": 0.9,
+                    "num_predict": 2500
+                }
+            )
+
+            # Parse LLM response
+            semantic_issues = self._parse_truth_llm_response(
+                response.get('response', ''),
+                plugins
+            )
+
+            self.logger.info(f"LLM truth validation found {len(semantic_issues)} semantic issues")
+            return semantic_issues
+
+        except Exception as e:
+            self.logger.warning(f"LLM truth validation failed: {e}")
+            return []
+
+    def _build_truth_llm_prompt(
+        self,
+        content: str,
+        family: str,
+        plugins: List[Dict],
+        core_rules: List[str],
+        combination_rules: List[Dict],
+        required_fields: List[str],
+        heuristic_issues: List[ValidationIssue]
+    ) -> str:
+        """Build LLM prompt with complete truth context."""
+
+        # Truncate content if too long to avoid token limits
+        content_excerpt = content[:3000] if len(content) > 3000 else content
+
+        # Format plugin definitions
+        plugin_definitions = []
+        for p in plugins[:20]:  # Limit to 20 plugins to avoid token overflow
+            plugin_type = p.get('plugin_type') or p.get('type', 'processor')
+            load_formats = p.get('load_formats', [])
+            save_formats = p.get('save_formats', [])
+            description = p.get('description', 'N/A')
+
+            plugin_def = f"""- {p.get('name', 'Unknown')} (ID: {p.get('id', 'unknown')})
+  Type: {plugin_type}
+  Load formats: {', '.join(load_formats) if load_formats else 'N/A'}
+  Save formats: {', '.join(save_formats) if save_formats else 'N/A'}
+  Description: {description}"""
+            plugin_definitions.append(plugin_def)
+
+        # Format combination rules
+        combination_text = []
+        for rule in combination_rules[:10]:  # Limit to avoid token overflow
+            rule_name = rule.get('name', 'Rule')
+            rule_desc = rule.get('description', 'N/A')
+            combination_text.append(f"- {rule_name}: {rule_desc}")
+
+        # Format heuristic findings
+        heuristic_text = []
+        for issue in heuristic_issues[:15]:  # Limit to most important issues
+            heuristic_text.append(f"- {issue.level.upper()}: {issue.message}")
+
+        prompt = f"""You are a technical documentation validator for Aspose.{family.capitalize()} products.
+
+Your task is to perform SEMANTIC VALIDATION of content against truth data (ground truth about plugins, formats, and requirements).
+
+CONTENT TO VALIDATE:
+```
+{content_excerpt}
+```
+
+TRUTH DATA:
+
+Available Plugins:
+{chr(10).join(plugin_definitions) if plugin_definitions else "- No plugin data available"}
+
+Core Rules:
+{chr(10).join([f"- {rule}" for rule in core_rules[:15]]) if core_rules else "- No core rules defined"}
+
+Valid Plugin Combinations:
+{chr(10).join(combination_text) if combination_text else "- No specific combination rules"}
+
+Required YAML Fields:
+{', '.join(required_fields) if required_fields else 'None'}
+
+HEURISTIC VALIDATION RESULTS (for context):
+{chr(10).join(heuristic_text) if heuristic_text else "- No heuristic issues found"}
+
+YOUR TASK:
+Analyze the content for SEMANTIC correctness against truth data. Look for:
+
+1. **Plugin Requirements**
+   - Does the content describe operations that require specific plugins?
+   - Are all required plugins declared in the frontmatter?
+   - Example: DOCX→PDF conversion requires Document processor + PDF processor + Document Converter
+
+2. **Plugin Combinations**
+   - Are plugin combinations valid?
+   - Feature plugins (Merger, Comparer, Watermark) need processor plugins to work
+   - Are plugins declared in a logical order?
+
+3. **Technical Accuracy**
+   - Are claims about plugin capabilities accurate per truth data?
+   - Example: If content says "Document plugin loads XLSX", that's wrong (needs Cells plugin)
+
+4. **Format Compatibility**
+   - Do mentioned file formats match plugin capabilities?
+   - Example: PDF processor can't load DOCX files directly
+
+5. **Missing Prerequisites**
+   - Does content imply operations without mentioning required plugins?
+   - Are there missing steps in the described workflow?
+
+6. **Semantic Contradictions**
+   - Does content contradict itself or truth data?
+   - Example: Claims about plugin capabilities that don't match truth data
+
+IMPORTANT:
+- Focus on SEMANTIC issues (meaning, correctness) not syntax
+- Only report issues that heuristics cannot catch
+- Be specific about what's wrong and why
+- Suggest specific fixes based on truth data
+- Use confidence scores (0.0-1.0) based on how certain you are
+
+Respond ONLY with valid JSON in this exact format:
+{{
+  "semantic_issues": [
+    {{
+      "level": "error",
+      "category": "plugin_requirement",
+      "message": "Clear description of the semantic issue",
+      "explanation": "Why this is an issue based on truth data",
+      "suggestion": "Specific fix based on truth data",
+      "confidence": 0.95
+    }}
+  ],
+  "overall_confidence": 0.85
+}}
+
+Valid categories: plugin_requirement, plugin_combination, technical_accuracy, format_mismatch, missing_prerequisite, semantic_contradiction
+Valid levels: error, warning, info"""
+
+        return prompt
+
+    def _parse_truth_llm_response(
+        self,
+        response: str,
+        plugins: List[Dict]
+    ) -> List[ValidationIssue]:
+        """Parse LLM response for semantic truth validation issues."""
+
+        try:
+            import json as json_lib
+
+            # Extract JSON from response
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+
+            if json_start < 0 or json_end <= json_start:
+                self.logger.debug("No valid JSON found in LLM truth validation response")
+                return []
+
+            json_str = response[json_start:json_end]
+            data = json_lib.loads(json_str)
+
+            semantic_issues = []
+
+            for issue_data in data.get('semantic_issues', []):
+                issue = ValidationIssue(
+                    level=issue_data.get('level', 'warning'),
+                    category=issue_data.get('category', 'llm_semantic'),
+                    message=issue_data.get('message', 'Semantic issue detected'),
+                    suggestion=issue_data.get('suggestion'),
+                    source="llm_truth"
+                )
+                semantic_issues.append(issue)
+
+            return semantic_issues
+
+        except json_lib.JSONDecodeError as e:
+            self.logger.warning(f"Failed to parse LLM truth validation response as JSON: {e}")
+            return []
+        except Exception as e:
+            self.logger.warning(f"Error parsing LLM truth validation response: {e}")
+            return []
 
     async def handle_validate_plugins(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Validate plugin requirements using LLM (merged from LLMValidatorAgent)."""
@@ -1448,21 +2074,39 @@ Respond ONLY with valid JSON in this exact format:
         """
         recommendations_generated = 0
         try:
+            # Determine status and severity based on issue levels, not just confidence
+            has_critical = any(issue.level == "critical" for issue in issues)
+            has_error = any(issue.level == "error" for issue in issues)
+            has_warning = any(issue.level == "warning" for issue in issues)
+
+            # Status should reflect actual issues, not just confidence in the validation
+            if has_critical or has_error:
+                status = "fail"
+                severity = "critical" if has_critical else "error"
+            elif has_warning:
+                status = "warning"
+                severity = "warning"
+            else:
+                # No issues found
+                status = "pass"
+                severity = "info"
+
             # Store validation results in database
             validation_result = db_manager.create_validation_result(
                 file_path=file_path,
                 rules_applied=validation_types,
                 validation_results={"confidence": confidence, "issues_count": len(issues), "issues": [issue.to_dict() for issue in issues], "metrics": metrics},
+                validation_types=validation_types,
                 notes=f"Validation completed with {len(issues)} issues",
-                severity="info" if confidence > 0.7 else "warning" if confidence > 0.5 else "error",
-                status="pass" if confidence > 0.7 else "warning" if confidence > 0.5 else "fail",
+                severity=severity,
+                status=status,
                 content=f"Content length: {content_length}",
                 run_id=f"validation_{family}_{file_path.replace('/', '_').replace(chr(92), '_')}",
                 workflow_id=workflow_id
             )
 
             # Generate recommendations using RecommendationAgent for failures/warnings
-            if confidence < 0.7 and issues:
+            if status in ["fail", "warning"] and issues:
                 try:
                     from agents.recommendation_agent import RecommendationAgent
                     rec_agent = RecommendationAgent()
