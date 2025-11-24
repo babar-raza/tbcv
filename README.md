@@ -257,20 +257,48 @@ tbcv/
 │   ├── logging.py      # Structured JSON logging
 │   ├── ollama.py       # LLM client
 │   └── rule_manager.py # Validation rules
+├── config/             # Configuration files
+│   ├── main.yaml       # Main system configuration
+│   └── agent.yaml      # Per-agent configuration
+├── data/               # Runtime data (database, logs, cache)
+│   ├── tbcv.db        # SQLite database
+│   ├── logs/          # Application logs
+│   └── cache/         # Two-level cache storage
+├── docs/               # Documentation
+│   ├── implementation/ # Technical implementation summaries
+│   ├── operations/    # Operational guides and procedures
+│   └── archive/       # Historical documentation
+├── migrations/         # Database migrations
+├── prompts/            # LLM prompts
+├── reports/            # Analysis reports and session summaries
+│   ├── organization/  # Project organization reports
+│   ├── sessions/      # Session-specific reports
+│   └── archive/       # Historical reports
+├── rules/              # Validation rules
+├── scripts/            # Utility and maintenance scripts
+│   ├── maintenance/   # System diagnostics
+│   ├── testing/       # Test runners
+│   ├── utilities/     # Database and system utilities
+│   ├── systemd/       # Linux service management
+│   └── windows/       # Windows service management
+├── svc/                # Background services
+├── templates/          # Jinja2 templates for web dashboard
+├── tests/              # Test suite
+│   ├── manual/        # Ad-hoc manual tests
+│   │   └── fixtures/  # Test data files
+│   ├── agents/        # Agent-specific tests
+│   ├── api/           # API tests
+│   ├── cli/           # CLI tests
+│   └── core/          # Core infrastructure tests
+├── tools/              # Development tools
 ├── truth/              # Plugin truth data
 │   ├── aspose_words_plugins_truth.json
 │   ├── aspose_words_plugins_combinations.json
 │   ├── words.json, cells.json, slides.json, pdf.json
 │   └── words/          # Family-specific truth files
-├── config/             # Configuration files
-│   ├── main.yaml       # Main system configuration
-│   └── agent.yaml      # Per-agent configuration
-├── templates/          # Jinja2 templates for dashboard
-├── tests/              # Test suite (15+ test modules)
-├── data/               # Runtime data (database, logs, cache)
-├── docs/               # Documentation
-├── main.py             # Entry point for API server
+├── main.py             # Application entry point
 ├── requirements.txt    # Python dependencies
+├── CHANGELOG.md        # Version history
 └── README.md           # This file
 ```
 
