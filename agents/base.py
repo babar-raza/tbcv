@@ -303,21 +303,114 @@ class BaseAgent(LoggerMixin, ABC):
         """Clear all cache entries owned by this agent."""
         cache_manager.clear_agent_cache(self.agent_id)
 
-    # ---------- Checkpoints (stubs) ----------
+    # ---------- Checkpoints ----------
 
-    def create_checkpoint(self, name: str, data: Dict[str, Any]) -> str:
+    def create_checkpoint(self, name: str, data: Dict[str, Any], workflow_id: Optional[str] = None) -> str:
         """
         Create a named checkpoint snapshot for resumable operations.
-        (Persist if you wire it to a store; currently logs only.)
+        Persists checkpoint data to the database for recovery.
+
+        Args:
+            name: Human-readable checkpoint name
+            data: State data to save (will be pickled)
+            workflow_id: Optional workflow ID to associate with checkpoint
+
+        Returns:
+            checkpoint_id: UUID of created checkpoint
         """
+        import pickle
+        from core.database import Checkpoint, db_manager
+
         checkpoint_id = str(uuid.uuid4())
-        self.logger.info("Checkpoint created", checkpoint_id=checkpoint_id, name=name)
-        return checkpoint_id
+
+        try:
+            # Serialize the state data
+            state_data = pickle.dumps(data)
+
+            # Use provided workflow_id or create agent-specific sentinel ID
+            if not workflow_id:
+                workflow_id = f"agent_{self.agent_id}_{checkpoint_id[:8]}"
+
+            # Calculate validation hash for integrity checking
+            import hashlib
+            validation_hash = hashlib.md5(state_data).hexdigest()
+
+            # Store in database
+            with db_manager.get_session() as session:
+                checkpoint = Checkpoint(
+                    id=checkpoint_id,
+                    workflow_id=workflow_id,
+                    name=name,
+                    step_number=0,
+                    state_data=state_data,
+                    validation_hash=validation_hash,
+                    can_resume_from=True
+                )
+                session.add(checkpoint)
+                session.commit()
+
+            self.logger.info("Checkpoint created and persisted",
+                           checkpoint_id=checkpoint_id,
+                           name=name,
+                           size_bytes=len(state_data))
+            return checkpoint_id
+
+        except Exception as e:
+            self.logger.error("Failed to create checkpoint",
+                            checkpoint_id=checkpoint_id,
+                            name=name,
+                            error=str(e))
+            raise
 
     def restore_checkpoint(self, checkpoint_id: str) -> Dict[str, Any]:
-        """Restore previously saved state (stub; currently logs only)."""
-        self.logger.info("Checkpoint restored", checkpoint_id=checkpoint_id)
-        return {}
+        """
+        Restore previously saved state from a checkpoint.
+
+        Args:
+            checkpoint_id: UUID of the checkpoint to restore
+
+        Returns:
+            data: The restored state data dictionary
+
+        Raises:
+            ValueError: If checkpoint not found or validation fails
+        """
+        import pickle
+        import hashlib
+        from core.database import Checkpoint, db_manager
+
+        try:
+            with db_manager.get_session() as session:
+                checkpoint = session.query(Checkpoint).filter(
+                    Checkpoint.id == checkpoint_id
+                ).first()
+
+                if not checkpoint:
+                    raise ValueError(f"Checkpoint {checkpoint_id} not found")
+
+                if not checkpoint.can_resume_from:
+                    raise ValueError(f"Checkpoint {checkpoint_id} is not resumable")
+
+                # Validate integrity
+                state_data = checkpoint.state_data
+                if checkpoint.validation_hash:
+                    actual_hash = hashlib.md5(state_data).hexdigest()
+                    if actual_hash != checkpoint.validation_hash:
+                        raise ValueError(f"Checkpoint {checkpoint_id} failed integrity check")
+
+                # Deserialize state
+                restored_data = pickle.loads(state_data)
+
+                self.logger.info("Checkpoint restored",
+                               checkpoint_id=checkpoint_id,
+                               name=checkpoint.name)
+                return restored_data
+
+        except Exception as e:
+            self.logger.error("Failed to restore checkpoint",
+                            checkpoint_id=checkpoint_id,
+                            error=str(e))
+            raise
 
     # ---------- Misc utilities ----------
 

@@ -98,8 +98,13 @@ async def websocket_endpoint(websocket: WebSocket, workflow_id: str):
     WebSocket endpoint for real-time progress updates.
     Clients can connect to receive updates about workflow progress.
     """
-    # Accept connection immediately to avoid 403
-    await websocket.accept()
+    try:
+        # Accept connection immediately to avoid 403
+        await websocket.accept()
+        logger.info(f"WebSocket accepted for workflow {workflow_id}")
+    except Exception as e:
+        logger.error(f"Failed to accept WebSocket for workflow {workflow_id}: {e}", exc_info=True)
+        raise
     
     # Create a heartbeat task to keep connection alive
     heartbeat_task = None

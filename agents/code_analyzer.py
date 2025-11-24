@@ -218,9 +218,9 @@ class CodeAnalyzerAgent(BaseAgent):
                 ),
                 AgentCapability(
                     name="update_dependencies",
-                    description="Analyze and suggest dependency updates (placeholder).",
-                    input_schema={"type": "object"},
-                    output_schema={"type": "object"},
+                    description="Analyze code dependencies, detect imports, and suggest improvements.",
+                    input_schema={"type": "object", "properties": {"code": {"type": "string"}, "language": {"type": "string"}, "file_path": {"type": "string"}}},
+                    output_schema={"type": "object", "properties": {"dependencies": {"type": "array"}, "suggestions": {"type": "array"}, "analyzed": {"type": "boolean"}}},
                 ),
                 AgentCapability(
                     name="get_supported_languages",
@@ -551,9 +551,102 @@ class CodeAnalyzerAgent(BaseAgent):
 
     async def handle_update_dependencies(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Placeholder for future dependency graph checks / version advice.
+        Analyze code dependencies and provide basic suggestions.
+        Detects imports/requires and flags common issues.
         """
-        return {"message": "Dependency analysis not yet implemented", "suggestions": []}
+        code = params.get("code", "")
+        language = params.get("language", "").lower()
+        file_path = params.get("file_path", "")
+
+        if not code:
+            return {"dependencies": [], "suggestions": [], "message": "No code provided"}
+
+        dependencies = []
+        suggestions = []
+
+        try:
+            if language == "python":
+                # Extract Python imports
+                import re
+                import_patterns = [
+                    r'^import\s+(\w+)',
+                    r'^from\s+(\w+)',
+                ]
+                for pattern in import_patterns:
+                    for match in re.finditer(pattern, code, re.MULTILINE):
+                        dep = match.group(1)
+                        dependencies.append({"name": dep, "type": "import", "language": "python"})
+
+                # Check for common outdated patterns
+                if "urllib2" in code:
+                    suggestions.append({
+                        "type": "deprecation",
+                        "message": "urllib2 is deprecated in Python 3, use urllib.request instead",
+                        "severity": "high"
+                    })
+                if "imp.load_source" in code:
+                    suggestions.append({
+                        "type": "deprecation",
+                        "message": "imp module is deprecated, use importlib instead",
+                        "severity": "high"
+                    })
+
+            elif language in ["javascript", "typescript", "js", "ts"]:
+                # Extract JS/TS imports
+                import re
+                patterns = [
+                    r'import\s+.*?\s+from\s+[\'"]([^\'"]+)[\'"]',
+                    r'require\([\'"]([^\'"]+)[\'"]\)',
+                ]
+                for pattern in patterns:
+                    for match in re.finditer(pattern, code):
+                        dep = match.group(1)
+                        dependencies.append({"name": dep, "type": "import", "language": language})
+
+                # Check for common issues
+                if "var " in code:
+                    suggestions.append({
+                        "type": "best_practice",
+                        "message": "Consider using 'const' or 'let' instead of 'var'",
+                        "severity": "low"
+                    })
+
+            elif language in ["go", "golang"]:
+                # Extract Go imports
+                import re
+                import_pattern = r'import\s+(?:\(([^)]+)\)|"([^"]+)")'
+                for match in re.finditer(import_pattern, code):
+                    imports_block = match.group(1) or match.group(2)
+                    if imports_block:
+                        for line in imports_block.split('\n'):
+                            dep_match = re.search(r'"([^"]+)"', line)
+                            if dep_match:
+                                dependencies.append({"name": dep_match.group(1), "type": "import", "language": "go"})
+
+            # Generic suggestions
+            if len(dependencies) > 50:
+                suggestions.append({
+                    "type": "complexity",
+                    "message": f"High number of dependencies ({len(dependencies)}). Consider refactoring.",
+                    "severity": "medium"
+                })
+
+            return {
+                "dependencies": dependencies,
+                "dependency_count": len(dependencies),
+                "suggestions": suggestions,
+                "language": language,
+                "analyzed": True
+            }
+
+        except Exception as e:
+            self.logger.error("Dependency analysis failed", error=str(e))
+            return {
+                "dependencies": [],
+                "suggestions": [],
+                "error": str(e),
+                "analyzed": False
+            }
 
     async def handle_get_supported_languages(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """

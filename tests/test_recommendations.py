@@ -17,19 +17,19 @@ from core.database import db_manager
 
 
 @pytest.fixture
-async def setup_agents():
+def setup_agents():
     """Setup all required agents"""
     validator = ContentValidatorAgent("content_validator")
     agent_registry.register_agent(validator)
-    
+
     rec_agent = RecommendationAgent("recommendation_agent")
     agent_registry.register_agent(rec_agent)
-    
+
     enhance_agent = EnhancementAgent("enhancement_agent")
     agent_registry.register_agent(enhance_agent)
-    
+
     yield validator, rec_agent, enhance_agent
-    
+
     agent_registry.unregister_agent("content_validator")
     agent_registry.unregister_agent("recommendation_agent")
     agent_registry.unregister_agent("enhancement_agent")

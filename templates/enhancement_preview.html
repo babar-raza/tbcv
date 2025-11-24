@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhancement Preview - {{ preview.preview_id }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .safety-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .safety-badge.safe {
+            background-color: #10b981;
+            color: white;
+        }
+
+        .safety-badge.warning {
+            background-color: #f59e0b;
+            color: white;
+        }
+
+        .safety-badge.unsafe {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            font-size: 18px;
+            color: #1f2937;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-top: 5px;
+        }
+
+        .diff-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .diff-header {
+            background: #2d2d30;
+            padding: 10px 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .diff-line {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            padding: 2px 15px;
+            line-height: 1.6;
+        }
+
+        .diff-line.unchanged {
+            background: #1e1e1e;
+        }
+
+        .diff-line.added {
+            background: #1e3a1e;
+            color: #73c991;
+        }
+
+        .diff-line.removed {
+            background: #3a1e1e;
+            color: #f48771;
+        }
+
+        .diff-line-number {
+            display: inline-block;
+            width: 60px;
+            color: #858585;
+            text-align: right;
+            margin-right: 15px;
+            user-select: none;
+        }
+
+        .recommendations-list {
+            list-style: none;
+        }
+
+        .recommendation-item {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border-left: 4px solid #10b981;
+        }
+
+        .recommendation-item.skipped {
+            border-left-color: #f59e0b;
+            opacity: 0.7;
+        }
+
+        .recommendation-type {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+
+        .recommendation-detail {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            padding: 30px;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+
+        .btn-secondary:hover {
+            background: #f9fafb;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .preservation-report {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .preservation-report h3 {
+            color: #15803d;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .preservation-report ul {
+            list-style: none;
+        }
+
+        .preservation-report li {
+            padding: 5px 0;
+            color: #166534;
+        }
+
+        .preservation-report li:before {
+            content: "✓ ";
+            color: #22c55e;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .warning-item:before {
+            content: "⚠ ";
+            color: #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Enhancement Preview</h1>
+            <div class="subtitle">
+                Preview ID: {{ preview.preview_id }} |
+                File: {{ preview.file_path }} |
+                Created: {{ preview.created_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC
+            </div>
+
+            {% if preview.safety_score %}
+            <div class="safety-badge {% if preview.safety_score.overall_score >= 0.8 %}safe{% elif preview.safety_score.overall_score >= 0.6 %}warning{% else %}unsafe{% endif %}">
+                Safety Score: {{ "%.1f" | format(preview.safety_score.overall_score * 100) }}%
+                {% if preview.is_safe_to_apply() %}(Safe to Apply ✓){% else %}(Requires Review){% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="content">
+            <!-- Statistics -->
+            <div class="section">
+                <h2>Change Summary</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Lines Added</div>
+                        <div class="stat-value" style="color: #10b981;">
+                            +{{ preview.diff_statistics.lines_added if preview.diff_statistics else 0 }}
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Lines Removed</div>
+                        <div class="stat-value" style="color: #ef4444;">
+                            -{{ preview.diff_statistics.lines_removed if preview.diff_statistics else 0 }}
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Lines Modified</div>
+                        <div class="stat-value" style="color: #f59e0b;">
+                            ~{{ preview.diff_statistics.lines_modified if preview.diff_statistics else 0 }}
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Change Percentage</div>
+                        <div class="stat-value">
+                            {{ "%.1f" | format(preview.diff_statistics.change_percentage if preview.diff_statistics else 0) }}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Diff Viewer -->
+            <div class="section">
+                <h2>Changes Preview</h2>
+                <div class="diff-container">
+                    <div class="diff-header">
+                        {{ preview.file_path }}
+                    </div>
+                    <div class="diff-body">
+                        {% for line in preview.side_by_side_diff[:100] %}
+                        <div class="diff-line {{ line.change_type }}">
+                            <span class="diff-line-number">
+                                {% if line.line_number_original %}{{ line.line_number_original }}{% else %} {% endif %}
+                                {% if line.line_number_enhanced %}{{ line.line_number_enhanced }}{% else %} {% endif %}
+                            </span>
+                            <span class="diff-content">{{ line.content }}</span>
+                        </div>
+                        {% endfor %}
+                        {% if preview.side_by_side_diff|length > 100 %}
+                        <div class="diff-line unchanged">
+                            <span class="diff-content">... ({{ preview.side_by_side_diff|length - 100 }} more lines)</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommendations Applied -->
+            <div class="section">
+                <h2>Recommendations Applied ({{ preview.applied_recommendations|length }})</h2>
+                <ul class="recommendations-list">
+                    {% for rec in preview.applied_recommendations %}
+                    <li class="recommendation-item">
+                        <div class="recommendation-type">{{ rec.recommendation_type | replace('_', ' ') | title }}</div>
+                        <div class="recommendation-detail">
+                            {{ rec.changes_made }}
+                            (Confidence: {{ "%.0f" | format(rec.confidence * 100) }}%)
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+
+                {% if preview.skipped_recommendations %}
+                <h2 style="margin-top: 20px;">Skipped Recommendations ({{ preview.skipped_recommendations|length }})</h2>
+                <ul class="recommendations-list">
+                    {% for rec in preview.skipped_recommendations %}
+                    <li class="recommendation-item skipped">
+                        <div class="recommendation-type">{{ rec.recommendation_type | replace('_', ' ') | title }}</div>
+                        <div class="recommendation-detail">Skipped: {{ rec.reason }}</div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+
+            <!-- Preservation Report -->
+            {% if preview.safety_score %}
+            <div class="section">
+                <h2>Safety & Preservation Report</h2>
+                <div class="preservation-report">
+                    <h3>Preservation Checks</h3>
+                    <ul>
+                        <li>Keyword Preservation: {{ "%.0f" | format(preview.safety_score.keyword_preservation * 100) }}%</li>
+                        <li>Structure Preservation: {{ "%.0f" | format(preview.safety_score.structure_preservation * 100) }}%</li>
+                        <li>Content Stability: {{ "%.0f" | format(preview.safety_score.content_stability * 100) }}%</li>
+                        <li>Technical Accuracy: {{ "%.0f" | format(preview.safety_score.technical_accuracy * 100) }}%</li>
+                    </ul>
+
+                    {% if preview.safety_score.violations %}
+                    <h3 style="color: #dc2626; margin-top: 15px;">Violations Detected</h3>
+                    <ul>
+                        {% for violation in preview.safety_score.violations %}
+                        <li class="warning-item">{{ violation.description }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+
+                    {% if preview.safety_score.warnings %}
+                    <h3 style="color: #f59e0b; margin-top: 15px;">Warnings</h3>
+                    <ul>
+                        {% for warning in preview.safety_score.warnings %}
+                        <li class="warning-item">{{ warning }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+            <button class="btn btn-primary"
+                    onclick="applyEnhancement()"
+                    {% if not preview.is_safe_to_apply() or preview.status != 'pending' %}disabled{% endif %}>
+                Apply Enhancement
+            </button>
+            <button class="btn btn-secondary" onclick="rejectPreview()">
+                Reject
+            </button>
+            <button class="btn btn-secondary" onclick="window.history.back()">
+                Back to Dashboard
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function applyEnhancement() {
+            if (!confirm('Are you sure you want to apply this enhancement? The file will be modified.')) {
+                return;
+            }
+
+            fetch(`/api/enhance/apply`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    preview_id: '{{ preview.preview_id }}',
+                    user_confirmation: true,
+                    applied_by: 'user',
+                    create_backup: true
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Enhancement applied successfully!');
+                    window.location.href = '/dashboard';
+                } else {
+                    alert('Failed to apply enhancement: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            });
+        }
+
+        function rejectPreview() {
+            const reason = prompt('Reason for rejection (optional):');
+            if (reason === null) return;
+
+            fetch(`/api/enhance/preview/{{ preview.preview_id }}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    reason: reason || 'user_rejected'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Preview rejected');
+                    window.location.href = '/dashboard';
+                } else {
+                    alert('Failed to reject preview');
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+[Unit]
+Description=TBCV Recommendation Generation Timer
+Requires=tbcv-recommendations.service
+
+[Timer]
+# Run every 10 minutes
+OnBootSec=5min
+OnUnitActiveSec=10min
+Unit=tbcv-recommendations.service
+
+[Install]
+WantedBy=timers.target

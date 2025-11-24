@@ -1,0 +1,22 @@
+[Unit]
+Description=TBCV Recommendation Generation Service
+After=network.target
+
+[Service]
+Type=oneshot
+User=tbcv
+Group=tbcv
+WorkingDirectory=/opt/tbcv
+ExecStart=/usr/bin/python3 /opt/tbcv/scripts/generate_recommendations_cron.py --batch-size 10 --min-age 5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tbcv-recommendations
+
+# Security hardening
+PrivateTmp=yes
+NoNewPrivileges=yes
+ReadOnlyPaths=/
+ReadWritePaths=/opt/tbcv/tbcv.db /opt/tbcv/data/logs
+
+[Install]
+WantedBy=multi-user.target

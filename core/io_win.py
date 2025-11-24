@@ -133,3 +133,15 @@ def backup_file(file_path: Union[str, Path], suffix: str = ".bak") -> Optional[P
     write_text_crlf(backup_path, content)
     
     return backup_path
+
+
+def atomic_write(file_path: Union[str, Path], content: str, encoding: str = "utf-8") -> None:
+    """
+    Atomically write content to a file using temp file + rename.
+    
+    Args:
+        file_path: Path to the file to write
+        content: Text content to write
+        encoding: Text encoding (default: utf-8)
+    """
+    write_text_crlf(file_path, content, encoding=encoding, atomic=True)

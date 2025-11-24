@@ -48,7 +48,7 @@ def detected_plugins():
     ]
 
 @pytest.fixture
-async def enhancer_agent():
+def enhancer_agent():
     """Create content enhancer agent."""
     return ContentEnhancerAgent("test_enhancer")
 

@@ -2,27 +2,875 @@
 {% block title %}Workflows - TBCV{% endblock %}
 {% block content %}
 <h1 style="margin-bottom: 30px;">Workflows</h1>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <form method="GET" style="display: flex; gap: 15px; align-items: center; width: 100%; flex-wrap: wrap;">
+        <label for="state">State:</label>
+        <select name="state" id="state" onchange="this.form.submit()">
+            <option value="">All</option>
+            <option value="pending" {% if state_filter == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="running" {% if state_filter == 'running' %}selected{% endif %}>Running</option>
+            <option value="completed" {% if state_filter == 'completed' %}selected{% endif %}>Completed</option>
+            <option value="failed" {% if state_filter == 'failed' %}selected{% endif %}>Failed</option>
+            <option value="cancelled" {% if state_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+        </select>
+        
+        <button type="submit" class="btn btn-primary">Filter</button>
+        
+        <div style="margin-left: auto;">
+            <button type="button" class="btn btn-success" onclick="openRunWorkflowModal()">▶ Run Workflow</button>
+        </div>
+    </form>
+</div>
+
+<!-- Active Runs Section -->
+<div id="activeRunsSection" style="display: none;" class="card">
+    <h2>Active Workflow Runs</h2>
+    <div id="activeRunsList"></div>
+</div>
+
+<!-- Run Workflow Modal -->
+<div id="runWorkflowModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 30px; border-radius: 8px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <h2 style="margin-bottom: 20px;">Run New Workflow</h2>
+        
+        <form id="runWorkflowForm">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Workflow Type:</label>
+                <select id="workflowType" class="form-control" onchange="updateWorkflowForm()" required>
+                    <option value="">Select workflow type...</option>
+                    <option value="directory">Directory Validation</option>
+                    <option value="batch">Batch Validation</option>
+                </select>
+            </div>
+            
+            <div id="directoryFields" style="display: none;">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Directory Mode:</label>
+                    <select id="directoryMode" class="form-control" onchange="updateDirectoryMode()">
+                        <option value="upload">Upload Directory (from your computer)</option>
+                        <option value="server">Server Path (directory on server)</option>
+                    </select>
+                </div>
+
+                <div id="directoryUploadFields" style="display: block;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Select Directory:</label>
+                        <input type="file" id="directoryInput" class="form-control" webkitdirectory directory multiple style="display: none;">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('directoryInput').click()" style="width: 100%; margin-bottom: 10px;">
+                            Browse Directory...
+                        </button>
+
+                        <div id="dirDropZone" style="border: 2px dashed #ddd; border-radius: 8px; padding: 40px 20px; text-align: center; background: #f9f9f9; cursor: pointer; transition: all 0.3s;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">📂</div>
+                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">Select or drop a directory</div>
+                            <div style="font-size: 13px; color: #666;">or click "Browse Directory" button above</div>
+                            <div style="font-size: 12px; color: #999; margin-top: 10px;">Supported: .md, .txt, .html, .json, .yaml, .yml</div>
+                        </div>
+
+                        <div id="directoryFilesList" style="margin-top: 15px; display: none;">
+                            <div style="font-weight: 600; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                                <span>Directory: <span id="directoryName"></span></span>
+                                <button type="button" class="btn btn-danger btn-sm" onclick="clearDirectorySelection()">Clear</button>
+                            </div>
+                            <div style="padding: 10px; background: #f5f5f5; border-radius: 4px; margin-bottom: 10px;">
+                                <div style="font-size: 13px; margin-bottom: 5px;"><strong>Total Files:</strong> <span id="directoryFileCount">0</span></div>
+                                <div style="font-size: 13px;"><strong>Total Size:</strong> <span id="directoryTotalSize">0 B</span></div>
+                            </div>
+                            <div id="directoryFilesContainer" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: white;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="directoryServerFields" style="display: none;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Directory Path:</label>
+                        <input type="text" id="directoryPath" class="form-control" placeholder="/path/to/directory">
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">File Pattern:</label>
+                        <input type="text" id="filePattern" class="form-control" value="*.md">
+                    </div>
+                </div>
+            </div>
+
+            <div id="batchFields" style="display: none;">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Batch Mode:</label>
+                    <select id="batchModeWorkflow" class="form-control" onchange="updateBatchModeWorkflow()">
+                        <option value="upload">Upload Files (from your computer)</option>
+                        <option value="server">Server Paths (files on server)</option>
+                    </select>
+                </div>
+
+                <div id="batchUploadFieldsWorkflow" style="display: block;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Select Files:</label>
+                        <input type="file" id="batchFileInputWorkflow" class="form-control" accept=".md,.txt,.html,.json,.yaml,.yml" multiple style="display: none;">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('batchFileInputWorkflow').click()" style="width: 100%; margin-bottom: 10px;">
+                            Browse Files...
+                        </button>
+
+                        <div id="batchDropZoneWorkflow" style="border: 2px dashed #ddd; border-radius: 8px; padding: 40px 20px; text-align: center; background: #f9f9f9; cursor: pointer; transition: all 0.3s;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">📁</div>
+                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">Drop files here</div>
+                            <div style="font-size: 13px; color: #666;">or click "Browse Files" button above</div>
+                            <div style="font-size: 12px; color: #999; margin-top: 10px;">Supported: .md, .txt, .html, .json, .yaml, .yml</div>
+                        </div>
+
+                        <div id="selectedFilesListWorkflow" style="margin-top: 15px; display: none;">
+                            <div style="font-weight: 600; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                                <span>Selected Files (<span id="selectedFilesCountWorkflow">0</span>)</span>
+                                <button type="button" class="btn btn-danger btn-sm" onclick="clearWorkflowBatchFiles()">Clear All</button>
+                            </div>
+                            <div id="filesListContainerWorkflow" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: white;">
+                            </div>
+                            <div style="margin-top: 10px; font-size: 13px; color: #666;">
+                                <strong>Total Size:</strong> <span id="totalFileSizeWorkflow">0 B</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="batchServerFieldsWorkflow" style="display: none;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">File Paths (one per line):</label>
+                        <textarea id="filePaths" class="form-control" rows="6" placeholder="/path/to/file1.md&#10;/path/to/file2.md"></textarea>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">Enter full file paths from your server filesystem</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="commonFields" style="display: none;">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Family:</label>
+                    <select id="family" class="form-control">
+                        <option value="words">Words</option>
+                        <option value="cells">Cells</option>
+                        <option value="slides">Slides</option>
+                        <option value="pdf">PDF</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Max Workers:</label>
+                    <input type="number" id="maxWorkers" class="form-control" value="4" min="1" max="16">
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 25px;">
+                <button type="button" class="btn btn-secondary" onclick="closeRunWorkflowModal()">Cancel</button>
+                <button type="submit" class="btn btn-success" id="submitWorkflowBtn">Start Workflow</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card">
     {% if workflows %}
+    <!-- Bulk Actions Bar -->
+    <div id="bulkActionsBar" style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px; display: none;">
+        <span id="selectedCount">0 selected</span>
+        <div style="display: inline-block; margin-left: 20px;">
+            <button class="btn btn-danger btn-sm" onclick="bulkDelete()">Delete Selected</button>
+        </div>
+    </div>
+    
     <table>
         <thead>
-            <tr><th>ID</th><th>Type</th><th>State</th><th>Progress</th><th>Created</th><th>Actions</th></tr>
+            <tr>
+                <th style="width: 40px;">
+                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
+                </th>
+                <th>ID</th>
+                <th>Type</th>
+                <th>State</th>
+                <th>Progress</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
         </thead>
         <tbody>
             {% for workflow in workflows %}
             <tr>
+                <td>
+                    <input type="checkbox" class="workflow-checkbox" value="{{ workflow.id }}" onchange="updateBulkActions()">
+                </td>
                 <td><code>{{ workflow.id[:8] }}...</code></td>
                 <td>{{ workflow.type }}</td>
                 <td><span class="badge badge-{{ workflow.state }}">{{ workflow.state }}</span></td>
                 <td>{{ workflow.progress_percent }}%</td>
-                <td>{{ workflow.created_at }}</td>
-                <td><a href="/dashboard/workflows/{{ workflow.id }}" class="btn btn-primary">View</a></td>
+                <td>{{ workflow.created_at[:10] if workflow.created_at else 'N/A' }}</td>
+                <td>
+                    <a href="/dashboard/workflows/{{ workflow.id }}" class="btn btn-primary btn-sm">View</a>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    
+    <!-- Pagination -->
+    {% if has_prev or has_next %}
+    <div class="pagination">
+        {% if has_prev %}
+        <a href="?page={{ page - 1 }}{% if state_filter %}&state={{ state_filter }}{% endif %}" class="btn btn-secondary">← Previous</a>
+        {% endif %}
+        <span style="padding: 8px 16px;">Page {{ page }}</span>
+        {% if has_next %}
+        <a href="?page={{ page + 1 }}{% if state_filter %}&state={{ state_filter }}{% endif %}" class="btn btn-secondary">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
     {% else %}
     <div class="empty-state"><p>No workflows found</p></div>
     {% endif %}
 </div>
+
+<script>
+let activeRuns = new Map();
+let pollIntervals = new Map();
+let selectedDirectoryFiles = [];
+let selectedWorkflowBatchFiles = [];
+
+function openRunWorkflowModal() {
+    document.getElementById('runWorkflowModal').style.display = 'flex';
+}
+
+function closeRunWorkflowModal() {
+    document.getElementById('runWorkflowModal').style.display = 'none';
+    document.getElementById('runWorkflowForm').reset();
+    document.getElementById('directoryFields').style.display = 'none';
+    document.getElementById('batchFields').style.display = 'none';
+    document.getElementById('commonFields').style.display = 'none';
+    clearDirectorySelection();
+    clearWorkflowBatchFiles();
+}
+
+// Directory handling
+document.addEventListener('DOMContentLoaded', function() {
+    const directoryInput = document.getElementById('directoryInput');
+    if (directoryInput) {
+        directoryInput.addEventListener('change', function(e) {
+            handleDirectorySelection(Array.from(e.target.files));
+        });
+    }
+
+    const dirDropZone = document.getElementById('dirDropZone');
+    if (dirDropZone) {
+        dirDropZone.addEventListener('click', function() {
+            document.getElementById('directoryInput').click();
+        });
+
+        dirDropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.borderColor = '#667eea';
+            this.style.background = '#f0f0ff';
+        });
+
+        dirDropZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.borderColor = '#ddd';
+            this.style.background = '#f9f9f9';
+        });
+
+        dirDropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.borderColor = '#ddd';
+            this.style.background = '#f9f9f9';
+
+            const files = Array.from(e.dataTransfer.files);
+            handleDirectorySelection(files);
+        });
+    }
+
+    // Batch file handling for workflows
+    const batchFileInputWorkflow = document.getElementById('batchFileInputWorkflow');
+    if (batchFileInputWorkflow) {
+        batchFileInputWorkflow.addEventListener('change', function(e) {
+            handleWorkflowBatchFilesSelection(Array.from(e.target.files));
+        });
+    }
+
+    const batchDropZoneWorkflow = document.getElementById('batchDropZoneWorkflow');
+    if (batchDropZoneWorkflow) {
+        batchDropZoneWorkflow.addEventListener('click', function() {
+            document.getElementById('batchFileInputWorkflow').click();
+        });
+
+        batchDropZoneWorkflow.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.borderColor = '#667eea';
+            this.style.background = '#f0f0ff';
+        });
+
+        batchDropZoneWorkflow.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.borderColor = '#ddd';
+            this.style.background = '#f9f9f9';
+        });
+
+        batchDropZoneWorkflow.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.style.borderColor = '#ddd';
+            this.style.background = '#f9f9f9';
+
+            const files = Array.from(e.dataTransfer.files);
+            handleWorkflowBatchFilesSelection(files);
+        });
+    }
+});
+
+function updateDirectoryMode() {
+    const mode = document.getElementById('directoryMode').value;
+    document.getElementById('directoryUploadFields').style.display = mode === 'upload' ? 'block' : 'none';
+    document.getElementById('directoryServerFields').style.display = mode === 'server' ? 'block' : 'none';
+}
+
+function updateBatchModeWorkflow() {
+    const mode = document.getElementById('batchModeWorkflow').value;
+    document.getElementById('batchUploadFieldsWorkflow').style.display = mode === 'upload' ? 'block' : 'none';
+    document.getElementById('batchServerFieldsWorkflow').style.display = mode === 'server' ? 'block' : 'none';
+}
+
+function handleDirectorySelection(files) {
+    const validExtensions = ['.md', '.txt', '.html', '.json', '.yaml', '.yml'];
+
+    selectedDirectoryFiles = files.filter(file => {
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        return validExtensions.includes(ext);
+    });
+
+    if (selectedDirectoryFiles.length === 0) {
+        showMessage('No valid files found in the selected directory', 'warning');
+        return;
+    }
+
+    // Extract directory name from first file's path
+    const firstFile = files[0];
+    const pathParts = firstFile.webkitRelativePath ? firstFile.webkitRelativePath.split('/') : [firstFile.name];
+    const dirName = pathParts.length > 1 ? pathParts[0] : 'Selected Directory';
+
+    updateDirectoryFilesList(dirName);
+}
+
+function updateDirectoryFilesList(dirName) {
+    const listContainer = document.getElementById('directoryFilesContainer');
+    const directoryFilesList = document.getElementById('directoryFilesList');
+    const directoryNameSpan = document.getElementById('directoryName');
+    const fileCountSpan = document.getElementById('directoryFileCount');
+    const totalSizeSpan = document.getElementById('directoryTotalSize');
+
+    if (selectedDirectoryFiles.length === 0) {
+        directoryFilesList.style.display = 'none';
+        return;
+    }
+
+    directoryFilesList.style.display = 'block';
+    directoryNameSpan.textContent = dirName;
+    fileCountSpan.textContent = selectedDirectoryFiles.length;
+
+    let totalSize = selectedDirectoryFiles.reduce((sum, file) => sum + file.size, 0);
+    totalSizeSpan.textContent = formatFileSize(totalSize);
+
+    listContainer.innerHTML = '';
+    selectedDirectoryFiles.forEach((file) => {
+        const fileItem = document.createElement('div');
+        fileItem.style.cssText = 'padding: 6px; border-bottom: 1px solid #eee; font-size: 13px;';
+
+        const relativePath = file.webkitRelativePath || file.name;
+        fileItem.innerHTML = `
+            <div style="display: flex; justify-content: space-between;">
+                <div style="flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${relativePath}</div>
+                <div style="color: #666; font-size: 12px; margin-left: 10px;">${formatFileSize(file.size)}</div>
+            </div>
+        `;
+
+        listContainer.appendChild(fileItem);
+    });
+}
+
+function clearDirectorySelection() {
+    selectedDirectoryFiles = [];
+    document.getElementById('directoryFilesList').style.display = 'none';
+    const dirInput = document.getElementById('directoryInput');
+    if (dirInput) dirInput.value = '';
+}
+
+function handleWorkflowBatchFilesSelection(files) {
+    const validExtensions = ['.md', '.txt', '.html', '.json', '.yaml', '.yml'];
+
+    files.forEach(file => {
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        if (validExtensions.includes(ext)) {
+            const exists = selectedWorkflowBatchFiles.some(f => f.name === file.name && f.size === file.size);
+            if (!exists) {
+                selectedWorkflowBatchFiles.push(file);
+            }
+        } else {
+            showMessage(`Skipped ${file.name}: Unsupported file type`, 'warning');
+        }
+    });
+
+    updateWorkflowBatchFilesList();
+}
+
+function updateWorkflowBatchFilesList() {
+    const listContainer = document.getElementById('filesListContainerWorkflow');
+    const selectedFilesList = document.getElementById('selectedFilesListWorkflow');
+    const countSpan = document.getElementById('selectedFilesCountWorkflow');
+    const totalSizeSpan = document.getElementById('totalFileSizeWorkflow');
+
+    if (selectedWorkflowBatchFiles.length === 0) {
+        selectedFilesList.style.display = 'none';
+        return;
+    }
+
+    selectedFilesList.style.display = 'block';
+    countSpan.textContent = selectedWorkflowBatchFiles.length;
+
+    let totalSize = selectedWorkflowBatchFiles.reduce((sum, file) => sum + file.size, 0);
+    totalSizeSpan.textContent = formatFileSize(totalSize);
+
+    listContainer.innerHTML = '';
+    selectedWorkflowBatchFiles.forEach((file, index) => {
+        const fileItem = document.createElement('div');
+        fileItem.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 13px;';
+
+        fileItem.innerHTML = `
+            <div style="flex: 1; overflow: hidden;">
+                <div style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.name}</div>
+                <div style="color: #666; font-size: 12px;">${formatFileSize(file.size)}</div>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeWorkflowBatchFile(${index})" style="margin-left: 10px;">Remove</button>
+        `;
+
+        listContainer.appendChild(fileItem);
+    });
+}
+
+function removeWorkflowBatchFile(index) {
+    selectedWorkflowBatchFiles.splice(index, 1);
+    updateWorkflowBatchFilesList();
+}
+
+function clearWorkflowBatchFiles() {
+    selectedWorkflowBatchFiles = [];
+    updateWorkflowBatchFilesList();
+    const batchInput = document.getElementById('batchFileInputWorkflow');
+    if (batchInput) batchInput.value = '';
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function readFileContent(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(new Error('Failed to read file'));
+        reader.readAsText(file);
+    });
+}
+
+function updateWorkflowForm() {
+    const type = document.getElementById('workflowType').value;
+    document.getElementById('directoryFields').style.display = type === 'directory' ? 'block' : 'none';
+    document.getElementById('batchFields').style.display = type === 'batch' ? 'block' : 'none';
+    document.getElementById('commonFields').style.display = type ? 'block' : 'none';
+}
+
+document.getElementById('runWorkflowForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = document.getElementById('submitWorkflowBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Starting...';
+    
+    try {
+        const workflowType = document.getElementById('workflowType').value;
+        let endpoint, payload;
+
+        if (workflowType === 'directory') {
+            const directoryMode = document.getElementById('directoryMode').value;
+
+            if (directoryMode === 'upload') {
+                // Handle client-side directory upload
+                if (selectedDirectoryFiles.length === 0) {
+                    alert('Please select a directory to upload');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Start Workflow';
+                    return;
+                }
+
+                submitBtn.textContent = 'Reading files...';
+                const fileContents = await Promise.all(
+                    selectedDirectoryFiles.map(async (file) => ({
+                        file_path: file.webkitRelativePath || file.name,
+                        content: await readFileContent(file)
+                    }))
+                );
+
+                endpoint = '/api/validate/batch';
+                payload = {
+                    files: fileContents.map(f => f.file_path),
+                    file_contents: fileContents,
+                    family: document.getElementById('family').value,
+                    validation_types: ['yaml', 'markdown', 'code', 'links', 'structure', 'Truth', 'FuzzyLogic'],
+                    max_workers: parseInt(document.getElementById('maxWorkers').value),
+                    upload_mode: true
+                };
+            } else {
+                // Handle server-side directory path
+                endpoint = '/workflows/validate-directory';
+                payload = {
+                    directory_path: document.getElementById('directoryPath').value,
+                    file_pattern: document.getElementById('filePattern').value,
+                    family: document.getElementById('family').value,
+                    max_workers: parseInt(document.getElementById('maxWorkers').value),
+                    workflow_type: 'validate_directory'
+                };
+            }
+        } else if (workflowType === 'batch') {
+            const batchMode = document.getElementById('batchModeWorkflow').value;
+
+            if (batchMode === 'upload') {
+                // Handle client-side file upload
+                if (selectedWorkflowBatchFiles.length === 0) {
+                    alert('Please select at least one file to upload');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Start Workflow';
+                    return;
+                }
+
+                submitBtn.textContent = 'Reading files...';
+                const fileContents = await Promise.all(
+                    selectedWorkflowBatchFiles.map(async (file) => ({
+                        file_path: file.name,
+                        content: await readFileContent(file)
+                    }))
+                );
+
+                endpoint = '/api/validate/batch';
+                payload = {
+                    files: fileContents.map(f => f.file_path),
+                    file_contents: fileContents,
+                    family: document.getElementById('family').value,
+                    validation_types: ['yaml', 'markdown', 'code', 'links', 'structure', 'Truth', 'FuzzyLogic'],
+                    max_workers: parseInt(document.getElementById('maxWorkers').value),
+                    upload_mode: true
+                };
+            } else {
+                // Handle server-side file paths
+                endpoint = '/api/validate/batch';
+                const filesText = document.getElementById('filePaths').value;
+                const files = filesText.split('\n').map(f => f.trim()).filter(f => f);
+
+                if (files.length === 0) {
+                    alert('Please enter at least one file path');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Start Workflow';
+                    return;
+                }
+
+                payload = {
+                    files: files,
+                    family: document.getElementById('family').value,
+                    validation_types: ['yaml', 'markdown', 'code', 'links', 'structure', 'Truth', 'FuzzyLogic'],
+                    max_workers: parseInt(document.getElementById('maxWorkers').value)
+                };
+            }
+        } else {
+            alert('Please select a workflow type');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Start Workflow';
+            return;
+        }
+        
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showMessage(`Workflow started: ${result.workflow_id}`, 'success');
+            closeRunWorkflowModal();
+            
+            activeRuns.set(result.workflow_id, {
+                workflow_id: result.workflow_id,
+                job_id: result.job_id,
+                status: result.status,
+                type: workflowType,
+                started_at: new Date().toISOString()
+            });
+            
+            updateActiveRunsDisplay();
+            startWorkflowTracking(result.workflow_id);
+        } else {
+            showMessage(`Failed to start workflow: ${result.detail || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error starting workflow:', error);
+        showMessage(`Error: ${error.message}`, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Start Workflow';
+    }
+});
+
+function updateActiveRunsDisplay() {
+    const section = document.getElementById('activeRunsSection');
+    const list = document.getElementById('activeRunsList');
+    
+    if (activeRuns.size === 0) {
+        section.style.display = 'none';
+        return;
+    }
+    
+    section.style.display = 'block';
+    list.innerHTML = '';
+    
+    activeRuns.forEach((run, workflowId) => {
+        const runCard = document.createElement('div');
+        runCard.className = 'run-card';
+        runCard.style.cssText = 'border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 6px; background: #f9f9f9;';
+        
+        const statusBadge = `<span class="badge badge-${run.status}">${run.status}</span>`;
+        const progressBar = run.progress_percent !== undefined 
+            ? `<div style="background: #e0e0e0; height: 8px; border-radius: 4px; margin: 10px 0;">
+                   <div style="background: #667eea; height: 100%; width: ${run.progress_percent}%; border-radius: 4px; transition: width 0.3s;"></div>
+               </div>`
+            : '';
+        
+        runCard.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; margin-bottom: 5px;">
+                        <code>${workflowId.substring(0, 8)}...</code>
+                        ${statusBadge}
+                    </div>
+                    <div style="font-size: 13px; color: #666; margin-bottom: 5px;">
+                        Type: ${run.type} | Started: ${new Date(run.started_at).toLocaleTimeString()}
+                    </div>
+                    ${progressBar}
+                    ${run.progress_percent !== undefined ? `<div style="font-size: 13px; color: #666;">${run.progress_percent}% complete</div>` : ''}
+                    ${run.error ? `<div style="color: #dc3545; font-size: 13px; margin-top: 5px;">Error: ${run.error}</div>` : ''}
+                </div>
+                <div style="display: flex; gap: 5px;">
+                    <a href="/dashboard/workflows/${workflowId}" class="btn btn-primary btn-sm" style="text-decoration: none;">View</a>
+                    ${run.status === 'running' || run.status === 'started' 
+                        ? `<button class="btn btn-danger btn-sm" onclick="stopTracking('${workflowId}')">Stop Tracking</button>` 
+                        : `<button class="btn btn-secondary btn-sm" onclick="removeRun('${workflowId}')">Clear</button>`}
+                </div>
+            </div>
+        `;
+        
+        list.appendChild(runCard);
+    });
+}
+
+function startWorkflowTracking(workflowId) {
+    const ws = new WebSocket(`ws://${window.location.host}/ws/${workflowId}`);
+    
+    ws.onopen = function() {
+        console.log(`WebSocket connected for workflow ${workflowId}`);
+    };
+    
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'progress_update' && data.data) {
+            const run = activeRuns.get(workflowId);
+            if (run) {
+                run.status = data.data.status || run.status;
+                run.progress_percent = data.data.progress_percent;
+                run.error = data.data.error;
+                
+                if (data.data.status === 'completed' || data.data.status === 'failed' || data.data.status === 'cancelled') {
+                    ws.close();
+                }
+                
+                updateActiveRunsDisplay();
+            }
+        }
+    };
+    
+    ws.onerror = function(error) {
+        console.error(`WebSocket error for workflow ${workflowId}:`, error);
+        fallbackToPolling(workflowId);
+    };
+    
+    ws.onclose = function() {
+        console.log(`WebSocket closed for workflow ${workflowId}`);
+        const run = activeRuns.get(workflowId);
+        if (run && (run.status === 'running' || run.status === 'started')) {
+            fallbackToPolling(workflowId);
+        }
+    };
+}
+
+function fallbackToPolling(workflowId) {
+    if (pollIntervals.has(workflowId)) return;
+    
+    const intervalId = setInterval(async () => {
+        try {
+            const response = await fetch(`/workflows/${workflowId}`);
+            const data = await response.json();
+            
+            const run = activeRuns.get(workflowId);
+            if (run) {
+                run.status = data.state || data.status;
+                run.progress_percent = data.progress_percent;
+                run.error = data.error;
+                
+                if (data.state === 'completed' || data.state === 'failed' || data.state === 'cancelled') {
+                    clearInterval(intervalId);
+                    pollIntervals.delete(workflowId);
+                }
+                
+                updateActiveRunsDisplay();
+            }
+        } catch (error) {
+            console.error(`Error polling workflow ${workflowId}:`, error);
+        }
+    }, 3000);
+    
+    pollIntervals.set(workflowId, intervalId);
+}
+
+function stopTracking(workflowId) {
+    activeRuns.delete(workflowId);
+    
+    if (pollIntervals.has(workflowId)) {
+        clearInterval(pollIntervals.get(workflowId));
+        pollIntervals.delete(workflowId);
+    }
+    
+    updateActiveRunsDisplay();
+}
+
+function removeRun(workflowId) {
+    stopTracking(workflowId);
+}
+
+function showMessage(message, type) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.textContent = message;
+    alert.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 2000; min-width: 300px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);';
+    
+    document.body.appendChild(alert);
+    
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    }, 5000);
+}
+
+function toggleSelectAll(checkbox) {
+    const checkboxes = document.querySelectorAll('.workflow-checkbox');
+    checkboxes.forEach(cb => cb.checked = checkbox.checked);
+    updateBulkActions();
+}
+
+function updateBulkActions() {
+    const checkboxes = document.querySelectorAll('.workflow-checkbox:checked');
+    const count = checkboxes.length;
+    const bulkBar = document.getElementById('bulkActionsBar');
+    const selectedCount = document.getElementById('selectedCount');
+    
+    if (count > 0) {
+        bulkBar.style.display = 'block';
+        selectedCount.textContent = `${count} selected`;
+    } else {
+        bulkBar.style.display = 'none';
+    }
+}
+
+async function bulkDelete() {
+    const checkboxes = document.querySelectorAll('.workflow-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+        alert('Please select at least one workflow');
+        return;
+    }
+    
+    if (!confirm(`Delete ${selectedIds.length} workflow(s)? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/workflows/bulk-delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(selectedIds)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            alert(`Successfully deleted ${result.deleted_count} workflow(s)`);
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert(`Failed: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
+</script>
+
+<style>
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+textarea.form-control {
+    resize: vertical;
+    font-family: monospace;
+}
+
+.btn-warning {
+    background: #f59e0b;
+    color: white;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+</style>
+
 {% endblock %}

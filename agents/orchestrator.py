@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from core.config import get_settings
 from agents.base import BaseAgent, AgentContract, AgentCapability, agent_registry, AgentStatus
 from core.logging import PerformanceLogger, get_logger
+from core.language_utils import is_english_content, validate_english_content_batch, log_language_rejection
 from agents.validators.router import ValidatorRouter
 
 logger = get_logger(__name__)
@@ -224,6 +225,18 @@ class OrchestratorAgent(BaseAgent):
             if not file_path or not os.path.exists(file_path):
                 return {"status": "error", "message": f"File not found: {file_path}"}
 
+            # Check if content is English - mandatory requirement
+            is_english, reason = is_english_content(file_path)
+            if not is_english:
+                log_language_rejection(file_path, reason, self.logger)
+                return {
+                    "status": "error",
+                    "error_type": "language_rejection",
+                    "message": f"Non-English content rejected: {reason}",
+                    "file_path": file_path,
+                    "reason": reason
+                }
+
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
@@ -238,7 +251,8 @@ class OrchestratorAgent(BaseAgent):
 
     async def handle_validate_directory(self, params: Dict[str, Any]) -> Dict[str, Any]:
         with PerformanceLogger(self.logger, "validate_directory"):
-            directory_path = params.get("directory_path")
+            # Accept both 'directory_path' and 'directory' for compatibility
+            directory_path = params.get("directory_path") or params.get("directory")
             pattern = params.get("pattern", "**/*.md")
             family = params.get("family", "words")
             validation_types = params.get("validation_types", None)
@@ -251,7 +265,23 @@ class OrchestratorAgent(BaseAgent):
             job_id = f"batch_{int(time.time())}"
 
             # Find files matching pattern
-            files = list(Path(directory_path).glob(pattern))
+            all_files = list(Path(directory_path).glob(pattern))
+
+            # Filter for English content only
+            file_paths_str = [str(f) for f in all_files]
+            english_file_paths, rejected_files = validate_english_content_batch(file_paths_str)
+
+            # Log rejected files
+            if rejected_files:
+                self.logger.info(f"Filtered out {len(rejected_files)} non-English files from directory validation")
+                for file_path, reason in rejected_files[:10]:  # Log first 10 rejections
+                    self.logger.debug(f"Rejected: {file_path} - {reason}")
+                if len(rejected_files) > 10:
+                    self.logger.debug(f"... and {len(rejected_files) - 10} more non-English files")
+
+            # Convert back to Path objects
+            files = [Path(fp) for fp in english_file_paths]
+
             workflow_result = WorkflowResult(
                 job_id=job_id,
                 workflow_type="validate_directory",
@@ -259,6 +289,15 @@ class OrchestratorAgent(BaseAgent):
                 files_total=len(files)
             )
             self.active_workflows[job_id] = workflow_result
+
+            # Add rejected file info to workflow result
+            if rejected_files:
+                workflow_result.errors.extend([
+                    f"Skipped (non-English): {fp} - {reason}"
+                    for fp, reason in rejected_files[:5]  # Include first 5 in errors
+                ])
+                if len(rejected_files) > 5:
+                    workflow_result.errors.append(f"... and {len(rejected_files) - 5} more non-English files skipped")
 
             try:
                 # Process files with limited concurrency

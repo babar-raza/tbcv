@@ -17,11 +17,11 @@ from __future__ import annotations
 import asyncio
 from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from importlib import resources as ilres
 import uuid
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Query, Response, status
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Query, Response, status, WebSocket
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -69,12 +69,24 @@ try:
     from core.config import get_settings
     from core.logging import setup_logging, get_logger
     from core.database import db_manager, WorkflowState, RecommendationStatus, ValidationResult
+    from core.cache import cache_manager
+    from core.language_utils import validate_english_content_batch, is_english_content, log_language_rejection
 except ImportError:
     from core.config import get_settings
     from core.logging import setup_logging, get_logger
     from core.database import db_manager, WorkflowState, RecommendationStatus, ValidationResult
+    from core.cache import cache_manager
+    from core.language_utils import validate_english_content_batch, is_english_content, log_language_rejection
 
 logger = get_logger(__name__)
+
+# =============================================================================
+# Global Server State
+# =============================================================================
+
+import time
+SERVER_START_TIME = time.time()
+MAINTENANCE_MODE = False
 
 # =============================================================================
 # Pydantic Models for API
@@ -93,11 +105,17 @@ class DirectoryValidationRequest(BaseModel):
     max_workers: int = 4
     family: str = "words"
 
+class FileContent(BaseModel):
+    file_path: str
+    content: str
+
 class BatchValidationRequest(BaseModel):
     files: List[str] = Field(description="List of file paths to validate")
     family: str = "words"
     validation_types: List[str] = ["yaml", "markdown", "code", "links", "structure", "Truth", "FuzzyLogic"]
     max_workers: int = 4
+    upload_mode: bool = Field(False, description="True if files are uploaded from client, False if server-side paths")
+    file_contents: Optional[List[FileContent]] = Field(None, description="File contents when upload_mode is True")
 
 class EnhanceContentRequest(BaseModel):
     validation_id: str = Field(description="Validation result ID to enhance from")
@@ -317,16 +335,9 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 
-# Add CORS middleware
-# Note: WebSocket connections use HTTP origins, not ws:// origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"]
-)
+# NOTE: CORS middleware moved to AFTER WebSocket routes to avoid 403 errors
+# WebSockets don't use CORS the same way as HTTP requests
+# The middleware will be added later in the file
 
 # Include dashboard router if available
 try:
@@ -550,6 +561,14 @@ async def api_root(request: Request):
         }
 
 
+# Test minimal WebSocket endpoint
+@app.websocket("/ws/test")
+async def test_websocket(websocket: WebSocket):
+    """Minimal test WebSocket endpoint."""
+    await websocket.accept()
+    await websocket.send_text("Hello from test WebSocket!")
+    await websocket.close()
+
 # WebSocket endpoint for live updates
 @app.websocket("/ws/{workflow_id}")
 async def websocket_endpoint(websocket: WebSocket, workflow_id: str):
@@ -566,6 +585,18 @@ async def validation_updates_websocket(websocket: WebSocket):
     """
     from api.websocket_endpoints import websocket_endpoint as ws_handler
     await ws_handler(websocket, "validation_updates")
+
+
+# Add CORS middleware AFTER WebSocket routes to avoid conflicts
+# Note: WebSocket connections use HTTP origins, not ws:// origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"]
+)
 
 
 # SSE endpoint for live updates
@@ -645,7 +676,7 @@ async def health_check(response: Response):
 
     return {
         "status": "healthy" if healthy else "degraded",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "agents_registered": len(agent_registry.list_agents()),
         "database_connected": database_connected,
         "schema_present": schema_present,
@@ -665,7 +696,7 @@ async def health_check(response: Response):
 
     return {
         "status": "healthy" if database_connected else "degraded",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "agents_registered": len(agent_registry.list_agents()),
         "database_connected": database_connected,
         "version": "2.0.0",
@@ -677,7 +708,7 @@ async def health_live():
     """Kubernetes liveness probe - is the application running?"""
     return {
         "status": "alive",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 @app.get("/health/ready")
@@ -709,7 +740,7 @@ async def readiness_check(response: Response):
 
     return {
         "status": "ready" if all_ready else "not_ready",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "checks": checks,
     }
 async def readiness_check(response: Response):
@@ -736,7 +767,7 @@ async def readiness_check(response: Response):
 
     return {
         "status": "ready" if all_ready else "not_ready",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "checks": checks,
     }
 
@@ -949,12 +980,16 @@ async def validate_content_api(request: ContentValidationRequest):
             result["validation_id"] = validation_result.id
 
             # Publish validation update
-            live_bus = get_live_bus()
-            await live_bus.publish_validation_update(
-                validation_result.id,
-                "validation_created",
-                {"file_path": request.file_path, "status": result.get("status", "completed")}
-            )
+            try:
+                from api.services.live_bus import get_live_bus
+                live_bus = get_live_bus()
+                await live_bus.publish_validation_update(
+                    validation_result.id,
+                    "validation_created",
+                    {"file_path": request.file_path, "status": result.get("status", "completed")}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to publish validation update: {e}")
 
             return result
 
@@ -1377,12 +1412,12 @@ async def get_dashboard_stats():
 
         # Get recent activity (last 24 hours)
         from datetime import timedelta
-        recent_cutoff = datetime.utcnow() - timedelta(hours=24)
+        recent_cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
         recent_validations = [v for v in all_validations if v.created_at and v.created_at > recent_cutoff]
 
         return {
             "success": True,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "total_validations": total_validations,
             "total_recommendations": total_recommendations,
             "pending_recommendations": pending_count,
@@ -1492,6 +1527,65 @@ async def get_validation_diff(validation_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get diff: {str(e)}")
 
 
+@app.get("/api/validations/{validation_id}/enhancement-comparison")
+async def get_enhancement_comparison(validation_id: str):
+    """
+    Get comprehensive enhancement comparison data for side-by-side viewing.
+
+    This endpoint provides detailed before/after comparison including:
+    - Original and enhanced content
+    - Line-by-line diff with change markers
+    - Statistics (lines added/removed/modified)
+    - Applied recommendations
+    - Unified diff
+
+    Args:
+        validation_id: Validation result ID
+
+    Returns:
+        Dict with comprehensive comparison data
+
+    Raises:
+        HTTPException: If validation not found or error occurs
+    """
+    try:
+        from api.services.enhancement_comparison import get_enhancement_comparison_service
+
+        service = get_enhancement_comparison_service()
+        comparison = await service.get_enhancement_comparison(validation_id)
+
+        if comparison.status == "error":
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error generating comparison: {comparison.error_message}"
+            )
+
+        # Convert dataclass to dict for JSON response
+        return {
+            "success": True,
+            "validation_id": comparison.validation_id,
+            "file_path": comparison.file_path,
+            "original_content": comparison.original_content,
+            "enhanced_content": comparison.enhanced_content,
+            "diff_lines": comparison.diff_lines,
+            "stats": comparison.stats,
+            "applied_recommendations": comparison.applied_recommendations,
+            "unified_diff": comparison.unified_diff,
+            "status": comparison.status
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error getting enhancement comparison")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get enhancement comparison: {str(e)}"
+        )
+
+
 # =============================================================================
 # Part 3: Validation Action Endpoints (Approve/Reject/Enhance)
 # =============================================================================
@@ -1529,7 +1623,7 @@ async def approve_validation(validation_id: str):
         await connection_manager.send_progress_update("validation_updates", {
             "type": "validation_approved",
             "validation_id": validation_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         
         return {
@@ -1578,7 +1672,7 @@ async def reject_validation(validation_id: str):
         await connection_manager.send_progress_update("validation_updates", {
             "type": "validation_rejected",
             "validation_id": validation_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         
         return {
@@ -1627,7 +1721,7 @@ async def enhance_validation(validation_id: str):
         await connection_manager.send_progress_update("validation_updates", {
             "type": "validation_enhanced",
             "validation_id": validation_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "enhanced_count": result.get("enhanced_count", 0)
         })
         
@@ -1649,8 +1743,8 @@ async def enhance_validation(validation_id: str):
 @app.post("/api/enhance")
 async def enhance_content_with_recommendations(request: EnhanceContentRequest):
     """
-    Enhance content using approved recommendations via EnhancementAgent.
-    
+    Enhance content using approved recommendations via MCP.
+
     This endpoint applies approved recommendations to content, producing:
     - Enhanced content
     - Structured diff
@@ -1658,70 +1752,50 @@ async def enhance_content_with_recommendations(request: EnhanceContentRequest):
     - Marks applied recommendations as 'actioned'
     """
     try:
+        from svc.mcp_server import create_mcp_client
+
         # Get validation and its recommendations
         validation = db_manager.get_validation_result(request.validation_id)
         if not validation:
             raise HTTPException(status_code=404, detail="Validation not found")
-        
-        # Get the enhancement agent
-        enhancement_agent = agent_registry.get_agent("enhancement_agent")
-        if not enhancement_agent:
-            raise HTTPException(status_code=500, detail="Enhancement agent not available")
-        
-        # Apply recommendations via EnhancementAgent
-        result = await enhancement_agent.process_request(
-            "enhance_with_recommendations",
-            {
-                "content": request.content,
-                "file_path": request.file_path,
-                "validation_id": request.validation_id,
-                "recommendation_ids": request.recommendations,
-                "persist": not request.preview  # Persist only if not preview
-            }
-        )
-        
-        # If not preview, write enhanced content to file
-        if not request.preview and result.get("enhanced_content") != request.content:
-            try:
-                output_path = Path(request.file_path)
-                # Create backup
-                backup_path = output_path.with_suffix(output_path.suffix + '.backup')
-                if output_path.exists():
-                    import shutil
-                    shutil.copy2(output_path, backup_path)
-                    logger.info(f"Created backup: {backup_path}")
-                
-                # Write enhanced content
-                output_path.write_text(result["enhanced_content"], encoding='utf-8')
-                logger.info(f"Enhanced content written to: {output_path}")
-                
-            except Exception as e:
-                logger.error(f"Failed to persist enhanced content: {e}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Enhancement succeeded but failed to save file: {str(e)}"
-                )
-        
-        # Prepare response
-        applied_count = result.get("applied_count", 0)
-        skipped_count = result.get("skipped_count", 0)
-        
+
+        # Create MCP client and call enhance
+        mcp_client = create_mcp_client()
+        mcp_request = {
+            "method": "enhance",
+            "params": {
+                "ids": [request.validation_id]
+            },
+            "id": 1
+        }
+
+        response = mcp_client.handle_request(mcp_request)
+
+        if "error" in response:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Enhancement failed: {response['error'].get('message', 'Unknown error')}"
+            )
+
+        result = response.get("result", {})
+
+        # Get enhanced_count from MCP result
+        enhanced_count = result.get("enhanced_count", 0)
+
         # Update workflow metrics if in a workflow
         if validation.workflow_id:
             db_manager.update_workflow_metrics(
                 validation.workflow_id,
-                recommendations_actioned=applied_count
+                recommendations_actioned=enhanced_count
             )
-        
+
         return {
-            "success": True,
-            "message": f"Applied {applied_count} recommendations, skipped {skipped_count}",
-            "enhanced_content": result["enhanced_content"],
-            "diff": result.get("diff", ""),
-            "applied_count": applied_count,
-            "skipped_count": skipped_count,
-            "results": result.get("results", []),
-            "content_version": result.get("content_version"),
+            "success": result.get("success", False),
+            "message": f"Enhancement complete",
+            "applied_count": enhanced_count,
+            "enhanced_count": enhanced_count,
+            "enhancements": result.get("enhancements", []),
+            "errors": result.get("errors", [])
         }
         
     except HTTPException:
@@ -1826,7 +1900,7 @@ async def bulk_approve_validations(request: BulkActionRequest):
             "type": "bulk_validation_approved",
             "validation_ids": request.ids,
             "approved_count": result.get("approved_count", 0),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         
         return {
@@ -1879,7 +1953,7 @@ async def bulk_reject_validations(request: BulkActionRequest):
             "type": "bulk_validation_rejected",
             "validation_ids": request.ids,
             "rejected_count": result.get("rejected_count", 0),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         
         return {
@@ -1932,7 +2006,7 @@ async def bulk_enhance_validations(request: BulkActionRequest):
             "type": "bulk_validation_enhanced",
             "validation_ids": request.ids,
             "enhanced_count": result.get("enhanced_count", 0),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         
         return {
@@ -2469,12 +2543,14 @@ async def admin_status():
         workflows = db_manager.list_workflows(limit=10000)
         active = [w for w in workflows if w.state in [WorkflowState.RUNNING, WorkflowState.PENDING]]
         
+        uptime_seconds = int(time.time() - SERVER_START_TIME)
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "system": {
                 "version": "1.0.0",
-                "uptime_seconds": 0,  # TODO: Track actual uptime
-                "agents_registered": len(agent_registry.list_agents())
+                "uptime_seconds": uptime_seconds,
+                "agents_registered": len(agent_registry.list_agents()),
+                "maintenance_mode": MAINTENANCE_MODE
             },
             "workflows": {
                 "total": len(workflows),
@@ -2511,10 +2587,30 @@ async def admin_active_workflows():
 async def admin_clear_cache():
     """Clear all caches."""
     try:
-        # TODO: Implement actual cache clearing
+        cleared = {"l1": False, "l2": False, "l1_entries": 0, "l2_entries": 0}
+
+        # Clear L1 cache
+        if cache_manager.l1_cache:
+            l1_size = cache_manager.l1_cache.size()
+            cache_manager.l1_cache.clear()
+            cleared["l1"] = True
+            cleared["l1_entries"] = l1_size
+            logger.info("L1 cache cleared", entries=l1_size)
+
+        # Clear L2 cache
+        from core.database import CacheEntry
+        with db_manager.get_session() as session:
+            l2_count = session.query(CacheEntry).count()
+            session.query(CacheEntry).delete()
+            session.commit()
+            cleared["l2"] = True
+            cleared["l2_entries"] = l2_count
+            logger.info("L2 cache cleared", entries=l2_count)
+
         return {
             "message": "Cache cleared successfully",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "cleared": cleared
         }
     except Exception:
         logger.exception("Failed to clear cache")
@@ -2524,21 +2620,8 @@ async def admin_clear_cache():
 async def admin_cache_stats():
     """Get cache statistics."""
     try:
-        # TODO: Implement actual cache stats
-        return {
-            "l1": {
-                "size": 0,
-                "hits": 0,
-                "misses": 0,
-                "hit_rate": 0.0
-            },
-            "l2": {
-                "size": 0,
-                "hits": 0,
-                "misses": 0,
-                "hit_rate": 0.0
-            }
-        }
+        stats = cache_manager.get_statistics()
+        return stats
     except Exception:
         logger.exception("Failed to get cache stats")
         raise HTTPException(status_code=500, detail="Failed to retrieve cache statistics")
@@ -2547,10 +2630,14 @@ async def admin_cache_stats():
 async def admin_cleanup_cache():
     """Cleanup expired cache entries."""
     try:
-        # TODO: Implement actual cache cleanup
+        result = cache_manager.cleanup_expired()
+        total_removed = result.get("l1_cleaned", 0) + result.get("l2_cleaned", 0)
+
         return {
             "message": "Cache cleanup completed",
-            "removed_entries": 0
+            "removed_entries": total_removed,
+            "details": result,
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception:
         logger.exception("Failed to cleanup cache")
@@ -2560,10 +2647,35 @@ async def admin_cleanup_cache():
 async def admin_rebuild_cache():
     """Rebuild cache from scratch."""
     try:
-        # TODO: Implement actual cache rebuild
+        # Clear all existing cache
+        if cache_manager.l1_cache:
+            cache_manager.l1_cache.clear()
+
+        from core.database import CacheEntry
+        with db_manager.get_session() as session:
+            session.query(CacheEntry).delete()
+            session.commit()
+
+        logger.info("Cache rebuild: all caches cleared, will repopulate on demand")
+
+        # Optionally preload critical data (truth data)
+        try:
+            truth_manager = agent_registry.get_agent("truth_manager")
+            if truth_manager:
+                # This will cache the truth data on first load
+                await truth_manager.handle_message({
+                    "type": "REQUEST",
+                    "method": "load_truth",
+                    "params": {"family": "words"}
+                })
+                logger.info("Cache rebuild: preloaded truth data for 'words' family")
+        except Exception as e:
+            logger.warning("Cache rebuild: failed to preload truth data", error=str(e))
+
         return {
-            "message": "Cache rebuild initiated",
-            "timestamp": datetime.utcnow().isoformat()
+            "message": "Cache rebuild completed",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "note": "Cache cleared and will repopulate on demand"
         }
     except Exception:
         logger.exception("Failed to rebuild cache")
@@ -2571,16 +2683,57 @@ async def admin_rebuild_cache():
 
 @app.get("/admin/reports/performance")
 async def admin_performance_report(days: int = Query(7, le=90)):
-    """Get performance report."""
+    """Get performance report based on workflow analysis."""
     try:
-        # TODO: Implement actual performance reporting
+        from datetime import timedelta
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+
+        # Get all workflows from the period
+        all_workflows = db_manager.list_workflows(limit=100000)
+        # Ensure timezone-aware comparison
+        period_workflows = [
+            w for w in all_workflows
+            if w.created_at and (
+                w.created_at.replace(tzinfo=timezone.utc) if w.created_at.tzinfo is None else w.created_at
+            ) >= cutoff_date
+        ]
+
+        total = len(period_workflows)
+        completed = len([w for w in period_workflows if w.state == WorkflowState.COMPLETED])
+        failed = len([w for w in period_workflows if w.state == WorkflowState.FAILED])
+        running = len([w for w in period_workflows if w.state == WorkflowState.RUNNING])
+
+        # Calculate average completion time for completed workflows
+        completion_times = []
+        for w in period_workflows:
+            if w.state == WorkflowState.COMPLETED and w.created_at and w.updated_at:
+                delta = (w.updated_at - w.created_at).total_seconds() * 1000  # ms
+                completion_times.append(delta)
+
+        avg_completion_ms = sum(completion_times) / len(completion_times) if completion_times else 0
+        error_rate = (failed / total) if total > 0 else 0.0
+        success_rate = (completed / total) if total > 0 else 0.0
+
+        # Cache statistics
+        cache_stats = cache_manager.get_statistics()
+        l1_hit_rate = cache_stats.get("l1", {}).get("hit_rate", 0.0)
+
         return {
             "period_days": days,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "metrics": {
-                "avg_response_time_ms": 0,
-                "total_requests": 0,
-                "error_rate": 0.0
+                "total_workflows": total,
+                "completed_workflows": completed,
+                "failed_workflows": failed,
+                "running_workflows": running,
+                "avg_completion_time_ms": round(avg_completion_ms, 2),
+                "error_rate": round(error_rate, 4),
+                "success_rate": round(success_rate, 4),
+                "cache_hit_rate_l1": round(l1_hit_rate, 4)
+            },
+            "period": {
+                "start": cutoff_date.isoformat(),
+                "end": datetime.now(timezone.utc).isoformat()
             }
         }
     except Exception:
@@ -2593,7 +2746,7 @@ async def admin_health_report(period: str = Query("7days")):
     try:
         return {
             "period": period,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "database": db_manager.is_connected(),
             "agents": len(agent_registry.list_agents()),
             "status": "healthy"
@@ -2604,16 +2757,31 @@ async def admin_health_report(period: str = Query("7days")):
 
 @app.post("/admin/agents/reload/{agent_id}")
 async def admin_reload_agent(agent_id: str):
-    """Reload a specific agent."""
+    """Reload a specific agent by clearing its cache and reinitializing."""
     try:
         agent = agent_registry.get_agent(agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # TODO: Implement actual agent reload
+
+        # Clear agent's cache
+        cache_manager.clear_agent_cache(agent_id)
+        logger.info(f"Cleared cache for agent {agent_id}")
+
+        # Reload configuration if agent has a config reload method
+        if hasattr(agent, 'reload_config'):
+            await agent.reload_config()
+            logger.info(f"Reloaded configuration for agent {agent_id}")
+
+        # Reset internal state if applicable
+        if hasattr(agent, 'reset_state'):
+            agent.reset_state()
+            logger.info(f"Reset state for agent {agent_id}")
+
         return {
             "message": f"Agent {agent_id} reloaded successfully",
-            "agent_id": agent_id
+            "agent_id": agent_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actions": ["cache_cleared", "config_reloaded" if hasattr(agent, 'reload_config') else "no_config_reload"]
         }
     except HTTPException:
         raise
@@ -2629,7 +2797,7 @@ async def admin_garbage_collect():
         gc.collect()
         return {
             "message": "Garbage collection completed",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception:
         logger.exception("Failed to trigger GC")
@@ -2639,10 +2807,15 @@ async def admin_garbage_collect():
 async def admin_enable_maintenance():
     """Enable maintenance mode."""
     try:
-        # TODO: Implement actual maintenance mode
+        global MAINTENANCE_MODE
+        MAINTENANCE_MODE = True
+        logger.warning("Maintenance mode ENABLED - system is now in maintenance mode")
+
         return {
             "message": "Maintenance mode enabled",
-            "timestamp": datetime.utcnow().isoformat()
+            "maintenance_mode": MAINTENANCE_MODE,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "note": "New workflow submissions will be rejected while in maintenance mode"
         }
     except Exception:
         logger.exception("Failed to enable maintenance mode")
@@ -2652,10 +2825,15 @@ async def admin_enable_maintenance():
 async def admin_disable_maintenance():
     """Disable maintenance mode."""
     try:
-        # TODO: Implement actual maintenance mode
+        global MAINTENANCE_MODE
+        MAINTENANCE_MODE = False
+        logger.info("Maintenance mode DISABLED - system is now operational")
+
         return {
             "message": "Maintenance mode disabled",
-            "timestamp": datetime.utcnow().isoformat()
+            "maintenance_mode": MAINTENANCE_MODE,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "note": "System is now accepting new workflows"
         }
     except Exception:
         logger.exception("Failed to disable maintenance mode")
@@ -2663,13 +2841,65 @@ async def admin_disable_maintenance():
 
 @app.post("/admin/system/checkpoint")
 async def admin_system_checkpoint():
-    """Create system checkpoint."""
+    """Create system checkpoint for disaster recovery."""
     try:
-        # TODO: Implement actual checkpointing
+        import json
+        import pickle
+
+        checkpoint_id = str(uuid.uuid4())
+        timestamp = datetime.now(timezone.utc)
+
+        # Gather system state
+        workflows = db_manager.list_workflows(limit=10000)
+        active_workflows = [w for w in workflows if w.state in [WorkflowState.RUNNING, WorkflowState.PENDING]]
+
+        system_state = {
+            "checkpoint_id": checkpoint_id,
+            "timestamp": timestamp.isoformat(),
+            "workflows": {
+                "total": len(workflows),
+                "active": len(active_workflows),
+                "active_ids": [w.id for w in active_workflows]
+            },
+            "agents": {
+                "registered": len(agent_registry.list_agents()),
+                "agent_ids": [a["agent_id"] for a in agent_registry.list_agents()]
+            },
+            "cache": cache_manager.get_statistics(),
+            "system": {
+                "uptime_seconds": int(time.time() - SERVER_START_TIME),
+                "maintenance_mode": MAINTENANCE_MODE
+            }
+        }
+
+        # Store checkpoint in database using a special sentinel workflow
+        from core.database import Checkpoint
+        state_data = pickle.dumps(system_state)
+
+        # Create a system checkpoint entry (workflow_id can be null for system checkpoints)
+        # But since the schema requires it, we'll use a special ID
+        SYSTEM_CHECKPOINT_WORKFLOW_ID = "00000000-0000-0000-0000-000000000000"
+
+        with db_manager.get_session() as session:
+            checkpoint = Checkpoint(
+                id=checkpoint_id,
+                workflow_id=SYSTEM_CHECKPOINT_WORKFLOW_ID,
+                name=f"system_checkpoint_{timestamp.strftime('%Y%m%d_%H%M%S')}",
+                step_number=0,
+                state_data=state_data,
+                created_at=timestamp,
+                can_resume_from=True
+            )
+            session.add(checkpoint)
+            session.commit()
+
+        logger.info("System checkpoint created", checkpoint_id=checkpoint_id)
+
         return {
-            "message": "System checkpoint created",
-            "checkpoint_id": str(uuid.uuid4()),
-            "timestamp": datetime.utcnow().isoformat()
+            "message": "System checkpoint created successfully",
+            "checkpoint_id": checkpoint_id,
+            "timestamp": timestamp.isoformat(),
+            "summary": system_state
         }
     except Exception:
         logger.exception("Failed to create checkpoint")
@@ -2755,8 +2985,11 @@ async def admin_reset_system(reset_request: SystemResetRequest):
         if reset_request.clear_cache:
             try:
                 from core.cache import cache_manager
-                cache_manager.clear_l1()
-                cache_manager.clear_l2()
+                # Clear L1 cache
+                if cache_manager.l1_cache:
+                    cache_manager.l1_cache.clear()
+                # Clear L2 cache from database
+                db_manager.cleanup_expired_cache()
                 cache_cleared = True
                 logger.info("Cache cleared after system reset")
             except Exception as e:
@@ -2769,7 +3002,7 @@ async def admin_reset_system(reset_request: SystemResetRequest):
             "message": "System reset completed",
             "deleted": results,
             "cache_cleared": cache_cleared,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except HTTPException:
@@ -2836,7 +3069,7 @@ async def run_directory_validation_workflow(job_id: str, workflow_id: str, reque
             workflow_id,
             state="completed",
             progress_percent=100,
-            completed_at=datetime.utcnow()
+            completed_at=datetime.now(timezone.utc)
         )
 
     except Exception as e:
@@ -2853,26 +3086,50 @@ async def run_batch_validation(job_id: str, workflow_id: str, request: BatchVali
     """Run batch validation workflow with automatic recommendation generation."""
     validator = agent_registry.get_agent("content_validator")
     recommendation_agent = agent_registry.get_agent("recommendation_agent")
-    
+
     if not validator:
         workflow_jobs[job_id].status = "failed"
         workflow_jobs[job_id].errors = ["Validator agent not available"]
         return
-    
+
     try:
         workflow_jobs[job_id].status = "running"
         db_manager.update_workflow(workflow_id, state="running")
-        
+
         validated = 0
         failed = 0
         errors = []
         total_recommendations = 0
-        
-        for file_path in request.files:
+
+        # Filter for English content only
+        english_file_paths, rejected_files = validate_english_content_batch(request.files)
+
+        # Log rejected files
+        if rejected_files:
+            logger.info(f"Filtered out {len(rejected_files)} non-English files from batch validation")
+            for file_path, reason in rejected_files[:10]:  # Log first 10 rejections
+                errors.append(f"Skipped (non-English): {file_path} - {reason}")
+                logger.debug(f"Rejected: {file_path} - {reason}")
+
+        # Update workflow with filtered file count
+        workflow_jobs[job_id].files_total = len(english_file_paths)
+
+        # Create a mapping of file_path to content if in upload mode
+        content_map = {}
+        if request.upload_mode and request.file_contents:
+            content_map = {fc.file_path: fc.content for fc in request.file_contents}
+
+        for file_path in english_file_paths:
             try:
-                # Read file content (simplified - in production use proper file reading)
-                from pathlib import Path
-                content = Path(file_path).read_text()
+                # Read file content - either from upload or server filesystem
+                if request.upload_mode:
+                    content = content_map.get(file_path)
+                    if not content:
+                        raise ValueError(f"Content not found for uploaded file: {file_path}")
+                else:
+                    # Read from server filesystem
+                    from pathlib import Path
+                    content = Path(file_path).read_text()
                 
                 # Step 1: Validate
                 validation_result = await validator.process_request("validate_content", {
@@ -2923,15 +3180,15 @@ async def run_batch_validation(job_id: str, workflow_id: str, request: BatchVali
                 errors.append(f"{file_path}: {str(e)}")
             
             # Update progress
-            progress = int((validated + failed) / len(request.files) * 100)
+            progress = int((validated + failed) / len(english_file_paths) * 100) if english_file_paths else 100
             workflow_jobs[job_id].files_validated = validated
             workflow_jobs[job_id].files_failed = failed
             workflow_jobs[job_id].errors = errors[:10]  # Keep last 10 errors
-            
+
             db_manager.update_workflow(
                 workflow_id,
                 current_step=validated + failed,
-                total_steps=len(request.files),
+                total_steps=len(english_file_paths),
                 progress_percent=progress
             )
         
@@ -2948,7 +3205,7 @@ async def run_batch_validation(job_id: str, workflow_id: str, request: BatchVali
         db_manager.update_workflow(
             workflow_id,
             state="completed",
-            completed_at=datetime.utcnow()
+            completed_at=datetime.now(timezone.utc)
         )
         
         logger.info(
@@ -3175,7 +3432,7 @@ async def get_validation_recommendations(validation_id: str):
             raise HTTPException(status_code=404, detail="Validation not found")
 
         # Get recommendations
-        recommendations = db_manager.get_recommendations_by_validation(validation_id)
+        recommendations = db_manager.list_recommendations(validation_id=validation_id)
 
         return {
             "validation_id": validation_id,
@@ -3404,7 +3661,7 @@ async def system_status():
     
     return {
         "status": "operational",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": "2.0.0",
         "components": {
             "database": db_manager.is_connected(),

@@ -1,0 +1,49 @@
+{
+  "family": "cells",
+  "version": "1.0.0",
+  "plugins": [
+    {
+      "id": "aspose-cells-cloud",
+      "name": "Aspose.Cells Cloud",
+      "slug": "aspose-cells-cloud",
+      "description": "Cloud API for Excel spreadsheet processing",
+      "patterns": {
+        "classNames": ["CellsApi", "Workbook", "Worksheet"],
+        "methods": ["GetWorkbook", "PutWorkbook", "PostWorksheetCalculateFormula"],
+        "imports": ["aspose.cells.cloud"]
+      },
+      "family": "cells",
+      "version": "21.10.0",
+      "dependencies": [],
+      "capabilities": ["convert", "calculate", "render"],
+      "plugin_type": "api",
+      "load_formats": ["XLS", "XLSX", "CSV", "ODS"],
+      "save_formats": ["PDF", "HTML", "XLSX", "CSV"]
+    },
+    {
+      "id": "aspose-cells-net",
+      "name": "Aspose.Cells for .NET",
+      "slug": "aspose-cells-net",
+      "description": ".NET library for Excel spreadsheet manipulation",
+      "patterns": {
+        "classNames": ["Workbook", "Worksheet", "Cells"],
+        "methods": ["Save", "Calculate", "AutoFitColumns"],
+        "imports": ["Aspose.Cells"]
+      },
+      "family": "cells",
+      "version": "21.10.0",
+      "dependencies": [],
+      "capabilities": ["convert", "formula", "charts"],
+      "plugin_type": "library",
+      "load_formats": ["XLS", "XLSX", "CSV", "ODS", "HTML"],
+      "save_formats": ["PDF", "XLSX", "HTML", "CSV", "XML"]
+    }
+  ],
+  "combination_rules": [],
+  "required_fields": ["title", "data_source"],
+  "forbidden_patterns": ["hardcoded_credentials"],
+  "metadata": {
+    "last_updated": "2024-01-15",
+    "maintainer": "Aspose Documentation Team"
+  }
+}

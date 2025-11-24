@@ -448,3 +448,67 @@ def _parse_omission_response(response: str) -> List[Dict]:
     except Exception as e:
         logger.debug(f"Failed to parse Ollama omission response: {e}")
     return []
+
+
+class OllamaClient:
+    """
+    Client wrapper for Ollama with helper methods for startup checks.
+    Provides is_available() and list_models() for health checks.
+    """
+    
+    def __init__(self, base_url: Optional[str] = None):
+        """Initialize OllamaClient."""
+        self.ollama = Ollama(base_url=base_url)
+    
+    def is_available(self) -> bool:
+        """
+        Check if Ollama server is reachable.
+        
+        Returns:
+            True if server is reachable, False otherwise
+        """
+        try:
+            # Try to list models as a health check
+            models = self.list_models()
+            return True
+        except Exception as e:
+            logger.debug(f"Ollama not available: {e}")
+            return False
+    
+    def list_models(self) -> List[str]:
+        """
+        List available models from Ollama.
+        
+        Returns:
+            List of model names
+        """
+        try:
+            result = self.ollama._make_request('api/tags', {}, method='GET')
+            models = result.get('models', [])
+            return [m.get('name', '') for m in models if 'name' in m]
+        except Exception as e:
+            logger.warning(f"Failed to list Ollama models: {e}")
+            return []
+    
+    def chat(self, model: str, messages: List[Dict[str, str]], **kwargs) -> Dict[str, Any]:
+        """Proxy to Ollama.chat()"""
+        return self.ollama.chat(model, messages, **kwargs)
+    
+    def generate(self, model: str, prompt: str, **kwargs) -> str:
+        """Proxy to Ollama.generate()"""
+        return self.ollama.generate(model, prompt, **kwargs)
+    
+    def embed(self, model: str, inputs: Union[str, List[str]]) -> List[List[float]]:
+        """Proxy to Ollama.embed()"""
+        return self.ollama.embed(model, inputs)
+
+
+# Create default global instance
+_default_client = None
+
+def get_ollama_client() -> OllamaClient:
+    """Get or create default OllamaClient instance."""
+    global _default_client
+    if _default_client is None:
+        _default_client = OllamaClient()
+    return _default_client

@@ -1,0 +1,219 @@
+{
+  "family": "words",
+  "version": "1.0.0",
+  "last_updated": "2025-11-11",
+  "plugins": [
+    {
+      "id": "word_processor",
+      "name": "Document",
+      "slug": "document",
+      "description": "Core Document class for loading, creating, and manipulating Word documents",
+      "type": "processor",
+      "patterns": {
+        "format": ["\\bDOCX?\\b", "\\bDOC\\b", "\\.docx?\\b"],
+        "api": ["Document\\(", "new Document", "Document\\.Load"],
+        "method": ["Load", "Save", "new"]
+      },
+      "load_formats": ["DOC", "DOCX", "RTF", "ODT", "HTML", "PDF"],
+      "save_formats": ["DOC", "DOCX", "PDF", "HTML", "RTF", "ODT", "TXT"],
+      "capabilities": ["load", "save", "create"],
+      "dependencies": []
+    },
+    {
+      "id": "document_builder",
+      "name": "DocumentBuilder",
+      "slug": "documentbuilder",
+      "description": "Utility for building documents programmatically with content insertion",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["DocumentBuilder\\(", "new DocumentBuilder", "builder\\.Insert"],
+        "method": ["Insert", "Write", "Moveto"]
+      },
+      "capabilities": ["create", "modify"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "pdf_converter",
+      "name": "PdfSaveOptions",
+      "slug": "pdfsaveoptions",
+      "description": "Convert Word documents to PDF with various options",
+      "type": "feature",
+      "patterns": {
+        "format": ["\\bPDF\\b", "SaveFormat\\.Pdf"],
+        "api": ["PdfSaveOptions\\(", "SaveFormat\\.Pdf"],
+        "method": ["Save"]
+      },
+      "capabilities": ["convert", "save"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "mail_merge",
+      "name": "MailMerge",
+      "slug": "mailmerge",
+      "description": "Mail merge functionality for template-based document generation",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["MailMerge\\.", "doc\\.MailMerge", "Execute\\("],
+        "method": ["Execute", "ExecuteWithRegions"]
+      },
+      "capabilities": ["merge", "process"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "find_replace",
+      "name": "Range.Replace",
+      "slug": "range-replace",
+      "description": "Find and replace text in documents",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["Range\\.Replace", "\\.Replace\\("],
+        "method": ["Replace"]
+      },
+      "capabilities": ["modify"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "table_builder",
+      "name": "Table",
+      "slug": "table",
+      "description": "Create and manipulate tables in Word documents",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["Table\\(", "InsertTable", "StartTable"],
+        "method": ["InsertCell", "InsertRow", "EndTable"]
+      },
+      "capabilities": ["create", "modify"],
+      "dependencies": ["word_processor", "document_builder"]
+    },
+    {
+      "id": "image_handler",
+      "name": "Shape",
+      "slug": "shape",
+      "description": "Insert and manipulate images and shapes",
+      "type": "feature",
+      "patterns": {
+        "format": ["\\bPNG\\b", "\\bJPEG?\\b"],
+        "api": ["InsertImage\\(", "Shape\\(", "DrawingML"],
+        "method": ["InsertImage"]
+      },
+      "capabilities": ["create", "modify"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "header_footer",
+      "name": "HeaderFooter",
+      "slug": "headerfooter",
+      "description": "Manage headers and footers in documents",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["HeaderFooter\\(", "Section\\.HeadersFooters"],
+        "method": ["AddHeader", "AddFooter"]
+      },
+      "capabilities": ["modify"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "bookmark_manager",
+      "name": "Bookmark",
+      "slug": "bookmark",
+      "description": "Create and navigate bookmarks",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["Bookmark\\(", "doc\\.Range\\.Bookmarks"],
+        "method": ["StartBookmark", "EndBookmark"]
+      },
+      "capabilities": ["navigate", "modify"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "style_manager",
+      "name": "Style",
+      "slug": "style",
+      "description": "Apply and manage document styles",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["Style\\(", "doc\\.Styles", "ParagraphFormat\\.Style"],
+        "method": ["ApplyStyle"]
+      },
+      "capabilities": ["modify"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "page_setup",
+      "name": "PageSetup",
+      "slug": "pagesetup",
+      "description": "Configure page layout and margins",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["PageSetup\\.", "Section\\.PageSetup"],
+        "method": []
+      },
+      "capabilities": ["modify"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "html_converter",
+      "name": "HtmlSaveOptions",
+      "slug": "htmlsaveoptions",
+      "description": "Convert Word documents to HTML",
+      "type": "feature",
+      "patterns": {
+        "format": ["\\bHTML?\\b", "SaveFormat\\.Html"],
+        "api": ["HtmlSaveOptions\\(", "SaveFormat\\.Html"],
+        "method": ["Save"]
+      },
+      "capabilities": ["convert", "save"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "compare_documents",
+      "name": "Document.Compare",
+      "slug": "compare",
+      "description": "Compare two documents and show differences",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["Document\\.Compare", "\\.Compare\\("],
+        "method": ["Compare"]
+      },
+      "capabilities": ["compare", "process"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "digital_signature",
+      "name": "DigitalSignature",
+      "slug": "digitalsignature",
+      "description": "Sign documents digitally",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["DigitalSignature\\(", "DigitalSignatureUtil"],
+        "method": ["Sign"]
+      },
+      "capabilities": ["sign", "security"],
+      "dependencies": ["word_processor"]
+    },
+    {
+      "id": "field_manager",
+      "name": "Field",
+      "slug": "field",
+      "description": "Insert and update document fields",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["Field\\(", "InsertField\\(", "doc\\.Range\\.Fields"],
+        "method": ["InsertField", "Update"]
+      },
+      "capabilities": ["create", "modify"],
+      "dependencies": ["word_processor"]
+    }
+  ]
+}

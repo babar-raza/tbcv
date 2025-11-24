@@ -16,7 +16,7 @@ import os
 import uuid
 import json
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from threading import Lock
 from pathlib import Path
@@ -62,8 +62,9 @@ except ImportError:
 # Enums for type safety
 # ---------------------------
 class RecommendationStatus(enum.Enum):
+    PROPOSED = "proposed"
     PENDING = "pending"
-    ACCEPTED = "accepted"
+    APPROVED = "approved"
     REJECTED = "rejected"
     APPLIED = "applied"
 
@@ -220,6 +221,9 @@ class ValidationResult(Base):
     # Structured data
     rules_applied = Column(JSONField)
     validation_results = Column(JSONField)
+    validation_types = Column(JSONField)  # List of validation types run (e.g., ["yaml", "markdown", "Truth"])
+    parent_validation_id = Column(String(36), ForeignKey('validation_results.id'), nullable=True)  # For re-validation
+    comparison_data = Column(JSONField)  # Comparison results for re-validation
     notes = Column(Text)
 
     # Classification
@@ -230,6 +234,10 @@ class ValidationResult(Base):
     content_hash = Column(String(64), index=True)
     ast_hash = Column(String(64))
     run_id = Column(String(64), index=True)
+
+    # History tracking
+    file_hash = Column(String(64), index=True)  # Hash of the actual file for history tracking
+    version_number = Column(Integer, default=1)  # Version number for this file path
 
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -242,8 +250,6 @@ class ValidationResult(Base):
         Index('idx_validation_file_status', 'file_path', 'status'),
         Index('idx_validation_file_severity', 'file_path', 'severity'),
         Index('idx_validation_created', 'created_at'),
-        Index('idx_validation_run_id', 'run_id'),  # FIX: Added missing index
-        Index('idx_validation_workflow_status', 'workflow_id', 'status'),  # FIX: Added composite index
     )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -288,6 +294,12 @@ class Recommendation(Base):
     type = Column(String(50), nullable=False, index=True)  # link_plugin, fix_format, add_info_text, etc.
     title = Column(String(200), nullable=False)
     description = Column(Text)
+    
+    # Machine-readable recommendation fields
+    scope = Column(String(200))  # e.g., "line:42", "section:intro", "global"
+    instruction = Column(Text)  # Concrete, actionable instruction
+    rationale = Column(Text)  # Why this recommendation would fix the issue
+    severity = Column(String(20), default="medium")  # critical, high, medium, low
 
     # Change details
     original_content = Column(Text)
@@ -333,6 +345,10 @@ class Recommendation(Base):
             "type": self.type,
             "title": self.title,
             "description": self.description,
+            "scope": self.scope,
+            "instruction": self.instruction,
+            "rationale": self.rationale,
+            "severity": self.severity,
             "original_content": self.original_content,
             "proposed_content": self.proposed_content,
             "diff": self.diff,
@@ -423,6 +439,10 @@ class DatabaseManager:
     def init_database(self) -> bool:
         """Idempotent database initialization."""
         try:
+            # Ensure tables exist
+            if SQLALCHEMY_AVAILABLE and self.engine is not None:
+                Base.metadata.create_all(bind=self.engine)
+                logger.info("Database tables ensured (idempotent)")
             return self.is_connected()
         except Exception as e:
             logger.warning(f"Database initialization warning: {e}")
@@ -512,7 +532,7 @@ class DatabaseManager:
                 for key, value in updates.items():
                     if hasattr(wf, key):
                         setattr(wf, key, value)
-                wf.updated_at = datetime.utcnow()
+                wf.updated_at = datetime.now(timezone.utc)
                 session.commit()
                 session.refresh(wf)
             return wf
@@ -544,7 +564,7 @@ class DatabaseManager:
             if existing:
                 existing.result_data = result_data
                 existing.expires_at = expires_at
-                existing.last_accessed = datetime.utcnow()
+                existing.last_accessed = datetime.now(timezone.utc)
                 existing.size_bytes = size_bytes
                 existing.access_count = (existing.access_count or 0) + 1
             else:
@@ -554,13 +574,21 @@ class DatabaseManager:
                     method_name=method_name,
                     input_hash=input_hash,
                     result_data=result_data,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
                     expires_at=expires_at,
-                    last_accessed=datetime.utcnow(),
+                    last_accessed=datetime.now(timezone.utc),
                     size_bytes=size_bytes,
                 )
                 session.add(entry)
             session.commit()
+
+    def cleanup_expired_cache(self) -> int:
+        """Remove expired cache entries and return count."""
+        with self.get_session() as session:
+            now = datetime.now(timezone.utc)
+            result = session.query(CacheEntry).filter(CacheEntry.expires_at < now).delete()
+            session.commit()
+            return result
 
     # ---- ValidationResult helpers ----
     @staticmethod
@@ -580,6 +608,7 @@ class DatabaseManager:
         ast_hash: Optional[str] = None,
         run_id: Optional[str] = None,
         workflow_id: Optional[str] = None,
+        validation_types: Optional[List[str]] = None,
     ) -> ValidationResult:
         content_hash = self._sha256(content) if content else None
 
@@ -592,6 +621,7 @@ class DatabaseManager:
             file_path=file_path,
             rules_applied=rules_applied,
             validation_results=validation_results,
+            validation_types=validation_types,
             notes=notes,
             severity=severity,
             status=status,
@@ -604,7 +634,36 @@ class DatabaseManager:
             session.commit()
             session.refresh(vr)
         logger.info("Validation result stored", extra={"validation_id": vr.id})
+        
+        # Auto-generate recommendations if validation has results
+        if validation_results:
+            try:
+                # Import here to avoid circular dependency
+                from api.services.recommendation_consolidator import consolidate_recommendations
+                import asyncio
+                
+                # Run consolidation in background
+                try:
+                    # Try to get running loop
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(self._async_consolidate_recommendations(vr.id))
+                except RuntimeError:
+                    # No running loop, do it synchronously
+                    recs = consolidate_recommendations(vr.id)
+                    logger.info(f"Auto-generated {len(recs)} recommendations for validation {vr.id}")
+            except Exception as e:
+                logger.error(f"Failed to auto-generate recommendations for {vr.id}: {e}")
+        
         return vr
+    
+    async def _async_consolidate_recommendations(self, validation_id: str):
+        """Async wrapper for recommendation consolidation."""
+        try:
+            from api.services.recommendation_consolidator import consolidate_recommendations
+            recs = consolidate_recommendations(validation_id)
+            logger.info(f"Auto-generated {len(recs)} recommendations for validation {validation_id}")
+        except Exception as e:
+            logger.error(f"Failed to auto-generate recommendations for {validation_id}: {e}")
 
     def list_validation_results(
         self,
@@ -642,6 +701,170 @@ class DatabaseManager:
                 .first()
             )
 
+    def get_validation_history(
+        self,
+        *,
+        file_path: str,
+        limit: Optional[int] = None,
+        include_trends: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Get validation history for a file path, ordered from newest to oldest.
+
+        Args:
+            file_path: Path to the file
+            limit: Optional maximum number of historical records to return
+            include_trends: Whether to calculate trend analysis
+
+        Returns:
+            Dict with validation history and optional trend analysis
+        """
+        with self.get_session() as session:
+            query = (
+                session.query(ValidationResult)
+                .filter(ValidationResult.file_path == file_path)
+                .order_by(ValidationResult.created_at.desc())
+            )
+
+            if limit:
+                query = query.limit(limit)
+
+            validations = query.all()
+
+            history = {
+                "file_path": file_path,
+                "total_validations": len(validations),
+                "validations": [
+                    {
+                        "id": v.id,
+                        "status": v.status.value if hasattr(v.status, 'value') else str(v.status),
+                        "severity": v.severity,
+                        "version_number": v.version_number,
+                        "file_hash": v.file_hash,
+                        "content_hash": v.content_hash,
+                        "created_at": v.created_at.isoformat() if v.created_at else None,
+                        "validation_results": v.validation_results,
+                        "parent_validation_id": v.parent_validation_id,
+                        "comparison_data": v.comparison_data
+                    }
+                    for v in validations
+                ]
+            }
+
+            # Calculate trend analysis if requested
+            if include_trends and len(validations) > 1:
+                trends = self._calculate_validation_trends(validations)
+                history["trends"] = trends
+
+            return history
+
+    def _calculate_validation_trends(self, validations: List[ValidationResult]) -> Dict[str, Any]:
+        """
+        Calculate trend analysis from validation history.
+
+        Args:
+            validations: List of ValidationResult objects ordered newest to oldest
+
+        Returns:
+            Dict with trend metrics
+        """
+        if not validations:
+            return {}
+
+        # Extract issue counts from validation_results
+        issue_counts = []
+        confidence_scores = []
+        statuses = []
+
+        for v in reversed(validations):  # Oldest to newest for trend calculation
+            vr = v.validation_results
+            if isinstance(vr, dict):
+                # Count issues
+                issues = vr.get("issues", [])
+                issue_counts.append(len(issues))
+
+                # Get confidence
+                confidence = vr.get("confidence", 0.0)
+                confidence_scores.append(confidence)
+
+            # Track status
+            status_val = v.status.value if hasattr(v.status, 'value') else str(v.status)
+            statuses.append(status_val)
+
+        # Calculate trends
+        trends = {
+            "issue_count_trend": self._calculate_trend(issue_counts),
+            "confidence_trend": self._calculate_trend(confidence_scores),
+            "status_trend": self._analyze_status_trend(statuses),
+            "improvement_detected": False,
+            "regression_detected": False
+        }
+
+        # Detect improvement/regression
+        if len(issue_counts) >= 2:
+            recent_avg = sum(issue_counts[-3:]) / min(3, len(issue_counts))
+            older_avg = sum(issue_counts[:3]) / min(3, len(issue_counts))
+
+            if recent_avg < older_avg * 0.8:  # 20% improvement
+                trends["improvement_detected"] = True
+            elif recent_avg > older_avg * 1.2:  # 20% regression
+                trends["regression_detected"] = True
+
+        return trends
+
+    def _calculate_trend(self, values: List[float]) -> str:
+        """
+        Calculate trend direction from a list of numeric values.
+
+        Returns: "improving", "degrading", "stable", or "insufficient_data"
+        """
+        if len(values) < 2:
+            return "insufficient_data"
+
+        # Simple linear trend: compare first half to second half
+        mid = len(values) // 2
+        first_half_avg = sum(values[:mid]) / mid if mid > 0 else 0
+        second_half_avg = sum(values[mid:]) / (len(values) - mid)
+
+        diff_pct = abs(second_half_avg - first_half_avg) / (first_half_avg + 0.0001)
+
+        if diff_pct < 0.1:  # Less than 10% change
+            return "stable"
+        elif second_half_avg < first_half_avg:
+            return "improving"  # For issue counts, lower is better
+        else:
+            return "degrading"
+
+    def _analyze_status_trend(self, statuses: List[str]) -> str:
+        """
+        Analyze trend in validation statuses.
+
+        Returns: "improving", "degrading", "stable", or "mixed"
+        """
+        if len(statuses) < 2:
+            return "insufficient_data"
+
+        # Status hierarchy: PASS > PASS_WITH_WARNINGS > FAIL
+        status_scores = {
+            "PASS": 3,
+            "PASS_WITH_WARNINGS": 2,
+            "FAIL": 1,
+            "ERROR": 0
+        }
+
+        scores = [status_scores.get(s.upper(), 0) for s in statuses]
+
+        mid = len(scores) // 2
+        first_half_avg = sum(scores[:mid]) / mid if mid > 0 else 0
+        second_half_avg = sum(scores[mid:]) / (len(scores) - mid)
+
+        if abs(second_half_avg - first_half_avg) < 0.5:
+            return "stable"
+        elif second_half_avg > first_half_avg:
+            return "improving"
+        else:
+            return "degrading"
+
     # ---- Recommendation helpers ----
     def create_recommendation(
         self,
@@ -650,11 +873,16 @@ class DatabaseManager:
         type: str,
         title: str,
         description: str,
+        scope: Optional[str] = None,
+        instruction: Optional[str] = None,
+        rationale: Optional[str] = None,
+        severity: Optional[str] = None,
         original_content: Optional[str] = None,
         proposed_content: Optional[str] = None,
         diff: Optional[str] = None,
         confidence: float = 0.0,
         priority: str = "medium",
+        status: str = "pending",
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Recommendation:
         rec = Recommendation(
@@ -662,12 +890,16 @@ class DatabaseManager:
             type=type,
             title=title,
             description=description,
+            scope=scope,
+            instruction=instruction,
+            rationale=rationale,
+            severity=severity or "medium",
             original_content=original_content,
             proposed_content=proposed_content,
             diff=diff,
             confidence=confidence,
             priority=priority,
-            status=RecommendationStatus.PENDING,
+            status=RecommendationStatus(status) if isinstance(status, str) else status,
             recommendation_metadata=metadata or {},
         )
         with self.get_session() as session:
@@ -725,9 +957,9 @@ class DatabaseManager:
 
             rec.status = RecommendationStatus(status)
             rec.reviewed_by = reviewer
-            rec.reviewed_at = datetime.utcnow()
+            rec.reviewed_at = datetime.now(timezone.utc)
             rec.review_notes = review_notes
-            rec.updated_at = datetime.utcnow()
+            rec.updated_at = datetime.now(timezone.utc)
 
             session.commit()
             session.refresh(rec)
@@ -761,9 +993,9 @@ class DatabaseManager:
             before_state = rec.to_dict()
 
             rec.status = RecommendationStatus.APPLIED
-            rec.applied_at = datetime.utcnow()
+            rec.applied_at = datetime.now(timezone.utc)
             rec.applied_by = applied_by or "system"
-            rec.updated_at = datetime.utcnow()
+            rec.updated_at = datetime.now(timezone.utc)
 
             session.commit()
             session.refresh(rec)
@@ -781,6 +1013,195 @@ class DatabaseManager:
             )
 
             logger.info("Recommendation marked as applied", extra={"recommendation_id": rec.id})
+            return rec
+
+    def calculate_recommendation_confidence(
+        self,
+        *,
+        issue_severity: str,
+        recommendation_type: str,
+        has_original_content: bool = False,
+        has_proposed_content: bool = False,
+        has_diff: bool = False,
+        has_rationale: bool = False,
+        validation_confidence: float = 0.0,
+        additional_factors: Optional[Dict[str, float]] = None
+    ) -> Dict[str, Any]:
+        """
+        Calculate multi-factor confidence score for a recommendation.
+
+        Args:
+            issue_severity: Severity level (critical, high, medium, low)
+            recommendation_type: Type of recommendation
+            has_original_content: Whether original content is provided
+            has_proposed_content: Whether proposed fix is provided
+            has_diff: Whether diff is provided
+            has_rationale: Whether rationale is provided
+            validation_confidence: Confidence score from the original validation
+            additional_factors: Optional dict of additional scoring factors
+
+        Returns:
+            Dict with overall confidence score and breakdown
+        """
+        factors = {}
+
+        # Factor 1: Issue severity (0.0-0.3)
+        severity_scores = {
+            "critical": 0.3,
+            "high": 0.25,
+            "medium": 0.2,
+            "low": 0.15,
+            "info": 0.1
+        }
+        severity_score = severity_scores.get(issue_severity.lower(), 0.15)
+        factors["severity"] = severity_score
+
+        # Factor 2: Completeness of recommendation (0.0-0.3)
+        completeness = 0.0
+        if has_original_content:
+            completeness += 0.075
+        if has_proposed_content:
+            completeness += 0.1
+        if has_diff:
+            completeness += 0.075
+        if has_rationale:
+            completeness += 0.05
+        factors["completeness"] = completeness
+
+        # Factor 3: Validation confidence (0.0-0.2)
+        # Use the confidence from the original validation
+        validation_factor = validation_confidence * 0.2
+        factors["validation_confidence"] = validation_factor
+
+        # Factor 4: Recommendation type specificity (0.0-0.2)
+        type_scores = {
+            "fix_specific": 0.2,  # Exact fix provided
+            "fix_general": 0.15,  # General fix guidance
+            "enhancement": 0.1,   # Enhancement suggestion
+            "refactor": 0.1,     # Refactoring suggestion
+            "info": 0.05         # Informational only
+        }
+        # Map actual types to these categories
+        type_mapping = {
+            "link_plugin": "fix_specific",
+            "fix_format": "fix_specific",
+            "add_info_text": "fix_general",
+            "content_improvement": "enhancement",
+            "style_improvement": "refactor"
+        }
+        mapped_type = type_mapping.get(recommendation_type, "fix_general")
+        type_score = type_scores.get(mapped_type, 0.1)
+        factors["type_specificity"] = type_score
+
+        # Factor 5: Additional custom factors (0.0-0.2)
+        additional_score = 0.0
+        if additional_factors:
+            for key, value in additional_factors.items():
+                additional_score += min(value, 0.05)  # Cap each at 0.05
+            additional_score = min(additional_score, 0.2)  # Cap total at 0.2
+        factors["additional"] = additional_score
+
+        # Calculate overall confidence (sum of factors, capped at 1.0)
+        overall_confidence = min(
+            sum(factors.values()),
+            1.0
+        )
+
+        # Generate explanation
+        explanation = self._generate_confidence_explanation(
+            overall_confidence,
+            factors,
+            issue_severity,
+            has_proposed_content
+        )
+
+        return {
+            "confidence": overall_confidence,
+            "factors": factors,
+            "explanation": explanation,
+            "calculated_at": datetime.now(timezone.utc).isoformat()
+        }
+
+    def _generate_confidence_explanation(
+        self,
+        confidence: float,
+        factors: Dict[str, float],
+        severity: str,
+        has_fix: bool
+    ) -> str:
+        """Generate human-readable confidence explanation."""
+        if confidence >= 0.9:
+            base = "Very high confidence recommendation"
+        elif confidence >= 0.75:
+            base = "High confidence recommendation"
+        elif confidence >= 0.6:
+            base = "Moderate confidence recommendation"
+        elif confidence >= 0.4:
+            base = "Low-moderate confidence recommendation"
+        else:
+            base = "Low confidence recommendation"
+
+        details = []
+
+        if severity in ["critical", "high"]:
+            details.append(f"{severity} severity issue")
+
+        if has_fix:
+            details.append("specific fix provided")
+        else:
+            details.append("general guidance only")
+
+        if factors.get("validation_confidence", 0) > 0.15:
+            details.append("strong validation backing")
+
+        if factors.get("completeness", 0) > 0.2:
+            details.append("comprehensive details")
+
+        if details:
+            return f"{base}: {', '.join(details)}."
+        else:
+            return f"{base}."
+
+    def update_recommendation_confidence(
+        self,
+        recommendation_id: str,
+        confidence_data: Dict[str, Any]
+    ) -> Optional[Recommendation]:
+        """
+        Update a recommendation's confidence score and store breakdown in metadata.
+
+        Args:
+            recommendation_id: ID of the recommendation to update
+            confidence_data: Confidence data from calculate_recommendation_confidence()
+
+        Returns:
+            Updated Recommendation object or None if not found
+        """
+        with self.get_session() as session:
+            rec = session.query(Recommendation).filter(Recommendation.id == recommendation_id).first()
+            if not rec:
+                return None
+
+            # Update confidence score
+            rec.confidence = confidence_data["confidence"]
+
+            # Store breakdown in metadata
+            metadata = rec.recommendation_metadata or {}
+            metadata["confidence_breakdown"] = confidence_data
+
+            rec.recommendation_metadata = metadata
+            rec.updated_at = datetime.now(timezone.utc)
+
+            session.commit()
+            session.refresh(rec)
+
+            logger.info(
+                "Recommendation confidence updated",
+                extra={
+                    "recommendation_id": rec.id,
+                    "confidence": rec.confidence
+                }
+            )
             return rec
 
     # ---- AuditLog helpers ----
@@ -829,6 +1250,42 @@ class DatabaseManager:
                 q = q.filter(AuditLog.action == action)
             return q.order_by(AuditLog.created_at.desc()).limit(limit).all()
 
+    def delete_recommendation(self, recommendation_id: str) -> bool:
+        """Delete a recommendation."""
+        with self.get_session() as session:
+            rec = session.query(Recommendation).filter(Recommendation.id == recommendation_id).first()
+            if not rec:
+                return False
+            
+            session.delete(rec)
+            session.commit()
+            logger.info("Recommendation deleted", extra={"recommendation_id": recommendation_id})
+            return True
+    
+    def soft_delete_workflows(self, workflow_ids: List[str]) -> int:
+        """Soft delete workflows by marking them as deleted."""
+        count = 0
+        with self.get_session() as session:
+            for workflow_id in workflow_ids:
+                workflow = session.query(Workflow).filter(Workflow.id == workflow_id).first()
+                if workflow:
+                    # Add soft_deleted field if not exists
+                    if not hasattr(workflow, 'soft_deleted'):
+                        # For now, just mark in metadata
+                        if workflow.workflow_metadata is None:
+                            workflow.workflow_metadata = {}
+                        workflow.workflow_metadata['soft_deleted'] = True
+                        workflow.updated_at = datetime.now(timezone.utc)
+                        count += 1
+                    else:
+                        workflow.soft_deleted = True
+                        workflow.updated_at = datetime.now(timezone.utc)
+                        count += 1
+            
+            session.commit()
+            logger.info(f"Soft deleted {count} workflows")
+        return count
+
     # ---- Misc helpers for tests ----
     def _ensure_collection(self, collection_name: str) -> str:
         """Internal helper to ensure collection exists (used by non-SQLite tests)."""
@@ -852,6 +1309,477 @@ class DatabaseManager:
         """Query unknown source by creating default collection."""
         default_collection = self._ensure_collection("unknown_sources")
         return {"source": source, "collection": default_collection, "status": "mapped_to_default"}
+
+    def update_workflow_metrics(
+        self,
+        workflow_id: str,
+        *,
+        pages_processed: Optional[int] = None,
+        validations_found: Optional[int] = None,
+        validations_approved: Optional[int] = None,
+        recommendations_generated: Optional[int] = None,
+        recommendations_approved: Optional[int] = None,
+        recommendations_actioned: Optional[int] = None,
+    ) -> Optional[Workflow]:
+        """Update workflow metrics in metadata."""
+        workflow = self.get_workflow(workflow_id)
+        if not workflow:
+            return None
+        
+        # Initialize metrics if not present
+        if workflow.workflow_metadata is None:
+            workflow.workflow_metadata = {}
+        
+        metrics = workflow.workflow_metadata.get("metrics", {})
+        
+        if pages_processed is not None:
+            metrics["pages_processed"] = pages_processed
+        if validations_found is not None:
+            metrics["validations_found"] = validations_found
+        if validations_approved is not None:
+            metrics["validations_approved"] = validations_approved
+        if recommendations_generated is not None:
+            metrics["recommendations_generated"] = recommendations_generated
+        if recommendations_approved is not None:
+            metrics["recommendations_approved"] = recommendations_approved
+        if recommendations_actioned is not None:
+            metrics["recommendations_actioned"] = recommendations_actioned
+        
+        workflow.workflow_metadata["metrics"] = metrics
+
+        with self.get_session() as session:
+            merged_workflow = session.merge(workflow)
+            session.commit()
+            session.refresh(merged_workflow)
+
+        return merged_workflow
+    
+    def get_workflow_metrics(self, workflow_id: str) -> Dict[str, Any]:
+        """Get workflow metrics."""
+        workflow = self.get_workflow(workflow_id)
+        if not workflow or not workflow.workflow_metadata:
+            return {}
+        
+        return workflow.workflow_metadata.get("metrics", {})
+    
+    def get_workflow_stats(self, workflow_id: str) -> Dict[str, Any]:
+        """
+        Get comprehensive workflow statistics including:
+        - Validation counts
+        - Recommendation counts
+        - Processing metrics
+        """
+        workflow = self.get_workflow(workflow_id)
+        if not workflow:
+            return {}
+        
+        # Get validation counts
+        validations = self.list_validation_results(workflow_id=workflow_id, limit=10000)
+        validations_by_status = {}
+        for v in validations:
+            status = v.status.value if hasattr(v.status, 'value') else str(v.status)
+            validations_by_status[status] = validations_by_status.get(status, 0) + 1
+        
+        # Get recommendation counts
+        recommendations = []
+        for v in validations:
+            recommendations.extend(self.list_recommendations(validation_id=v.id, limit=1000))
+        
+        recommendations_by_status = {}
+        for r in recommendations:
+            status = r.status.value if hasattr(r.status, 'value') else str(r.status)
+            recommendations_by_status[status] = recommendations_by_status.get(status, 0) + 1
+        
+        # Get stored metrics
+        stored_metrics = workflow.workflow_metadata.get("metrics", {}) if workflow.workflow_metadata else {}
+        
+        return {
+            "workflow_id": workflow_id,
+            "workflow_type": workflow.type,
+            "workflow_state": workflow.state.value if hasattr(workflow.state, 'value') else str(workflow.state),
+            "started_at": workflow.created_at.isoformat() if workflow.created_at else None,
+            "completed_at": workflow.completed_at.isoformat() if workflow.completed_at else None,
+            "pages_processed": stored_metrics.get("pages_processed", len(validations)),
+            "validations_found": len(validations),
+            "validations_by_status": validations_by_status,
+            "recommendations_generated": len(recommendations),
+            "recommendations_by_status": recommendations_by_status,
+            "recommendations_approved": recommendations_by_status.get("approved", 0),
+            "recommendations_actioned": recommendations_by_status.get("applied", 0),
+        }
+    def generate_workflow_report(self, workflow_id: str) -> Dict[str, Any]:
+        """Generate a comprehensive report for a workflow.
+
+        Args:
+            workflow_id: The workflow ID
+
+        Returns:
+            Dict containing workflow report with validations, issues, and recommendations
+        """
+        workflow = self.get_workflow(workflow_id)
+        if not workflow:
+            raise ValueError(f"Workflow {workflow_id} not found")
+
+        # Get all validations for this workflow
+        validations = self.list_validation_results(workflow_id=workflow_id, limit=10000)
+
+        # Calculate summary statistics
+        total_files = len(validations)
+        files_passed = sum(1 for v in validations if v.status == ValidationStatus.PASS)
+        files_failed = sum(1 for v in validations if v.status == ValidationStatus.FAIL)
+        files_warning = sum(1 for v in validations if v.status == ValidationStatus.WARNING)
+
+        # Count total issues by severity
+        total_issues = 0
+        critical_issues = 0
+        error_issues = 0
+        warning_issues = 0
+        info_issues = 0
+
+        for validation in validations:
+            if validation.validation_results:
+                issues = validation.validation_results.get("issues", [])
+                total_issues += len(issues)
+                for issue in issues:
+                    level = issue.get("level", "").lower()
+                    if level == "critical":
+                        critical_issues += 1
+                    elif level == "error":
+                        error_issues += 1
+                    elif level == "warning":
+                        warning_issues += 1
+                    elif level == "info":
+                        info_issues += 1
+
+        # Calculate duration
+        duration_ms = None
+        if workflow.created_at and workflow.completed_at:
+            duration_ms = int((workflow.completed_at - workflow.created_at).total_seconds() * 1000)
+
+        # Get all recommendations
+        all_recommendations = []
+        for validation in validations:
+            recs = self.list_recommendations(validation_id=validation.id)
+            all_recommendations.extend(recs)
+
+        return {
+            "workflow_id": workflow_id,
+            "status": workflow.state.value if hasattr(workflow.state, "value") else str(workflow.state),
+            "type": workflow.type,
+            "created_at": workflow.created_at.isoformat() if workflow.created_at else None,
+            "completed_at": workflow.completed_at.isoformat() if workflow.completed_at else None,
+            "duration_ms": duration_ms,
+            "summary": {
+                "total_files": total_files,
+                "files_passed": files_passed,
+                "files_failed": files_failed,
+                "files_warning": files_warning,
+                "total_issues": total_issues,
+                "critical_issues": critical_issues,
+                "error_issues": error_issues,
+                "warning_issues": warning_issues,
+                "info_issues": info_issues,
+                "total_recommendations": len(all_recommendations),
+            },
+            "validations": [v.to_dict() for v in validations],
+            "recommendations": [r.to_dict() for r in all_recommendations],
+        }
+
+    def generate_validation_report(self, validation_id: str) -> Dict[str, Any]:
+        """Generate a report for a single validation.
+
+        Args:
+            validation_id: The validation ID
+
+        Returns:
+            Dict containing validation report with issues and recommendations
+        """
+        validation = self.get_validation_result(validation_id)
+        if not validation:
+            raise ValueError(f"Validation {validation_id} not found")
+
+        # Get recommendations for this validation
+        recommendations = self.list_recommendations(validation_id=validation_id)
+
+        # Extract issues from validation_results
+        issues = []
+        if validation.validation_results:
+            issues = validation.validation_results.get("issues", [])
+
+        # Count issues by level
+        issue_counts = {"critical": 0, "error": 0, "warning": 0, "info": 0}
+        for issue in issues:
+            level = issue.get("level", "").lower()
+            if level in issue_counts:
+                issue_counts[level] += 1
+
+        return {
+            "validation_id": validation_id,
+            "file_path": validation.file_path,
+            "status": validation.status.value if hasattr(validation.status, "value") else str(validation.status),
+            "severity": validation.severity,
+            "created_at": validation.created_at.isoformat() if validation.created_at else None,
+            "validation_types": validation.validation_types,
+            "summary": {
+                "total_issues": len(issues),
+                "critical_issues": issue_counts["critical"],
+                "error_issues": issue_counts["error"],
+                "warning_issues": issue_counts["warning"],
+                "info_issues": issue_counts["info"],
+                "total_recommendations": len(recommendations),
+            },
+            "issues": issues,
+            "recommendations": [r.to_dict() for r in recommendations],
+        }
+
+    def compare_validations(self, original_id: str, new_id: str) -> Dict[str, Any]:
+        """
+        Compare two validation results to calculate improvement metrics.
+
+        Args:
+            original_id: ID of the original validation
+            new_id: ID of the new validation (after enhancement)
+
+        Returns:
+            Dict with comparison metrics
+        """
+        original = self.get_validation_result(original_id)
+        new = self.get_validation_result(new_id)
+
+        if not original:
+            raise ValueError(f"Original validation {original_id} not found")
+        if not new:
+            raise ValueError(f"New validation {new_id} not found")
+
+        # Extract issues from both validations
+        original_issues = []
+        if original.validation_results:
+            original_issues = original.validation_results.get("issues", [])
+
+        new_issues = []
+        if new.validation_results:
+            new_issues = new.validation_results.get("issues", [])
+
+        # Match issues by category and message similarity
+        def issue_key(issue):
+            """Create a key for matching issues."""
+            return (
+                issue.get("category", "unknown").lower(),
+                issue.get("message", "")[:100].lower()  # First 100 chars for fuzzy match
+            )
+
+        original_issue_keys = {issue_key(issue): issue for issue in original_issues}
+        new_issue_keys = {issue_key(issue): issue for issue in new_issues}
+
+        # Categorize issues
+        resolved_issues = []
+        for key, issue in original_issue_keys.items():
+            if key not in new_issue_keys:
+                resolved_issues.append(issue)
+
+        new_issues_list = []
+        for key, issue in new_issue_keys.items():
+            if key not in original_issue_keys:
+                new_issues_list.append(issue)
+
+        persistent_issues = []
+        for key in original_issue_keys:
+            if key in new_issue_keys:
+                persistent_issues.append(original_issue_keys[key])
+
+        # Calculate improvement score
+        improvement_score = 0.0
+        if len(original_issues) > 0:
+            improvement_score = len(resolved_issues) / len(original_issues)
+
+        return {
+            "original_validation_id": original_id,
+            "new_validation_id": new_id,
+            "original_issues": len(original_issues),
+            "new_issues": len(new_issues),
+            "resolved_issues": len(resolved_issues),
+            "new_issues_added": len(new_issues_list),
+            "persistent_issues": len(persistent_issues),
+            "improvement_score": round(improvement_score, 2),
+            "resolved_issues_list": resolved_issues,
+            "new_issues_list": new_issues_list,
+            "persistent_issues_list": persistent_issues,
+        }
+
+    def get_validations_without_recommendations(
+        self,
+        min_age_minutes: int = 5,
+        limit: int = 100
+    ) -> List[ValidationResult]:
+        """
+        Get validation results that have no recommendations generated yet.
+
+        Args:
+            min_age_minutes: Only include validations older than this many minutes
+            limit: Maximum number of validations to return
+
+        Returns:
+            List of ValidationResult objects without recommendations
+        """
+        from datetime import datetime, timezone, timedelta
+
+        cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=min_age_minutes)
+
+        with self.get_session() as session:
+            # Get all validation IDs that have recommendations
+            validations_with_recs = session.query(Recommendation.validation_id).distinct().all()
+            validation_ids_with_recs = {v[0] for v in validations_with_recs}
+
+            # Get validations without recommendations
+            query = session.query(ValidationResult).filter(
+                ValidationResult.created_at < cutoff_time
+            )
+
+            if validation_ids_with_recs:
+                query = query.filter(
+                    ~ValidationResult.id.in_(validation_ids_with_recs)
+                )
+
+            query = query.order_by(ValidationResult.created_at.desc()).limit(limit)
+
+            results = query.all()
+
+            # Detach from session
+            for result in results:
+                session.expunge(result)
+
+            return results
+
+    # ------------------- System Reset/Cleanup Methods -------------------
+
+    def delete_all_validations(self, confirm: bool = False) -> int:
+        """
+        Delete ALL validation results from the database.
+
+        Args:
+            confirm: Must be True to actually delete (safety check)
+
+        Returns:
+            Number of validations deleted
+        """
+        if not confirm:
+            raise ValueError("Must explicitly confirm deletion by setting confirm=True")
+
+        with self.get_session() as session:
+            count = session.query(ValidationResult).count()
+            session.query(ValidationResult).delete()
+            session.commit()
+            logger.warning(f"Deleted all validations", extra={"count": count})
+            return count
+
+    def delete_all_workflows(self, confirm: bool = False) -> int:
+        """
+        Delete ALL workflows from the database.
+
+        Args:
+            confirm: Must be True to actually delete (safety check)
+
+        Returns:
+            Number of workflows deleted
+        """
+        if not confirm:
+            raise ValueError("Must explicitly confirm deletion by setting confirm=True")
+
+        with self.get_session() as session:
+            count = session.query(Workflow).count()
+            session.query(Workflow).delete()
+            session.commit()
+            logger.warning(f"Deleted all workflows", extra={"count": count})
+            return count
+
+    def delete_all_recommendations(self, confirm: bool = False) -> int:
+        """
+        Delete ALL recommendations from the database.
+
+        Args:
+            confirm: Must be True to actually delete (safety check)
+
+        Returns:
+            Number of recommendations deleted
+        """
+        if not confirm:
+            raise ValueError("Must explicitly confirm deletion by setting confirm=True")
+
+        with self.get_session() as session:
+            count = session.query(Recommendation).count()
+            session.query(Recommendation).delete()
+            session.commit()
+            logger.warning(f"Deleted all recommendations", extra={"count": count})
+            return count
+
+    def delete_all_audit_logs(self, confirm: bool = False) -> int:
+        """
+        Delete ALL audit logs from the database.
+
+        Args:
+            confirm: Must be True to actually delete (safety check)
+
+        Returns:
+            Number of audit logs deleted
+        """
+        if not confirm:
+            raise ValueError("Must explicitly confirm deletion by setting confirm=True")
+
+        with self.get_session() as session:
+            count = session.query(AuditLog).count()
+            session.query(AuditLog).delete()
+            session.commit()
+            logger.warning(f"Deleted all audit logs", extra={"count": count})
+            return count
+
+    def reset_system(
+        self,
+        confirm: bool = False,
+        delete_validations: bool = True,
+        delete_workflows: bool = True,
+        delete_recommendations: bool = True,
+        delete_audit_logs: bool = False
+    ) -> dict:
+        """
+        Reset the entire system by deleting data.
+
+        Args:
+            confirm: Must be True to actually delete (safety check)
+            delete_validations: Delete all validation results
+            delete_workflows: Delete all workflows
+            delete_recommendations: Delete all recommendations
+            delete_audit_logs: Delete all audit logs (default: False, preserved for compliance)
+
+        Returns:
+            Dictionary with counts of deleted items
+        """
+        if not confirm:
+            raise ValueError("Must explicitly confirm system reset by setting confirm=True")
+
+        results = {
+            "validations_deleted": 0,
+            "workflows_deleted": 0,
+            "recommendations_deleted": 0,
+            "audit_logs_deleted": 0
+        }
+
+        # Delete in order: recommendations -> validations -> workflows -> audit logs
+        # This respects foreign key constraints
+
+        if delete_recommendations:
+            results["recommendations_deleted"] = self.delete_all_recommendations(confirm=True)
+
+        if delete_validations:
+            results["validations_deleted"] = self.delete_all_validations(confirm=True)
+
+        if delete_workflows:
+            results["workflows_deleted"] = self.delete_all_workflows(confirm=True)
+
+        if delete_audit_logs:
+            results["audit_logs_deleted"] = self.delete_all_audit_logs(confirm=True)
+
+        logger.warning("System reset completed", extra=results)
+        return results
 
 
 # Singleton

@@ -171,14 +171,14 @@ def performance_metrics():
     """Create performance metrics collector."""
     return PerformanceMetrics()
 
-@pytest.fixture 
-async def validator_agent():
+@pytest.fixture
+def validator_agent():
     """Create content validator agent."""
     return ContentValidatorAgent("test_validator")
 
 @pytest.fixture
-async def enhancer_agent():
-    """Create content enhancer agent.""" 
+def enhancer_agent():
+    """Create content enhancer agent."""
     return ContentEnhancerAgent("test_enhancer")
 
 @pytest.mark.asyncio

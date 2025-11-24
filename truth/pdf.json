@@ -1,0 +1,37 @@
+{
+  "family": "pdf",
+  "version": "1.0.0",
+  "last_updated": "2025-11-11",
+  "plugins": [
+    {
+      "id": "document",
+      "name": "Document",
+      "slug": "document",
+      "description": "Core Document class for loading, creating, and manipulating PDF documents",
+      "type": "processor",
+      "patterns": {
+        "format": ["\\bPDF\\b", "\\.pdf\\b"],
+        "api": ["Document\\(", "new Document", "Document\\.Load"],
+        "method": ["Load", "Save", "new"]
+      },
+      "load_formats": ["PDF"],
+      "save_formats": ["PDF", "DOCX", "HTML", "XML"],
+      "capabilities": ["load", "save", "create"],
+      "dependencies": []
+    },
+    {
+      "id": "page",
+      "name": "Page",
+      "slug": "page",
+      "description": "Page manipulation for PDF documents",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["Page\\(", "Pages\\[", "page\\.Paragraphs"],
+        "method": ["AddPage", "DeletePage", "GetPage"]
+      },
+      "capabilities": ["modify", "create"],
+      "dependencies": ["document"]
+    }
+  ]
+}

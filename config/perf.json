@@ -1,0 +1,66 @@
+{
+  "system": {
+    "worker_pool_size": 8,
+    "max_concurrent_workflows": 50,
+    "max_concurrent_validations": 20,
+    "memory_limit_mb": 4096,
+    "enable_gpu": true,
+    "gpu_device_id": 0,
+    "auto_detect_cuda": true
+  },
+  "database": {
+    "connection_pool_size": 20,
+    "connection_timeout": 30,
+    "query_timeout": 10,
+    "enable_wal_mode": true,
+    "cache_size_mb": 256
+  },
+  "cache": {
+    "l1_memory": {
+      "enabled": true,
+      "max_size_mb": 512,
+      "ttl_seconds": 3600,
+      "eviction_policy": "lru"
+    },
+    "l2_persistent": {
+      "enabled": true,
+      "max_size_mb": 2048,
+      "ttl_seconds": 86400,
+      "storage_path": "./data/cache"
+    }
+  },
+  "batch_processing": {
+    "batch_size": 50,
+    "timeout_seconds": 300,
+    "max_retries": 3,
+    "retry_delay_seconds": 5,
+    "enable_progress_tracking": true
+  },
+  "network": {
+    "max_concurrent_requests": 10,
+    "timeout_seconds": 30,
+    "retry_attempts": 3,
+    "retry_backoff_multiplier": 2,
+    "enable_connection_pooling": true
+  },
+  "llm": {
+    "batch_size": 5,
+    "timeout_seconds": 60,
+    "max_concurrent_requests": 3,
+    "enable_streaming": false,
+    "use_gpu_if_available": true
+  },
+  "profiling": {
+    "enabled": false,
+    "sample_rate": 0.01,
+    "track_memory": true,
+    "track_cpu": true,
+    "output_path": "./data/profiles"
+  },
+  "optimization": {
+    "enable_jit_compilation": true,
+    "enable_async_io": true,
+    "enable_multiprocessing": false,
+    "chunk_size_kb": 1024
+  }
+}

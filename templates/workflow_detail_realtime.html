@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+{% block title %}Workflow Details - TBCV{% endblock %}
+{% block content %}
+<div style="margin-bottom: 20px;"><a href="/dashboard/workflows" class="btn btn-secondary">← Back to Workflows</a></div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2>Workflow Details</h2>
+        <div class="connection-status">
+            <span class="status-indicator" id="wsStatus"></span>
+            <span id="wsStatusText">Connecting...</span>
+        </div>
+    </div>
+
+    <div class="detail-grid">
+        <div class="detail-label">ID:</div>
+        <div class="detail-value"><code>{{ workflow.id }}</code></div>
+
+        <div class="detail-label">Type:</div>
+        <div class="detail-value">{{ workflow.type }}</div>
+
+        <div class="detail-label">State:</div>
+        <div class="detail-value"><span class="badge badge-{{ workflow.state }}" id="workflowState">{{ workflow.state }}</span></div>
+
+        <div class="detail-label">Source:</div>
+        <div class="detail-value">{{ workflow.metadata.source if workflow.metadata and workflow.metadata.source else 'Unknown' }}</div>
+
+        <div class="detail-label">Progress:</div>
+        <div class="detail-value">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="flex: 1; background: #e0e0e0; height: 20px; border-radius: 10px; overflow: hidden;">
+                    <div id="progressBar" style="background: #4CAF50; height: 100%; width: {{ workflow.progress_percent or 0 }}%; transition: width 0.3s ease;"></div>
+                </div>
+                <span id="progressPercent">{{ workflow.progress_percent or 0 }}%</span>
+            </div>
+        </div>
+
+        <div class="detail-label">Steps:</div>
+        <div class="detail-value"><span id="currentStep">{{ workflow.current_step or 0 }}</span> / <span id="totalSteps">{{ workflow.total_steps or 0 }}</span></div>
+
+        <div class="detail-label">Created:</div>
+        <div class="detail-value">{{ workflow.created_at }}</div>
+
+        <div class="detail-label" id="completedLabel" style="display: {% if workflow.completed_at %}grid{% else %}none{% endif %}">Completed:</div>
+        <div class="detail-value" id="completedValue" style="display: {% if workflow.completed_at %}block{% else %}none{% endif %}">{{ workflow.completed_at or '' }}</div>
+
+        <div class="detail-label" id="errorLabel" style="display: {% if workflow.error_message %}grid{% else %}none{% endif %}">Error:</div>
+        <div class="detail-value" id="errorValue" style="color: #d32f2f; display: {% if workflow.error_message %}block{% else %}none{% endif %}">{{ workflow.error_message or '' }}</div>
+    </div>
+</div>
+
+{% if validations %}
+<div class="card">
+    <h2>Included Pages (<span id="validationCount">{{ validations|length }}</span>)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>File Path</th>
+                <th>Status</th>
+                <th>Severity</th>
+                <th>Recommendations</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="validationsTable">
+            {% for v in validations %}
+            <tr>
+                <td class="truncate" title="{{ v.file_path }}">{{ v.file_path }}</td>
+                <td><span class="badge badge-{{ v.status }}">{{ v.status }}</span></td>
+                <td>
+                    {% if v.severity %}
+                    <span class="badge badge-{{ v.severity }}">{{ v.severity }}</span>
+                    {% else %}
+                    <span class="badge badge-secondary">N/A</span>
+                    {% endif %}
+                </td>
+                <td>{{ v.recommendations_count if v.recommendations_count else 0 }}</td>
+                <td>
+                    <a href="/dashboard/validations/{{ v.id }}" class="btn btn-primary btn-sm">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state" id="validationsEmpty">
+        <p>No validations found for this workflow. Waiting for workflow to start...</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Toast Container -->
+<div id="toastContainer" class="toast-container"></div>
+
+<script>
+let ws = null;
+const workflowId = '{{ workflow.id }}';
+
+// Toast notification
+function showToast(message, type = 'info', duration = 5000) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type} toast-enter`;
+
+    const icon = {
+        'success': '✓',
+        'error': '✗',
+        'warning': '⚠',
+        'info': 'ℹ'
+    }[type] || 'ℹ';
+
+    toast.innerHTML = `
+        <span class="toast-icon">${icon}</span>
+        <span class="toast-message">${message}</span>
+        <button class="toast-close" onclick="closeToast(this)">&times;</button>
+    `;
+
+    container.appendChild(toast);
+    setTimeout(() => toast.classList.add('toast-show'), 10);
+    setTimeout(() => closeToast(toast.querySelector('.toast-close')), duration);
+}
+
+function closeToast(btn) {
+    const toast = btn.parentElement;
+    toast.classList.remove('toast-show');
+    toast.classList.add('toast-exit');
+    setTimeout(() => toast.remove(), 300);
+}
+
+// Initialize WebSocket for real-time updates
+function initWebSocket() {
+    try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/${workflowId}`;
+
+        console.log('Connecting to workflow WebSocket:', wsUrl);
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function() {
+            console.log('WebSocket connected successfully');
+            updateConnectionStatus(true);
+            showToast('Connected to live workflow updates', 'success', 2000);
+        };
+
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Received workflow update:', data);
+
+                if (data.type === 'heartbeat' || data.type === 'connection_established') {
+                    console.log('WebSocket heartbeat/connection:', data.type);
+                    return;
+                }
+
+                handleWorkflowUpdate(data);
+            } catch (e) {
+                console.error('Error processing WebSocket message:', e);
+            }
+        };
+
+        ws.onclose = function(event) {
+            console.log('WebSocket disconnected:', event.code, event.reason);
+            updateConnectionStatus(false);
+            // Reconnect after 5 seconds
+            setTimeout(initWebSocket, 5000);
+        };
+
+        ws.onerror = function(error) {
+            console.error('WebSocket error:', error);
+            updateConnectionStatus(false);
+        };
+    } catch (error) {
+        console.error('WebSocket init error:', error);
+        updateConnectionStatus(false);
+        setTimeout(initWebSocket, 5000);
+    }
+}
+
+// Update connection status
+function updateConnectionStatus(connected) {
+    const statusIndicator = document.getElementById('wsStatus');
+    const statusText = document.getElementById('wsStatusText');
+
+    if (connected) {
+        statusIndicator.className = 'status-indicator status-connected';
+        statusText.textContent = 'Live';
+    } else {
+        statusIndicator.className = 'status-indicator status-disconnected';
+        statusText.textContent = 'Disconnected';
+    }
+}
+
+// Handle workflow updates
+function handleWorkflowUpdate(data) {
+    const type = data.type || 'unknown';
+
+    console.log('Handling update type:', type, data);
+
+    // Update progress
+    if (data.progress_percent !== undefined) {
+        updateProgress(data.progress_percent);
+    }
+
+    // Update state
+    if (data.status || data.state) {
+        updateState(data.status || data.state);
+    }
+
+    // Update steps
+    if (data.current_step !== undefined || data.total_steps !== undefined) {
+        updateSteps(data.current_step, data.total_steps);
+    }
+
+    // Handle file progress
+    if (type === 'progress_update' && data.data && data.data.file_path) {
+        showToast(`Processing: ${data.data.file_path}`, 'info', 2000);
+        refreshValidations();
+    }
+
+    // Handle completion
+    if (type === 'progress_update' && (data.status === 'completed' || data.state === 'completed')) {
+        showToast('Workflow completed successfully!', 'success');
+        setTimeout(() => location.reload(), 2000);
+    }
+
+    // Handle errors
+    if (type === 'progress_update' && (data.status === 'failed' || data.state === 'failed')) {
+        const errorMsg = data.error || data.data?.error || 'Workflow failed';
+        showToast(errorMsg, 'error');
+        updateError(errorMsg);
+    }
+}
+
+function updateProgress(percent) {
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    if (progressBar && progressPercent) {
+        progressBar.style.width = `${percent}%`;
+        progressPercent.textContent = `${percent}%`;
+    }
+}
+
+function updateState(state) {
+    const stateBadge = document.getElementById('workflowState');
+    if (stateBadge) {
+        stateBadge.className = `badge badge-${state}`;
+        stateBadge.textContent = state;
+    }
+}
+
+function updateSteps(current, total) {
+    if (current !== undefined) {
+        const currentStep = document.getElementById('currentStep');
+        if (currentStep) currentStep.textContent = current;
+    }
+    if (total !== undefined) {
+        const totalSteps = document.getElementById('totalSteps');
+        if (totalSteps) totalSteps.textContent = total;
+    }
+}
+
+function updateError(error) {
+    const errorLabel = document.getElementById('errorLabel');
+    const errorValue = document.getElementById('errorValue');
+    if (errorLabel && errorValue) {
+        errorLabel.style.display = 'grid';
+        errorValue.style.display = 'block';
+        errorValue.textContent = error;
+    }
+}
+
+async function refreshValidations() {
+    try {
+        const response = await fetch(`/api/validations?workflow_id=${workflowId}&limit=1000`);
+        if (response.ok) {
+            const validations = await response.json();
+            const count = document.getElementById('validationCount');
+            if (count) {
+                count.textContent = validations.length;
+            }
+            // Could also update the table here, but for now just refresh count
+        }
+    } catch (error) {
+        console.error('Error refreshing validations:', error);
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initWebSocket();
+
+    // Poll for updates every 30 seconds as fallback
+    setInterval(refreshValidations, 30000);
+});
+</script>
+
+<style>
+/* Reuse styles from dashboard_home_realtime.html */
+.detail-grid {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+.detail-label {
+    font-weight: bold;
+    color: #333;
+}
+
+.detail-value {
+    padding: 5px;
+}
+
+/* Connection Status */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #666;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.status-connected {
+    background: #28a745;
+}
+
+.status-disconnected {
+    background: #dc3545;
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 400px;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    background: white;
+    border-left: 4px solid;
+    opacity: 0;
+    transform: translateX(400px);
+    transition: all 0.3s ease;
+}
+
+.toast-enter {
+    animation: slideIn 0.3s ease forwards;
+}
+
+.toast-show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast-exit {
+    animation: slideOut 0.3s ease forwards;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(400px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideOut {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(400px); }
+}
+
+.toast-success {
+    border-left-color: #28a745;
+    background: #d4edda;
+}
+
+.toast-error {
+    border-left-color: #dc3545;
+    background: #f8d7da;
+}
+
+.toast-warning {
+    border-left-color: #ffc107;
+    background: #fff3cd;
+}
+
+.toast-info {
+    border-left-color: #17a2b8;
+    background: #d1ecf1;
+}
+
+.toast-icon {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.toast-message {
+    flex: 1;
+    font-size: 14px;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.toast-close:hover {
+    opacity: 1;
+}
+</style>
+
+{% endblock %}

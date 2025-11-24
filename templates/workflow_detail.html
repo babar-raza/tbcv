@@ -1,24 +1,109 @@
 {% extends "base.html" %}
 {% block title %}Workflow Details - TBCV{% endblock %}
 {% block content %}
-<div style="margin-bottom: 20px;"><a href="/dashboard/workflows" class="btn btn-secondary">← Back</a></div>
+<div style="margin-bottom: 20px;"><a href="/dashboard/workflows" class="btn btn-secondary">← Back to Workflows</a></div>
+
 <div class="card">
-    <h2>Workflow: {{ workflow.type }}</h2>
+    <h2>Workflow Details</h2>
     <div class="detail-grid">
-        <div class="detail-label">ID:</div><div class="detail-value"><code>{{ workflow.id }}</code></div>
-        <div class="detail-label">State:</div><div class="detail-value"><span class="badge badge-{{ workflow.state }}">{{ workflow.state }}</span></div>
-        <div class="detail-label">Progress:</div><div class="detail-value">{{ workflow.progress_percent }}%</div>
-        <div class="detail-label">Created:</div><div class="detail-value">{{ workflow.created_at }}</div>
+        <div class="detail-label">ID:</div>
+        <div class="detail-value"><code>{{ workflow.id }}</code></div>
+        
+        <div class="detail-label">Type:</div>
+        <div class="detail-value">{{ workflow.type }}</div>
+        
+        <div class="detail-label">State:</div>
+        <div class="detail-value"><span class="badge badge-{{ workflow.state }}">{{ workflow.state }}</span></div>
+        
+        <div class="detail-label">Source:</div>
+        <div class="detail-value">{{ workflow.metadata.source if workflow.metadata and workflow.metadata.source else 'Unknown' }}</div>
+        
+        <div class="detail-label">Progress:</div>
+        <div class="detail-value">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="flex: 1; background: #e0e0e0; height: 20px; border-radius: 10px; overflow: hidden;">
+                    <div style="background: #4CAF50; height: 100%; width: {{ workflow.progress_percent }}%;"></div>
+                </div>
+                <span>{{ workflow.progress_percent }}%</span>
+            </div>
+        </div>
+        
+        <div class="detail-label">Steps:</div>
+        <div class="detail-value">{{ workflow.current_step }} / {{ workflow.total_steps }}</div>
+        
+        <div class="detail-label">Created:</div>
+        <div class="detail-value">{{ workflow.created_at }}</div>
+        
+        {% if workflow.completed_at %}
+        <div class="detail-label">Completed:</div>
+        <div class="detail-value">{{ workflow.completed_at }}</div>
+        {% endif %}
+        
+        {% if workflow.error_message %}
+        <div class="detail-label">Error:</div>
+        <div class="detail-value" style="color: #d32f2f;">{{ workflow.error_message }}</div>
+        {% endif %}
     </div>
 </div>
+
 {% if validations %}
-<div class="card"><h2>Validations ({{ validations|length }})</h2>
-    <table><thead><tr><th>File Path</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-        {% for v in validations %}
-        <tr><td>{{ v.file_path }}</td><td><span class="badge badge-{{ v.status }}">{{ v.status }}</span></td>
-        <td><a href="/dashboard/validations/{{ v.id }}" class="btn btn-primary">View</a></td></tr>
-        {% endfor %}
-    </tbody></table>
+<div class="card">
+    <h2>Included Pages ({{ validations|length }})</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>File Path</th>
+                <th>Status</th>
+                <th>Severity</th>
+                <th>Recommendations</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for v in validations %}
+            <tr>
+                <td class="truncate" title="{{ v.file_path }}">{{ v.file_path }}</td>
+                <td><span class="badge badge-{{ v.status }}">{{ v.status }}</span></td>
+                <td>
+                    {% if v.severity %}
+                    <span class="badge badge-{{ v.severity }}">{{ v.severity }}</span>
+                    {% else %}
+                    <span class="badge badge-secondary">N/A</span>
+                    {% endif %}
+                </td>
+                <td>{{ v.recommendations_count if v.recommendations_count else 0 }}</td>
+                <td>
+                    <a href="/dashboard/validations/{{ v.id }}" class="btn btn-primary btn-sm">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state">
+        <p>No validations found for this workflow</p>
+    </div>
 </div>
 {% endif %}
+
+<style>
+.detail-grid {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+.detail-label {
+    font-weight: bold;
+    color: #333;
+}
+
+.detail-value {
+    padding: 5px;
+}
+</style>
+
 {% endblock %}

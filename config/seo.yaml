@@ -1,0 +1,29 @@
+# SEO Validation Configuration
+# Controls SEO-related validation rules for headings and content structure
+
+seo:
+  # Heading validation rules
+  headings:
+    # H1 requirements
+    h1:
+      required: true  # Document must have at least one H1
+      unique: true  # Only one H1 allowed per document
+      min_length: 20  # Minimum characters for SEO
+      max_length: 70  # Maximum characters for SEO
+      recommended_min: 30
+      recommended_max: 60
+
+    # General heading rules
+    allow_empty_headings: false
+    enforce_hierarchy: true  # No skipping levels (H1 -> H3 invalid)
+    max_depth: 6  # Maximum heading level (H1-H6)
+
+    # Heading order
+    h1_must_be_first: true  # H1 should come before other headings
+
+  # Strictness levels
+  strictness:
+    h1_violations: error  # Missing/multiple H1: error, warning, or info
+    hierarchy_skip: error  # Heading level skip: error, warning, or info
+    empty_heading: warning  # Empty heading: error, warning, or info
+    h1_length: warning  # H1 length outside range: error, warning, or info

@@ -19,10 +19,11 @@ from functools import lru_cache
 try:
     # Preferred: Pydantic Settings
     from pydantic_settings import BaseSettings, SettingsConfigDict
+    from pydantic import Field
 except ImportError:
     try:
         # Pydantic v2 fallback: BaseModel instead of BaseSettings
-        from pydantic import BaseModel
+        from pydantic import BaseModel, Field
 
         class BaseSettings(BaseModel):
             class Config:
@@ -112,8 +113,9 @@ class CacheConfig(BaseSettings):
         compression_enabled: bool = True
         compression_threshold_bytes: int = 1024
 
-    l1: L1Config = L1Config()
-    l2: L2Config = L2Config()
+    # Use Field with default_factory to avoid Pydantic 2.11 nested model validation issues
+    l1: L1Config = Field(default_factory=L1Config)
+    l2: L2Config = Field(default_factory=L2Config)
 
 class ServerConfig(BaseSettings):
     host: str = "localhost"
@@ -165,6 +167,20 @@ class LLMConfig(BaseSettings):
     enabled: bool = True
 
 
+class ValidatorConfig(BaseSettings):
+    """Configuration for individual validator agents."""
+    enabled: bool = True
+
+class ValidatorsConfig(BaseSettings):
+    """Configuration for all validator agents."""
+    seo: ValidatorConfig = Field(default_factory=ValidatorConfig)
+    yaml: ValidatorConfig = Field(default_factory=ValidatorConfig)
+    markdown: ValidatorConfig = Field(default_factory=ValidatorConfig)
+    code: ValidatorConfig = Field(default_factory=ValidatorConfig)
+    links: ValidatorConfig = Field(default_factory=ValidatorConfig)
+    structure: ValidatorConfig = Field(default_factory=ValidatorConfig)
+    truth: ValidatorConfig = Field(default_factory=ValidatorConfig)
+
 class ValidationConfig(BaseSettings):
     """
     Control the multi-stage validation pipeline.
@@ -176,28 +192,30 @@ class ValidationConfig(BaseSettings):
     llm_thresholds: thresholds used to gate heuristic issues when LLM is available.
     """
     mode: str = "two_stage"
-    llm_thresholds: ValidationLLMThresholds = ValidationLLMThresholds()
+    llm_thresholds: ValidationLLMThresholds = Field(default_factory=ValidationLLMThresholds)
 
 
 class TBCVSettings(BaseSettings):
     """Top-level settings composed of nested config models."""
     model_config = SettingsConfigDict(env_prefix="TBCV_", case_sensitive=False, env_file=".env")
 
-    system: SystemConfig = SystemConfig()
-    server: ServerConfig = ServerConfig()
-    cache: CacheConfig = CacheConfig()
-    performance: PerformanceConfig = PerformanceConfig()
+    system: SystemConfig = Field(default_factory=SystemConfig)
+    server: ServerConfig = Field(default_factory=ServerConfig)
+    cache: CacheConfig = Field(default_factory=CacheConfig)
+    performance: PerformanceConfig = Field(default_factory=PerformanceConfig)
 
-    fuzzy_detector: FuzzyDetectorConfig = FuzzyDetectorConfig()
-    content_validator: ContentValidatorConfig = ContentValidatorConfig()
-    content_enhancer: ContentEnhancerConfig = ContentEnhancerConfig()
-    orchestrator: OrchestratorConfig = OrchestratorConfig()
-    truth_manager: TruthManagerConfig = TruthManagerConfig()
+    fuzzy_detector: FuzzyDetectorConfig = Field(default_factory=FuzzyDetectorConfig)
+    content_validator: ContentValidatorConfig = Field(default_factory=ContentValidatorConfig)
+    content_enhancer: ContentEnhancerConfig = Field(default_factory=ContentEnhancerConfig)
+    orchestrator: OrchestratorConfig = Field(default_factory=OrchestratorConfig)
+    truth_manager: TruthManagerConfig = Field(default_factory=TruthManagerConfig)
 
     # Global LLM settings (enable/disable)
-    llm: LLMConfig = LLMConfig()
+    llm: LLMConfig = Field(default_factory=LLMConfig)
     # Validation pipeline settings
-    validation: ValidationConfig = ValidationConfig()
+    validation: ValidationConfig = Field(default_factory=ValidationConfig)
+    # Validator agents configuration
+    validators: ValidatorsConfig = Field(default_factory=ValidatorsConfig)
 
     truth_default_family: str = "words"
     truth_files: Dict[str, str] = {

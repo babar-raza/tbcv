@@ -215,7 +215,14 @@ def setup_logging() -> None:
         file_handler.setFormatter(formatter)
         logging.getLogger().addHandler(file_handler)
 
-    # Console handler (stdout)
+    # Console handler (stdout) with UTF-8 encoding to handle Unicode characters
+    # Reconfigure stdout to use UTF-8 encoding (fixes Windows cp1252 issues)
+    if hasattr(sys.stdout, 'reconfigure'):
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except Exception:
+            pass  # Ignore if reconfigure not available
+
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
     logging.getLogger().addHandler(console_handler)

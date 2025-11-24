@@ -184,13 +184,62 @@ class ContentEnhancerAgent(BaseAgent):
                 enhancements += fixes
                 stats["format_fixes_applied"] = len(fixes)
 
-            stats["enhanced_length"] = len(enhanced_content)
+            # --------------------------------------------------------------
+            # Gating logic: enforce rewrite ratio and blocked topics
+            # --------------------------------------------------------------
+            original_length = max(len(content), 1)
+            enhanced_length = len(enhanced_content)
+            rewrite_ratio = abs(enhanced_length - original_length) / float(original_length)
+            stats["enhanced_length"] = enhanced_length
             stats["total_enhancements"] = len(enhancements)
             stats["unique_plugins_linked"] = len(self.linked_plugins)
+            stats["rewrite_ratio"] = rewrite_ratio
 
+            # Retrieve thresholds and blocked topics from settings
+            try:
+                threshold = float(getattr(self.settings.content_enhancer, "rewrite_ratio_threshold", 0.3))
+            except Exception:
+                threshold = 0.3
+            try:
+                blocked_topics = getattr(self.settings.content_enhancer, "blocked_topics", []) or []
+            except Exception:
+                blocked_topics = []
+
+            # Check for blocked phrases in enhanced content (case-insensitive)
+            found_blocked: List[str] = []
+            for phrase in blocked_topics:
+                if phrase and re.search(re.escape(phrase), enhanced_content, flags=re.IGNORECASE):
+                    found_blocked.append(phrase)
+
+            # Determine gating conditions
+            rewrite_exceeded = rewrite_ratio > threshold
+            if found_blocked:
+                stats["blocked_topics_found"] = found_blocked
+            stats["rewrite_ratio_exceeded"] = rewrite_exceeded
+
+            # If gating triggered and not forced preview
+            if rewrite_exceeded or found_blocked:
+                # Flag gating status and return original content without applying enhancements
+                result_dict = {
+                    "enhanced_content": content,
+                    "enhancements": [],
+                    "statistics": stats,
+                    "status": "gated",
+                }
+                if rewrite_exceeded:
+                    result_dict["reason"] = f"Rewrite ratio {rewrite_ratio:.3f} exceeds threshold {threshold:.3f}"
+                else:
+                    result_dict["reason"] = f"Blocked topic(s) detected: {', '.join(found_blocked)}"
+                perf.add_context(total=0, change=0)
+                return result_dict
+
+            # Otherwise return enhanced content as usual
             result = EnhancementResult(enhanced_content, enhancements, stats)
-            perf.add_context(total=len(enhancements), change=len(enhanced_content) - len(content))
-            return result.to_dict()
+            perf.add_context(total=len(enhancements), change=enhanced_length - original_length)
+            # Add a success status for clarity
+            result_dict = result.to_dict()
+            result_dict["status"] = "success"
+            return result_dict
 
     async def handle_add_plugin_links(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -412,6 +461,195 @@ class ContentEnhancerAgent(BaseAgent):
             if start <= position <= end:
                 return (start, end, body)
         return None
+
+    async def enhance_from_recommendations(
+        self,
+        content: str,
+        recommendations: List[Dict[str, Any]],
+        file_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Apply approved recommendations to content.
+        
+        Args:
+            content: Original content to enhance
+            recommendations: List of approved recommendation dicts
+            file_path: Optional file path for context
+            
+        Returns:
+            {
+                "enhanced_content": str,
+                "applied_recommendations": List[str],  # IDs of applied recommendations
+                "skipped_recommendations": List[Dict],  # {id, reason}
+                "diff": str,
+                "statistics": Dict
+            }
+        """
+        from core.database import db_manager
+        import difflib
+        
+        enhanced_content = content
+        applied = []
+        skipped = []
+        changes_made = []
+        
+        # Sort recommendations by confidence (highest first)
+        sorted_recs = sorted(
+            recommendations,
+            key=lambda r: r.get("confidence", 0),
+            reverse=True
+        )
+        
+        for rec in sorted_recs:
+            rec_id = rec.get("id")
+            instruction = rec.get("instruction", "")
+            scope = rec.get("scope", "global")
+            severity = rec.get("severity", "medium")
+            
+            try:
+                if not instruction:
+                    skipped.append({"id": rec_id, "reason": "No instruction provided"})
+                    continue
+                
+                # Apply recommendation based on instruction patterns
+                applied_change = False
+                change_description = ""
+                
+                # Pattern: Add field to YAML frontmatter
+                if "frontmatter" in scope.lower() and "add" in instruction.lower():
+                    # Extract field name from instruction
+                    field_match = re.search(r"add.*?field.*?['\"]([^'\"]+)['\"]", instruction, re.IGNORECASE)
+                    if field_match:
+                        field_name = field_match.group(1)
+                        # Check if content has YAML frontmatter
+                        if enhanced_content.startswith("---"):
+                            parts = enhanced_content.split("---", 2)
+                            if len(parts) >= 3:
+                                frontmatter = parts[1]
+                                # Add field if not present
+                                if field_name not in frontmatter:
+                                    # Add at end of frontmatter
+                                    new_frontmatter = frontmatter.rstrip() + f"\n{field_name}: # TODO: Add value\n"
+                                    enhanced_content = f"---{new_frontmatter}---{parts[2]}"
+                                    applied_change = True
+                                    change_description = f"Added '{field_name}' field to frontmatter"
+                
+                # Pattern: Fix heading hierarchy
+                elif "heading" in instruction.lower() and ("hierarchy" in instruction.lower() or "sequential" in instruction.lower()):
+                    lines = enhanced_content.split("\n")
+                    fixed_lines = []
+                    prev_level = 0
+                    changes_in_headings = False
+                    
+                    for line in lines:
+                        if line.startswith("#"):
+                            # Count heading level
+                            level = len(line) - len(line.lstrip("#"))
+                            # Check if skips levels
+                            if prev_level > 0 and level > prev_level + 1:
+                                # Fix by reducing level
+                                new_level = prev_level + 1
+                                fixed_line = "#" * new_level + line[level:]
+                                fixed_lines.append(fixed_line)
+                                changes_in_headings = True
+                            else:
+                                fixed_lines.append(line)
+                            prev_level = level
+                        else:
+                            fixed_lines.append(line)
+                    
+                    if changes_in_headings:
+                        enhanced_content = "\n".join(fixed_lines)
+                        applied_change = True
+                        change_description = "Fixed heading hierarchy"
+                
+                # Pattern: Add language to code blocks
+                elif "code" in scope.lower() and "language" in instruction.lower():
+                    # Find code blocks without language identifiers
+                    pattern = r"```\n([\s\S]*?)\n```"
+                    
+                    def add_language(match):
+                        code = match.group(1)
+                        # Try to detect language from content
+                        if "using" in code and "namespace" in code:
+                            lang = "csharp"
+                        elif "def " in code and ":" in code:
+                            lang = "python"
+                        elif "function" in code or "var " in code or "const " in code:
+                            lang = "javascript"
+                        else:
+                            lang = "text"  # Default fallback
+                        return f"```{lang}\n{code}\n```"
+                    
+                    new_content = re.sub(pattern, add_language, enhanced_content)
+                    if new_content != enhanced_content:
+                        enhanced_content = new_content
+                        applied_change = True
+                        change_description = "Added language identifiers to code blocks"
+                
+                # Pattern: Fix/remove broken links
+                elif "link" in scope.lower() or "url" in scope.lower():
+                    if "fix" in instruction.lower() or "remove" in instruction.lower():
+                        # Extract URL from recommendation
+                        url_match = re.search(r"https?://[^\s]+", instruction)
+                        if url_match:
+                            broken_url = url_match.group(0)
+                            # Remove broken link
+                            enhanced_content = enhanced_content.replace(f"[{broken_url}]", "")
+                            enhanced_content = enhanced_content.replace(f"({broken_url})", "")
+                            applied_change = True
+                            change_description = f"Removed broken link: {broken_url}"
+                
+                # Pattern: Replace terminology
+                elif rec.get("found") and rec.get("expected"):
+                    incorrect = rec["found"]
+                    correct = rec["expected"]
+                    if incorrect in enhanced_content:
+                        enhanced_content = enhanced_content.replace(incorrect, correct)
+                        applied_change = True
+                        change_description = f"Replaced '{incorrect}' with '{correct}'"
+                
+                if applied_change:
+                    applied.append(rec_id)
+                    changes_made.append(change_description)
+                    # Mark recommendation as actioned in database
+                    try:
+                        db_manager.mark_recommendation_applied(rec_id, applied_by="content_enhancer")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to mark recommendation {rec_id} as applied: {e}")
+                else:
+                    skipped.append({
+                        "id": rec_id,
+                        "reason": "Pattern not matched - manual review recommended"
+                    })
+                
+            except Exception as e:
+                self.logger.error(f"Failed to apply recommendation {rec_id}: {e}")
+                skipped.append({"id": rec_id, "reason": f"Error: {str(e)}"})
+        
+        # Calculate diff (unified diff format)
+        diff_lines = list(difflib.unified_diff(
+            content.splitlines(keepends=True),
+            enhanced_content.splitlines(keepends=True),
+            fromfile='original',
+            tofile='enhanced',
+            lineterm=''
+        ))
+        diff = "".join(diff_lines) if diff_lines else "No changes"
+        
+        return {
+            "enhanced_content": enhanced_content,
+            "applied_recommendations": applied,
+            "skipped_recommendations": skipped,
+            "diff": diff,
+            "statistics": {
+                "total_recommendations": len(recommendations),
+                "applied": len(applied),
+                "skipped": len(skipped),
+                "changes_made": len(diff_lines) > 0,
+                "change_descriptions": changes_made,
+            }
+        }
 
 
 # =======================================================

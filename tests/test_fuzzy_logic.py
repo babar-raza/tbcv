@@ -13,16 +13,16 @@ from agents.base import agent_registry
 
 
 @pytest.fixture
-async def setup_agents():
+def setup_agents():
     """Setup validator and fuzzy detector agents"""
     fuzzy_detector = FuzzyDetectorAgent("fuzzy_detector")
     agent_registry.register_agent(fuzzy_detector)
-    
+
     validator = ContentValidatorAgent("content_validator")
     agent_registry.register_agent(validator)
-    
+
     yield validator, fuzzy_detector
-    
+
     agent_registry.unregister_agent("fuzzy_detector")
     agent_registry.unregister_agent("content_validator")
 

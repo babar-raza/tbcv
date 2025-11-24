@@ -14,13 +14,13 @@ from agents.base import agent_registry
 
 
 @pytest.fixture
-async def setup_validator():
+def setup_validator():
     """Setup validator agent"""
     validator = ContentValidatorAgent("content_validator")
     agent_registry.register_agent(validator)
-    
+
     yield validator
-    
+
     agent_registry.unregister_agent("content_validator")
 
 
@@ -85,6 +85,7 @@ async def test_cli_web_enhancement_parity(setup_validator):
 async def test_validation_types_consistency():
     """Test that validation types work the same in CLI and Web"""
     validator = ContentValidatorAgent("test_validator")
+    agent_registry.register_agent(validator)
     
     # Test all validation types
     validation_types = ["yaml", "markdown", "code", "links", "structure", "Truth", "FuzzyLogic"]
@@ -105,8 +106,9 @@ async def test_validation_types_consistency():
 async def test_mcp_endpoint_consistency():
     """Test that MCP endpoints work consistently"""
     from agents.content_validator import ContentValidatorAgent
-    
+
     validator = ContentValidatorAgent("test_mcp")
+    agent_registry.register_agent(validator)
     
     # Test MCP message handlers
     handlers = [

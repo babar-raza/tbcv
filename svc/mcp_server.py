@@ -6,7 +6,7 @@ Provides a JSON-RPC interface for validation operations.
 import json
 import sys
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
 import asyncio
@@ -121,7 +121,7 @@ class MCPServer:
                     db_record = session.query(ValidationResult).filter(ValidationResult.id == validation_id).first()
                     if db_record:
                         db_record.status = ValidationStatus.APPROVED
-                        db_record.updated_at = datetime.utcnow()
+                        db_record.updated_at = datetime.now(timezone.utc)
                         session.commit()
                         approved_count += 1
                     else:
@@ -163,7 +163,7 @@ class MCPServer:
                     db_record = session.query(ValidationResult).filter(ValidationResult.id == validation_id).first()
                     if db_record:
                         db_record.status = ValidationStatus.REJECTED
-                        db_record.updated_at = datetime.utcnow()
+                        db_record.updated_at = datetime.now(timezone.utc)
                         session.commit()
                         rejected_count += 1
                     else:
@@ -240,7 +240,7 @@ Original content:
 {content}
 Enhanced content:"""
                 # Call Ollama for enhancement
-                from core.ollama import chat
+                from core.ollama import get_ollama_client
                 try:
                     messages = [
                         {"role": "system", "content": "You are a technical writing assistant. Enhance markdown documents while preserving their structure and meaning."},
@@ -248,16 +248,18 @@ Enhanced content:"""
                     ]
                     # Get model from environment or use default
                     import os
-                    model = os.getenv("OLLAMA_MODEL", "llama2")
-                    response = chat(model, messages)
-                    enhanced_content = response.strip()
+                    model = os.getenv("OLLAMA_MODEL", "llama2:7b")
+                    client = get_ollama_client()
+                    response_dict = client.chat(model, messages)
+                    # Extract message content from response
+                    enhanced_content = response_dict.get("message", {}).get("content", "").strip()
                     # Write enhanced content atomically
                     write_text_crlf(file_path, enhanced_content, atomic=True)
                     # Create audit log entry
                     audit_entry = {
                         "validation_id": validation_id,
                         "action": "enhance",
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                         "original_size": len(original_content),
                         "enhanced_size": len(enhanced_content),
                         "model_used": model
@@ -267,7 +269,7 @@ Enhanced content:"""
                         db_record = session.query(ValidationResult).filter(ValidationResult.id == validation_id).first()
                         if db_record:
                             db_record.status = ValidationStatus.ENHANCED
-                            db_record.updated_at = datetime.utcnow()
+                            db_record.updated_at = datetime.now(timezone.utc)
                             # Store enhancement details in notes
                             current_notes = db_record.notes or ""
                             db_record.notes = f"{current_notes}\n\nEnhanced: {audit_entry}"

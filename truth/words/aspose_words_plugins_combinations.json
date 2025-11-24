@@ -1,0 +1,83 @@
+{
+  "family": "words",
+  "version": "1.0.0",
+  "combinations": [
+    {
+      "name": "document_to_pdf",
+      "plugins": ["word_processor", "pdf_converter"],
+      "trigger_patterns": ["\\.Save\\(.*Pdf", "SaveFormat\\.Pdf", "PdfSaveOptions"],
+      "confidence_boost": 0.15,
+      "required_all": true
+    },
+    {
+      "name": "document_builder_table",
+      "plugins": ["word_processor", "document_builder", "table_builder"],
+      "trigger_patterns": ["StartTable", "InsertCell", "EndTable"],
+      "confidence_boost": 0.1,
+      "required_all": false
+    },
+    {
+      "name": "mail_merge_fields",
+      "plugins": ["word_processor", "mail_merge", "field_manager"],
+      "trigger_patterns": ["MailMerge\\.Execute", "InsertField", "MERGEFIELD"],
+      "confidence_boost": 0.12,
+      "required_all": false
+    },
+    {
+      "name": "document_to_html",
+      "plugins": ["word_processor", "html_converter"],
+      "trigger_patterns": ["\\.Save\\(.*Html", "SaveFormat\\.Html", "HtmlSaveOptions"],
+      "confidence_boost": 0.15,
+      "required_all": true
+    },
+    {
+      "name": "image_insertion",
+      "plugins": ["word_processor", "document_builder", "image_handler"],
+      "trigger_patterns": ["InsertImage", "Shape\\(", "DrawingML"],
+      "confidence_boost": 0.1,
+      "required_all": false
+    },
+    {
+      "name": "styled_document_building",
+      "plugins": ["word_processor", "document_builder", "style_manager"],
+      "trigger_patterns": ["DocumentBuilder", "Style\\(", "ParagraphFormat"],
+      "confidence_boost": 0.08,
+      "required_all": false
+    },
+    {
+      "name": "find_replace_bookmarks",
+      "plugins": ["word_processor", "find_replace", "bookmark_manager"],
+      "trigger_patterns": ["Range\\.Replace", "Bookmark", "StartBookmark"],
+      "confidence_boost": 0.09,
+      "required_all": false
+    },
+    {
+      "name": "header_footer_setup",
+      "plugins": ["word_processor", "document_builder", "header_footer"],
+      "trigger_patterns": ["HeaderFooter", "MoveToHeaderFooter", "Section\\.HeadersFooters"],
+      "confidence_boost": 0.1,
+      "required_all": false
+    },
+    {
+      "name": "page_setup_margins",
+      "plugins": ["word_processor", "page_setup"],
+      "trigger_patterns": ["PageSetup\\.", "Margins", "Orientation"],
+      "confidence_boost": 0.08,
+      "required_all": true
+    },
+    {
+      "name": "document_comparison",
+      "plugins": ["word_processor", "compare_documents"],
+      "trigger_patterns": ["Document\\.Compare", "\\.Compare\\("],
+      "confidence_boost": 0.15,
+      "required_all": true
+    },
+    {
+      "name": "digital_signing",
+      "plugins": ["word_processor", "digital_signature"],
+      "trigger_patterns": ["DigitalSignature", "Sign\\(", "Certificate"],
+      "confidence_boost": 0.15,
+      "required_all": true
+    }
+  ]
+}

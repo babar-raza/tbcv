@@ -1,0 +1,430 @@
+{
+  "file_path": "test_enhancement_article.md",
+  "family": "words",
+  "validation_mode": "two_stage",
+  "llm_enabled": true,
+  "plugin_detection": {
+    "detections": [
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Words",
+        "context": "---\ntitle: Getting Started with Apose.Words\nfamily: Words\n---\n\n# Getting Started with Apose.Words\n\nThis guide will help you get started with Aspose.Word for .NET.\n\n#### Installation Steps\n\nYou can install Apose.Words using NuGet Package Manage",
+        "position": 38,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Words",
+        "context": "---\ntitle: Getting Started with Apose.Words\nfamily: Words\n---\n\n# Getting Started with Apose.Words\n\nThis guide will help you get started with Aspose.Word for .NET.\n\n#### Installation Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstal",
+        "position": 52,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Words",
+        "context": "---\ntitle: Getting Started with Apose.Words\nfamily: Words\n---\n\n# Getting Started with Apose.Words\n\nThis guide will help you get started with Aspose.Word for .NET.\n\n#### Installation Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Us",
+        "position": 92,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 0.7111111111111111,
+        "detection_type": "fuzzy",
+        "matched_text": "Word",
+        "context": "---\ntitle: Getting Started with Apose.Words\nfamily: Words\n---\n\n# Getting Started with Apose.Words\n\nThis guide will help you get started with Aspose.Word for .NET.\n\n#### Installation Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspos",
+        "position": 148,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Words",
+        "context": "Getting Started with Apose.Words\nfamily: Words\n---\n\n# Getting Started with Apose.Words\n\nThis guide will help you get started with Aspose.Word for .NET.\n\n#### Installation Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder buil",
+        "position": 211,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Words",
+        "context": "tarted with Apose.Words\n\nThis guide will help you get started with Aspose.Word for .NET.\n\n#### Installation Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\")",
+        "position": 274,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "document",
+        "context": "ted with Aspose.Word for .NET.\n\n#### Installation Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.",
+        "position": 332,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 0.7111111111111111,
+        "detection_type": "fuzzy",
+        "matched_text": "Word",
+        "context": "or .NET.\n\n#### Installation Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many",
+        "position": 354,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Document",
+        "context": "### Installation Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced featu",
+        "position": 365,
+        "family": "words"
+      },
+      {
+        "plugin_id": "unknown_document_creation",
+        "plugin_name": "Document Creation",
+        "confidence": 0.8,
+        "detection_type": "regex",
+        "matched_text": "Document doc =",
+        "context": "### Installation Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features fo",
+        "position": 365,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "new",
+        "context": "n Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for do",
+        "position": 380,
+        "family": "words"
+      },
+      {
+        "plugin_id": "unknown_document_creation",
+        "plugin_name": "Document Creation",
+        "confidence": 0.8,
+        "detection_type": "regex",
+        "matched_text": "new Document(",
+        "context": "n Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document man",
+        "position": 380,
+        "family": "words"
+      },
+      {
+        "plugin_id": "unknown_load_operations",
+        "plugin_name": "Load Operations",
+        "confidence": 0.8,
+        "detection_type": "regex",
+        "matched_text": "new Document(",
+        "context": "n Steps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document man",
+        "position": 380,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Document",
+        "context": "eps\n\nYou can install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document ma",
+        "position": 384,
+        "family": "words"
+      },
+      {
+        "plugin_id": "unknown_document_builder",
+        "plugin_name": "Document Builder",
+        "confidence": 0.8,
+        "detection_type": "regex",
+        "matched_text": "DocumentBuilder",
+        "context": " install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation includin",
+        "position": 396,
+        "family": "words"
+      },
+      {
+        "plugin_id": "document_builder",
+        "plugin_name": "DocumentBuilder",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "DocumentBuilder",
+        "context": " install Apose.Words using NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation includin",
+        "position": 396,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "new",
+        "context": " NuGet Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail mer",
+        "position": 422,
+        "family": "words"
+      },
+      {
+        "plugin_id": "unknown_document_builder",
+        "plugin_name": "Document Builder",
+        "confidence": 0.8,
+        "detection_type": "regex",
+        "matched_text": "DocumentBuilder",
+        "context": "et Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality",
+        "position": 426,
+        "family": "words"
+      },
+      {
+        "plugin_id": "document_builder",
+        "plugin_name": "DocumentBuilder",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "DocumentBuilder",
+        "context": "et Package Manager.\n\n```\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality",
+        "position": 426,
+        "family": "words"
+      },
+      {
+        "plugin_id": "unknown_document_builder",
+        "plugin_name": "Document Builder",
+        "confidence": 0.8,
+        "detection_type": "regex",
+        "matched_text": "builder.",
+        "context": "``\nInstall-Package Aspose.Words\n```\n\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document con",
+        "position": 448,
+        "family": "words"
+      },
+      {
+        "plugin_id": "unknown_save_operations",
+        "plugin_name": "Word Processor",
+        "confidence": 0.8,
+        "detection_type": "regex",
+        "matched_text": ".Save(",
+        "context": "\n### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document conversion\n- Working with tables and ",
+        "position": 484,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Save",
+        "context": "### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document conversion\n- Working with tables and",
+        "position": 485,
+        "family": "words"
+      },
+      {
+        "plugin_id": "html_converter",
+        "plugin_name": "HtmlSaveOptions",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Save",
+        "context": "### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document conversion\n- Working with tables and",
+        "position": 485,
+        "family": "words"
+      },
+      {
+        "plugin_id": "pdf_converter",
+        "plugin_name": "PdfSaveOptions",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Save",
+        "context": "### Basic Usage\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document conversion\n- Working with tables and",
+        "position": 485,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 0.7111111111111111,
+        "detection_type": "fuzzy",
+        "matched_text": "docx",
+        "context": "ge\n\nHere's how to create a simple document using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document conversion\n- Working with tables and images\n",
+        "position": 498,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 0.7111111111111111,
+        "detection_type": "fuzzy",
+        "matched_text": "Word",
+        "context": " using Aspose.Word:\n\n```\nDocument doc = new Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document conversion\n- Working with tables and images\n",
+        "position": 540,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "document",
+        "context": "ew Document();\nDocumentBuilder builder = new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document conversion\n- Working with tables and images\n",
+        "position": 581,
+        "family": "words"
+      },
+      {
+        "plugin_id": "mail_merge",
+        "plugin_name": "MailMerge",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "merge",
+        "context": "new DocumentBuilder(doc);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document conversion\n- Working with tables and images\n",
+        "position": 622,
+        "family": "words"
+      },
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Document",
+        "confidence": 1.0,
+        "detection_type": "exact",
+        "matched_text": "Document",
+        "context": "c);\nbuilder.Writeln(\"Hello World!\");\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document conversion\n- Working with tables and images\n",
+        "position": 644,
+        "family": "words"
+      },
+      {
+        "plugin_id": "table_builder",
+        "plugin_name": "Table",
+        "confidence": 0.7272727272727273,
+        "detection_type": "fuzzy",
+        "matched_text": "tables",
+        "context": ";\ndoc.Save(\"output.docx\");\n```\n\n## Advanced Features\n\nAspose.Word provides many advanced features for document manipulation including:\n\n- Mail merge functionality\n- Document conversion\n- Working with tables and images\n",
+        "position": 679,
+        "family": "words"
+      }
+    ],
+    "detection_count": 30,
+    "plugin_confidences": {
+      "word_processor": 1.0,
+      "unknown_document_creation": 0.96,
+      "unknown_load_operations": 0.8,
+      "unknown_document_builder": 0.992,
+      "document_builder": 1.0,
+      "unknown_save_operations": 0.8,
+      "html_converter": 1.0,
+      "pdf_converter": 1.0,
+      "mail_merge": 1.0,
+      "table_builder": 0.7273
+    },
+    "confidence": 1.0,
+    "family": "words"
+  },
+  "content_validation": {
+    "confidence": 0.0,
+    "issues": [],
+    "routing_info": {
+      "yaml": "legacy_fallback",
+      "markdown": "legacy_fallback",
+      "code": "legacy_fallback",
+      "links": "legacy_fallback",
+      "structure": "legacy_fallback",
+      "Truth": "legacy_fallback",
+      "FuzzyLogic": "error"
+    },
+    "yaml_validation": {
+      "used_legacy": true
+    },
+    "markdown_validation": {
+      "used_legacy": true
+    },
+    "code_validation": {
+      "used_legacy": true
+    },
+    "links_validation": {
+      "used_legacy": true
+    },
+    "structure_validation": {
+      "used_legacy": true
+    },
+    "Truth_validation": {
+      "used_legacy": true
+    },
+    "FuzzyLogic_validation": {
+      "error": "'FuzzyDetectorAgent' object has no attribute 'validate'",
+      "used_legacy": false
+    }
+  },
+  "llm_validation": {
+    "requirements": [
+      {
+        "plugin_id": "word_processor",
+        "plugin_name": "Word Processor",
+        "confidence": 0.95,
+        "detection_type": "llm_verified",
+        "reasoning": "Content shows loading .docx files",
+        "validation_status": "mentioned_correctly",
+        "matched_context": "The article explains loading .docx files",
+        "recommendation": null
+      },
+      {
+        "plugin_id": "document_converter",
+        "plugin_name": "Document Converter",
+        "confidence": 0.9,
+        "detection_type": "llm_missing",
+        "reasoning": "DOCX to PDF conversion requires Document Converter",
+        "validation_status": "missing_required",
+        "matched_context": null,
+        "recommendation": {
+          "type": "add_plugin_mention",
+          "severity": "high",
+          "message": "Document Converter plugin is required but not mentioned",
+          "suggested_addition": "This conversion requires Document Converter plugin",
+          "location": "prerequisites_section"
+        }
+      }
+    ],
+    "issues": [
+      {
+        "level": "high",
+        "category": "missing_plugin",
+        "message": "Document Converter plugin is required but not mentioned",
+        "plugin_id": "document_converter",
+        "auto_fixable": true,
+        "fix_suggestion": "This conversion requires Document Converter plugin"
+      },
+      {
+        "level": "warning",
+        "category": "incorrect_plugin",
+        "message": "Detected 'words_save_operations' is not a real plugin",
+        "fix_suggestion": "Should be 'Word Processor'",
+        "auto_fixable": false
+      }
+    ],
+    "confidence": 0.925
+  },
+  "gating_score": 0.925,
+  "final_issues": [
+    {
+      "level": "high",
+      "category": "missing_plugin",
+      "message": "Document Converter plugin is required but not mentioned",
+      "plugin_id": "document_converter",
+      "auto_fixable": true,
+      "fix_suggestion": "This conversion requires Document Converter plugin",
+      "source_stage": "llm"
+    },
+    {
+      "level": "warning",
+      "category": "incorrect_plugin",
+      "message": "Detected 'words_save_operations' is not a real plugin",
+      "fix_suggestion": "Should be 'Word Processor'",
+      "auto_fixable": false,
+      "source_stage": "llm"
+    }
+  ],
+  "overall_confidence": 0.7125,
+  "status": "success"
+}

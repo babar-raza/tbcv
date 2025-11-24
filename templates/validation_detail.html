@@ -60,6 +60,78 @@
     </div>
     {% endif %}
     
+        
+    <!-- Enhancement Comparison for Enhanced Validations -->
+    {% if validation.status == 'enhanced' %}
+    <div style="margin-top: 20px;" id="enhancementSection">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0;">Enhancement Comparison</h3>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary" onclick="loadEnhancementComparison('side-by-side')">Side-by-Side View</button>
+                <button class="btn btn-secondary" onclick="loadEnhancementComparison('unified')">Unified Diff</button>
+            </div>
+        </div>
+
+        <!-- Statistics Card -->
+        <div id="enhancementStats" style="display: none; margin-bottom: 20px;">
+            <div class="card" style="background: #f8f9fa; padding: 15px;">
+                <h4 style="margin: 0 0 10px 0;">Enhancement Statistics</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                    <div>
+                        <div style="font-size: 12px; color: #666;">Lines Added</div>
+                        <div id="stat-added" style="font-size: 24px; font-weight: bold; color: #28a745;">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: #666;">Lines Removed</div>
+                        <div id="stat-removed" style="font-size: 24px; font-weight: bold; color: #dc3545;">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: #666;">Lines Modified</div>
+                        <div id="stat-modified" style="font-size: 24px; font-weight: bold; color: #ffc107;">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: #666;">Recommendations Applied</div>
+                        <div id="stat-recs" style="font-size: 24px; font-weight: bold; color: #17a2b8;">0/0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Side-by-Side Comparison View -->
+        <div id="sideBySideView" style="display: none;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                <div>
+                    <h4 style="margin: 0 0 10px 0; color: #333;">Original Content</h4>
+                </div>
+                <div>
+                    <h4 style="margin: 0 0 10px 0; color: #333;">Enhanced Content</h4>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border: 1px solid #ddd; border-radius: 5px; overflow: hidden;">
+                <div id="originalContent" style="background: #fff; padding: 15px; overflow-y: auto; max-height: 600px; border-right: 1px solid #ddd; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6;">
+                    Loading...
+                </div>
+                <div id="enhancedContent" style="background: #fff; padding: 15px; overflow-y: auto; max-height: 600px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6;">
+                    Loading...
+                </div>
+            </div>
+        </div>
+
+        <!-- Unified Diff View -->
+        <div id="unifiedView" style="display: none;">
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto;">
+                <pre id="unifiedDiffContent" style="margin: 0; white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6;"></pre>
+            </div>
+        </div>
+
+        <!-- Applied Recommendations -->
+        <div id="appliedRecommendations" style="display: none; margin-top: 20px;">
+            <h4 style="margin-bottom: 10px;">Applied Recommendations</h4>
+            <div id="recsList"></div>
+        </div>
+    </div>
+    {% endif %}
+    
     {% if validation.validation_results %}
     <div style="margin-top: 20px;">
         <h3 style="margin-bottom: 10px;">Validation Results</h3>
@@ -70,15 +142,34 @@
 
 <!-- Recommendations -->
 <div class="card">
-    <h2>Recommendations ({{ recommendations|length }})</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2>Recommendations ({{ recommendations|length }})</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="rebuildRecommendations()">Rebuild</button>
+            {% if recommendations %}
+            <button class="btn btn-warning" onclick="enhanceSelected()">Enhance Selected</button>
+            {% endif %}
+        </div>
+    </div>
+    
     {% if recommendations %}
+    <div style="margin-bottom: 15px;">
+        <label>
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
+            Select All
+        </label>
+    </div>
+    
     <table>
         <thead>
             <tr>
+                <th style="width: 40px;">
+                    <input type="checkbox" disabled>
+                </th>
                 <th>Title</th>
                 <th>Type</th>
                 <th>Status</th>
-                <th>Priority</th>
+                <th>Target</th>
                 <th>Confidence</th>
                 <th>Actions</th>
             </tr>
@@ -86,13 +177,20 @@
         <tbody>
             {% for rec in recommendations %}
             <tr>
-                <td class="truncate">{{ rec.title }}</td>
+                <td>
+                    <input type="checkbox" class="rec-checkbox" value="{{ rec.id }}" 
+                           {% if rec.status == 'accepted' %}checked{% endif %}>
+                </td>
+                <td class="truncate" title="{{ rec.title }}">{{ rec.title }}</td>
                 <td><span class="badge badge-secondary">{{ rec.type }}</span></td>
                 <td><span class="badge badge-{{ rec.status }}">{{ rec.status }}</span></td>
-                <td><span class="badge badge-warning">{{ rec.priority }}</span></td>
-                <td>{{ "%.1f"|format(rec.confidence * 100) }}%</td>
+                <td class="truncate" title="{{ rec.metadata.target.selector if rec.metadata and rec.metadata.target else 'N/A' }}">
+                    {{ rec.metadata.target.selector if rec.metadata and rec.metadata.target else 'N/A' }}
+                </td>
+                <td>{{ "%.0f"|format(rec.confidence * 100) }}%</td>
                 <td class="actions">
-                    <a href="/dashboard/recommendations/{{ rec.id }}" class="btn btn-primary">Review</a>
+                    <a href="/dashboard/recommendations/{{ rec.id }}" class="btn btn-primary btn-sm">Review</a>
+                    <button class="btn btn-secondary btn-sm" onclick="copyRecAsJSON('{{ rec.id }}')">Copy JSON</button>
                 </td>
             </tr>
             {% endfor %}
@@ -101,6 +199,7 @@
     {% else %}
     <div class="empty-state">
         <p>No recommendations for this validation</p>
+        <button class="btn btn-primary" onclick="generateRecommendations()">Generate Recommendations</button>
     </div>
     {% endif %}
 </div>
@@ -253,6 +352,330 @@ function showMessage(message, type) {
         }
     }, 5000);
 }
+
+
+// Load and display enhancement comparison
+let currentComparisonData = null;
+
+async function loadEnhancementComparison(viewType = 'side-by-side') {
+    try {
+        showMessage('Loading enhancement comparison...', 'info');
+
+        // Fetch comparison data if not already loaded
+        if (!currentComparisonData) {
+            const response = await fetch(`/api/validations/${validationId}/enhancement-comparison`);
+            if (!response.ok) {
+                throw new Error(`Failed to load comparison: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error('Invalid response from server');
+            }
+
+            currentComparisonData = data;
+        }
+
+        // Show stats
+        displayStats(currentComparisonData.stats);
+
+        // Show appropriate view
+        if (viewType === 'side-by-side') {
+            displaySideBySideView(currentComparisonData);
+        } else {
+            displayUnifiedView(currentComparisonData);
+        }
+
+        // Show applied recommendations
+        displayAppliedRecommendations(currentComparisonData.applied_recommendations);
+
+        showMessage('Comparison loaded successfully', 'success');
+    } catch (error) {
+        console.error('Error loading enhancement comparison:', error);
+        showMessage(`Error loading comparison: ${error.message}`, 'error');
+    }
+}
+
+function displayStats(stats) {
+    const statsEl = document.getElementById('enhancementStats');
+    statsEl.style.display = 'block';
+
+    document.getElementById('stat-added').textContent = stats.lines_added || 0;
+    document.getElementById('stat-removed').textContent = stats.lines_removed || 0;
+    document.getElementById('stat-modified').textContent = stats.lines_modified || 0;
+    document.getElementById('stat-recs').textContent =
+        `${stats.recommendations_applied || 0}/${stats.recommendations_total || 0}`;
+}
+
+function displaySideBySideView(data) {
+    // Hide unified view, show side-by-side
+    document.getElementById('unifiedView').style.display = 'none';
+    document.getElementById('sideBySideView').style.display = 'block';
+
+    const originalEl = document.getElementById('originalContent');
+    const enhancedEl = document.getElementById('enhancedContent');
+
+    // Render original content with line numbers
+    originalEl.innerHTML = renderContentWithLineNumbers(
+        data.original_content,
+        data.diff_lines,
+        'original'
+    );
+
+    // Render enhanced content with line numbers
+    enhancedEl.innerHTML = renderContentWithLineNumbers(
+        data.enhanced_content,
+        data.diff_lines,
+        'enhanced'
+    );
+
+    // Sync scrolling
+    syncScroll(originalEl, enhancedEl);
+}
+
+function displayUnifiedView(data) {
+    // Hide side-by-side, show unified
+    document.getElementById('sideBySideView').style.display = 'none';
+    document.getElementById('unifiedView').style.display = 'block';
+
+    const unifiedEl = document.getElementById('unifiedDiffContent');
+    unifiedEl.innerHTML = formatDiff(data.unified_diff);
+}
+
+function renderContentWithLineNumbers(content, diffLines, side) {
+    const lines = content.split('\n');
+    let html = '';
+
+    // Create a map of line changes from diff_lines
+    const changeMap = new Map();
+    diffLines.forEach(diffLine => {
+        const lineNum = side === 'original'
+            ? diffLine.line_number_original
+            : diffLine.line_number_enhanced;
+
+        if (lineNum !== null) {
+            changeMap.set(lineNum, diffLine.change_type);
+        }
+    });
+
+    lines.forEach((line, index) => {
+        const lineNum = index + 1;
+        const changeType = changeMap.get(lineNum) || 'unchanged';
+
+        let bgColor = '';
+        let textColor = '';
+
+        switch (changeType) {
+            case 'added':
+                bgColor = '#e6ffe6';
+                textColor = '#155724';
+                break;
+            case 'removed':
+                bgColor = '#ffe6e6';
+                textColor = '#721c24';
+                break;
+            case 'modified':
+                bgColor = '#fff3cd';
+                textColor = '#856404';
+                break;
+            default:
+                bgColor = '#fff';
+                textColor = '#333';
+        }
+
+        html += `<div style="display: flex; background: ${bgColor}; color: ${textColor};">`;
+        html += `<span style="display: inline-block; width: 40px; text-align: right; padding-right: 10px; color: #999; user-select: none; border-right: 1px solid #ddd;">${lineNum}</span>`;
+        html += `<span style="flex: 1; padding-left: 10px;">${escapeHtml(line) || '&nbsp;'}</span>`;
+        html += `</div>`;
+    });
+
+    return html;
+}
+
+function displayAppliedRecommendations(recommendations) {
+    if (!recommendations || recommendations.length === 0) {
+        document.getElementById('appliedRecommendations').style.display = 'none';
+        return;
+    }
+
+    document.getElementById('appliedRecommendations').style.display = 'block';
+
+    const recsList = document.getElementById('recsList');
+    let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+    recommendations.forEach(rec => {
+        html += `
+            <div class="card" style="padding: 10px; background: #f8f9fa;">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div style="flex: 1;">
+                        <strong>${escapeHtml(rec.title)}</strong>
+                        <div style="font-size: 13px; color: #666; margin-top: 5px;">
+                            ${escapeHtml(rec.instruction || '')}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="badge badge-${rec.status}" style="font-size: 11px;">
+                            ${rec.status}
+                        </span>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            ${Math.round(rec.confidence * 100)}% confidence
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    recsList.innerHTML = html;
+}
+
+function syncScroll(el1, el2) {
+    el1.addEventListener('scroll', () => {
+        el2.scrollTop = el1.scrollTop;
+    });
+
+    el2.addEventListener('scroll', () => {
+        el1.scrollTop = el2.scrollTop;
+    });
+}
+
+// Format diff for display (unified view)
+function formatDiff(diff) {
+    const lines = diff.split('\n');
+    let formatted = '';
+    for (const line of lines) {
+        if (line.startsWith('+')) {
+            formatted += `<span style="color: #155724; background: #e6ffe6;">${escapeHtml(line)}</span>\n`;
+        } else if (line.startsWith('-')) {
+            formatted += `<span style="color: #721c24; background: #ffe6e6;">${escapeHtml(line)}</span>\n`;
+        } else if (line.startsWith('@@')) {
+            formatted += `<span style="color: #007bff; background: #e7f3ff; font-weight: bold;">${escapeHtml(line)}</span>\n`;
+        } else {
+            formatted += `${escapeHtml(line)}\n`;
+        }
+    }
+    return formatted;
+}
+
+// Escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Toggle select all checkboxes
+function toggleSelectAll(checkbox) {
+    const checkboxes = document.querySelectorAll('.rec-checkbox');
+    checkboxes.forEach(cb => cb.checked = checkbox.checked);
+}
+
+// Rebuild recommendations
+async function rebuildRecommendations() {
+    if (!confirm('Rebuild all recommendations? This will delete existing ones and regenerate from validation results.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/validations/${validationId}/rebuild_recommendations`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showMessage(`Rebuilt ${result.count} recommendation(s)`, 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            const error = await response.json();
+            showMessage(`Failed to rebuild: ${error.detail || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error rebuilding recommendations:', error);
+        showMessage(`Error: ${error.message}`, 'error');
+    }
+}
+
+// Generate recommendations
+async function generateRecommendations() {
+    try {
+        // Use rebuild endpoint to force generation
+        const response = await fetch(`/api/validations/${validationId}/rebuild_recommendations`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showMessage(`Generated ${result.count} recommendation(s)`, 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            const error = await response.json();
+            showMessage(`Failed to generate: ${error.detail || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error generating recommendations:', error);
+        showMessage(`Error: ${error.message}`, 'error');
+    }
+}
+        console.error('Error generating recommendations:', error);
+        showMessage(`Error: ${error.message}`, 'error');
+    }
+}
+
+// Enhance selected recommendations
+async function enhanceSelected() {
+    const checkboxes = document.querySelectorAll('.rec-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+        showMessage('Please select at least one recommendation', 'warning');
+        return;
+    }
+    
+    if (!confirm(`Enhance with ${selectedIds.length} selected recommendation(s)?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/recommendations/bulk_review', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                ids: selectedIds,
+                action: 'enhance'
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showMessage(`Enhancement queued for ${result.updated} recommendation(s)`, 'success');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showMessage('Failed to enhance recommendations', 'error');
+        }
+    } catch (error) {
+        console.error('Error enhancing recommendations:', error);
+        showMessage(`Error: ${error.message}`, 'error');
+    }
+}
+
+// Copy recommendation as JSON
+async function copyRecAsJSON(recId) {
+    try {
+        const response = await fetch(`/api/recommendations/${recId}`);
+        if (response.ok) {
+            const rec = await response.json();
+            await navigator.clipboard.writeText(JSON.stringify(rec, null, 2));
+            showMessage('Copied to clipboard', 'success');
+        }
+    } catch (error) {
+        console.error('Error copying recommendation:', error);
+        showMessage('Failed to copy', 'error');
+    }
+}
+
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {

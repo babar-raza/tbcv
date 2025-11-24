@@ -21,6 +21,14 @@ import shutil
 from pathlib import Path
 from typing import Optional, Tuple
 
+# Configure UTF-8 encoding for stdout/stderr to handle Unicode characters (Windows fix)
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 def _ensure_project_on_path() -> Path:
     """
     Ensure the project root (folder that contains the 'tbcv' package) is on sys.path.
@@ -91,15 +99,15 @@ def _validate_schemas() -> bool:
                     data = json.load(f)
                 # Basic validation - ensure it's valid JSON and has expected structure
                 if isinstance(data, dict) and len(data) > 0:
-                    print(f"✓ Schema valid: {file_path.name}")
+                    print(f"[OK] Schema valid: {file_path.name}")
                 else:
-                    print(f"✗ Schema invalid: {file_path.name} - empty or invalid structure")
+                    print(f"[FAIL] Schema invalid: {file_path.name} - empty or invalid structure")
                     return False
             except json.JSONDecodeError as e:
-                print(f"✗ JSON error in {file_path.name}: {e}")
+                print(f"[FAIL] JSON error in {file_path.name}: {e}")
                 return False
             except Exception as e:
-                print(f"✗ Error validating {file_path.name}: {e}")
+                print(f"[FAIL] Error validating {file_path.name}: {e}")
                 return False
         
         return True
@@ -152,7 +160,25 @@ def run_api(host: str, port: int, reload: bool, log_level: str, clean: bool) -> 
     if not _validate_schemas():
         print("Error: Schema validation failed. Aborting startup.")
         sys.exit(1)
-    print("✓ All schemas validated successfully")
+    print("[OK] All schemas validated successfully")
+
+    # Run comprehensive startup checks
+    print("\n" + "="*70)
+    print("RUNNING COMPREHENSIVE STARTUP CHECKS")
+    print("="*70 + "\n")
+    
+    try:
+        from core.startup_checks import run_startup_checks
+        success, summary = run_startup_checks()
+        
+        if not success:
+            print("FATAL: Critical startup checks failed. Cannot start server.")
+            sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: Startup checks failed with exception: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
     uvicorn = _import_uvicorn_or_die()
 
@@ -168,6 +194,7 @@ def run_api(host: str, port: int, reload: bool, log_level: str, clean: bool) -> 
                 port=port,
                 reload=reload,
                 log_level=log_level,
+                ws="wsproto",  # Use wsproto WebSocket implementation
             )
         except ImportError:
             app_path = "tbcv.api.server:app"
@@ -178,6 +205,7 @@ def run_api(host: str, port: int, reload: bool, log_level: str, clean: bool) -> 
                 port=port,
                 reload=reload,
                 log_level=log_level,
+                ws="wsproto",  # Use wsproto WebSocket implementation
             )
     except Exception as e:
         print(f"Failed to start API: {e}")
@@ -197,7 +225,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Run mode. Use 'api' to start the FastAPI server.",
     )
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8080, help="Port to bind (default: 8080)")
+    parser.add_argument("--port", type=int, default=8585, help="Port to bind (default: 8585)")
     parser.add_argument("--reload", action="store_true", help="Enable auto reload")
     parser.add_argument("--log-level", default="info", help="Uvicorn log level (default: info)")
     parser.add_argument(

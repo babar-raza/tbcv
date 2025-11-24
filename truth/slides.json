@@ -1,0 +1,37 @@
+{
+  "family": "slides",
+  "version": "1.0.0",
+  "last_updated": "2025-11-11",
+  "plugins": [
+    {
+      "id": "presentation",
+      "name": "Presentation",
+      "slug": "presentation",
+      "description": "Core Presentation class for loading, creating, and manipulating PowerPoint presentations",
+      "type": "processor",
+      "patterns": {
+        "format": ["\\bPPTX?\\b", "\\bPPT\\b", "\\.pptx?\\b"],
+        "api": ["Presentation\\(", "new Presentation", "Presentation\\.Load"],
+        "method": ["Load", "Save", "new"]
+      },
+      "load_formats": ["PPT", "PPTX", "ODP", "PDF"],
+      "save_formats": ["PPT", "PPTX", "PDF", "HTML", "ODP"],
+      "capabilities": ["load", "save", "create"],
+      "dependencies": []
+    },
+    {
+      "id": "slide",
+      "name": "Slide",
+      "slug": "slide",
+      "description": "Slide manipulation for content, layout, and shapes",
+      "type": "feature",
+      "patterns": {
+        "format": [],
+        "api": ["Slide\\(", "Slides\\[", "slide\\.Shapes"],
+        "method": ["AddSlide", "RemoveSlide", "AddShape"]
+      },
+      "capabilities": ["modify", "create"],
+      "dependencies": ["presentation"]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "voice": {
+    "style": "professional",
+    "formality": "formal",
+    "persona": "technical_expert",
+    "audience": "developers"
+  },
+  "strictness": {
+    "validation": "strict",
+    "recommendations": "moderate",
+    "auto_apply": "conservative"
+  },
+  "language": {
+    "primary": "en-US",
+    "technical_terminology": "preserve",
+    "code_snippets": "preserve",
+    "brand_names": "preserve"
+  },
+  "recommendation_tone": {
+    "severity_low": {
+      "prefix": "Consider",
+      "verb_tense": "conditional",
+      "confidence_expression": "subtle"
+    },
+    "severity_medium": {
+      "prefix": "Recommend",
+      "verb_tense": "imperative",
+      "confidence_expression": "moderate"
+    },
+    "severity_high": {
+      "prefix": "Must",
+      "verb_tense": "imperative",
+      "confidence_expression": "strong"
+    },
+    "severity_critical": {
+      "prefix": "Critical",
+      "verb_tense": "imperative",
+      "confidence_expression": "urgent"
+    }
+  },
+  "validation_messages": {
+    "style": "concise",
+    "include_examples": true,
+    "include_rationale": true,
+    "max_length": 200
+  },
+  "llm_prompts": {
+    "system_role": "You are an expert technical documentation validator with deep knowledge of Aspose APIs and best practices.",
+    "temperature": 0.3,
+    "tone_guidelines": [
+      "Be specific and actionable",
+      "Cite evidence from documentation",
+      "Prioritize correctness over completeness",
+      "Use technical precision",
+      "Avoid subjective opinions"
+    ]
+  },
+  "enhancement_voice": {
+    "preserve_author_voice": true,
+    "minimum_change_threshold": 0.8,
+    "explanation_style": "brief",
+    "diff_format": "unified"
+  }
+}

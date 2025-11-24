@@ -1,0 +1,18 @@
+# Enhancement Configuration
+# Controls behavior of content enhancement and recommendation requirements
+
+enhancement:
+  # Require recommendations before allowing enhancement
+  require_recommendations: false
+
+  # Minimum number of recommendations required (if require_recommendations is true)
+  min_recommendations: 0
+
+  # Auto-generate recommendations if required but missing
+  auto_generate_if_missing: true
+
+  # Maximum time to wait for recommendation generation (seconds)
+  generation_timeout: 30
+
+  # Confidence threshold for auto-applying recommendations
+  auto_apply_confidence_threshold: 0.95

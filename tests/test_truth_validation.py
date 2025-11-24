@@ -15,16 +15,16 @@ from agents.base import agent_registry
 
 
 @pytest.fixture
-async def setup_agents():
+def setup_agents():
     """Setup validator and truth manager agents"""
     truth_manager = TruthManagerAgent("truth_manager")
     agent_registry.register_agent(truth_manager)
-    
+
     validator = ContentValidatorAgent("content_validator")
     agent_registry.register_agent(validator)
-    
+
     yield validator, truth_manager
-    
+
     agent_registry.unregister_agent("truth_manager")
     agent_registry.unregister_agent("content_validator")
 
@@ -166,7 +166,7 @@ Document doc = new Document();
 
 
 @pytest.fixture
-async def setup_truth_manager():
+def setup_truth_manager():
     """
     Setup only the truth manager for direct truth-related tests.
     """
@@ -183,8 +183,8 @@ async def test_truth_manager_plugin_lookup_multiple(setup_truth_manager):
     tm = setup_truth_manager
     # Load truth data for words
     await tm.process_request("load_truth_data", {"family": "words"})
-    # Pick a known plugin id from Aspose truth definitions
-    plugin_id = "word_processor"
+    # Pick a known plugin id from Aspose truth definitions (actual ID from words.json)
+    plugin_id = "aspose-words-net"
     # Perform multiple lookups
     for _ in range(5):
         res = await tm.process_request("get_plugin_info", {"plugin_id": plugin_id})
@@ -197,11 +197,11 @@ async def test_truth_manager_alias_search(setup_truth_manager):
     """Search plugins by alias or slug should return the correct plugin."""
     tm = setup_truth_manager
     await tm.process_request("load_truth_data", {"family": "words"})
-    # Search by slug of pdf converter
-    res = await tm.process_request("search_plugins", {"query": "pdfsaveoptions", "family": "words"})
+    # Search by pattern from aspose-words-net (Document class)
+    res = await tm.process_request("search_plugins", {"query": "Document", "family": "words"})
     assert res["matches_count"] >= 1
     ids = {p["id"] for p in res["results"]}
-    assert "pdf_converter" in ids, f"Expected pdf_converter in search results, got {ids}"
+    assert "aspose-words-net" in ids, f"Expected aspose-words-net in search results, got {ids}"
 
 
 @pytest.mark.asyncio
@@ -218,7 +218,8 @@ async def test_truth_manager_combination_valid(setup_truth_manager):
     """Verify that a known combination of plugins is recognized as valid."""
     tm = setup_truth_manager
     await tm.process_request("load_truth_data", {"family": "words"})
-    combo = ["word_processor", "pdf_converter"]
+    # Use actual plugin IDs from words.json combination_rules
+    combo = ["aspose-words-cloud", "aspose-words-net"]
     res = await tm.process_request("check_plugin_combination", {"plugins": combo, "family": "words"})
     assert res["valid"] is True, f"Combination {combo} should be valid"
     assert res["rules"], "Expected at least one matching combination rule"
@@ -229,7 +230,7 @@ async def test_truth_manager_combination_invalid(setup_truth_manager):
     """Ensure invalid combinations or unknown plugins are flagged."""
     tm = setup_truth_manager
     await tm.process_request("load_truth_data", {"family": "words"})
-    combo = ["word_processor", "unknown_plugin"]
+    combo = ["aspose-words-net", "unknown_plugin"]
     res = await tm.process_request("check_plugin_combination", {"plugins": combo, "family": "words"})
     # Should be invalid with unknown plugin reported
     assert res["valid"] is False
@@ -272,7 +273,7 @@ class MockLLMValidator(LLMValidatorAgent):
 
 
 @pytest.fixture
-async def setup_orchestrator_environment():
+def setup_orchestrator_environment():
     """
     Setup orchestrator with required agents (truth manager, fuzzy detector, content validator, mock LLM) for gating tests.
     Yields orchestrator agent and settings so that tests can modify validation mode and LLM enabled flags.

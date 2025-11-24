@@ -1,0 +1,96 @@
+agents:
+  truth_manager:
+    enabled: true
+    cache_ttl: 3600
+    truth_directories:
+      - "./truth"
+    supported_families:
+      - words
+      - cells
+      - slides
+      - pdf
+      - email
+    
+  fuzzy_detector:
+    enabled: true
+    similarity_threshold: 0.85
+    min_pattern_length: 3
+    max_results: 10
+    cache_ttl: 1800
+    use_levenshtein: true
+    use_jaro_winkler: true
+    pattern_boost_multiplier: 1.2
+    
+  content_validator:
+    enabled: true
+    validation_types:
+      - yaml
+      - markdown
+      - code
+      - links
+      - structure
+    link_validation_enabled: true
+    link_timeout_seconds: 5
+    max_concurrent_validations: 10
+    cache_ttl: 1800
+    
+  content_enhancer:
+    enabled: true
+    auto_link_plugins: true
+    link_format: "[{name}](https://products.aspose.com/{family}/{slug})"
+    severity_threshold: medium
+    max_enhancements_per_file: 50
+    preserve_formatting: true
+    
+  llm_validator:
+    enabled: true
+    provider: ollama
+    model: llama2
+    temperature: 0.3
+    max_tokens: 2048
+    timeout_seconds: 30
+    retry_attempts: 3
+    retry_delay_seconds: 2
+    fallback_providers:
+      - openai
+      - gemini
+    
+  code_analyzer:
+    enabled: true
+    languages:
+      - python
+      - csharp
+      - java
+      - javascript
+    max_complexity_threshold: 15
+    analyze_security: true
+    analyze_performance: true
+    cache_ttl: 3600
+    
+  orchestrator:
+    enabled: true
+    max_concurrent_workflows: 50
+    workflow_timeout_seconds: 600
+    checkpoint_interval: 10
+    enable_auto_recovery: true
+    max_retry_attempts: 3
+    
+  recommendation_agent:
+    enabled: true
+    confidence_threshold: 0.7
+    max_recommendations_per_file: 20
+    auto_approve_high_confidence: false
+    high_confidence_threshold: 0.95
+    
+  enhancement_agent:
+    enabled: true
+    apply_threshold: medium
+    backup_original: true
+    validate_after_enhancement: true
+
+global:
+  message_timeout: 30
+  agent_startup_timeout: 10
+  health_check_interval: 60
+  log_level: info
+  enable_performance_metrics: true
