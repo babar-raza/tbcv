@@ -4,7 +4,7 @@ import sys
 
 def approve_recommendations(limit=5):
     """Approve the first N recommendations."""
-    conn = sqlite3.connect('tbcv.db')
+    conn = sqlite3.connect('data/tbcv.db')
     cursor = conn.cursor()
 
     # Get recent PROPOSED recommendations

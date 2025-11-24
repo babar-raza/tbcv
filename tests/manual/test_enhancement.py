@@ -1,7 +1,7 @@
 """Get details of approved recommendations for testing enhancement."""
 import sqlite3
 
-conn = sqlite3.connect('tbcv.db')
+conn = sqlite3.connect('data/tbcv.db')
 cursor = conn.cursor()
 
 # Get an approved recommendation with file path

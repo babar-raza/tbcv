@@ -419,7 +419,7 @@ class DatabaseManager:
     def __init__(self):
         self._lock = Lock()
         if SQLALCHEMY_AVAILABLE:
-            db_url = os.getenv("DATABASE_URL", "sqlite:///./tbcv.db")
+            db_url = os.getenv("DATABASE_URL", "sqlite:///./data/tbcv.db")
             # Ensure SQLite path exists
             if db_url.startswith('sqlite:///'):
                 db_path = db_url.replace('sqlite:///', '')

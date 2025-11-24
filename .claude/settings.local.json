@@ -33,7 +33,9 @@
       "Bash(mkdir:*)",
       "Bash(start:*)",
       "Bash(del fix_file_path.py)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(git checkout:*)",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []

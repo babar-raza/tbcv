@@ -1,6 +1,6 @@
 import sqlite3
 
-conn = sqlite3.connect('tbcv.db')
+conn = sqlite3.connect('data/tbcv.db')
 cursor = conn.cursor()
 
 cursor.execute('SELECT status, COUNT(*) FROM recommendations WHERE created_at > datetime("now", "-15 minutes") GROUP BY status')
