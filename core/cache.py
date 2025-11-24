@@ -17,7 +17,7 @@ import hashlib
 import pickle
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Tuple
 from collections import OrderedDict
 import threading
@@ -240,7 +240,7 @@ class CacheManager:
                     size_bytes = len(serialized)
                     if ttl_seconds is None:
                         ttl_seconds = self._get_default_ttl(method)
-                    expires_at = datetime.utcnow() + timedelta(seconds=int(ttl_seconds))
+                    expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(ttl_seconds))
                     input_hash = hashlib.sha256(str(input_data).encode()).hexdigest()
 
                     db_manager.store_cache_entry(
