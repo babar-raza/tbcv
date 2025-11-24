@@ -94,3 +94,24 @@ htmlcov/
 *.bak
 *.swp
 .~*
+
+# Additional runtime files (prevent clutter at root)
+/srv.log
+/server_output.log
+/validation_*.txt
+/validation_*.json
+/*.db
+/*.sqlite
+/*.sqlite3
+
+# Test artifacts at root (should be in tests/)
+/test_*.md
+/test_*.py
+!tests/
+!main.py
+!setup.py
+
+# Utility scripts that may be temporarily created
+/check_*.py
+/approve_*.py
+!scripts/
