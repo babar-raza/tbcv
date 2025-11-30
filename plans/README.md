@@ -4,165 +4,137 @@ This directory contains planning documents for major project initiatives.
 
 ---
 
-## Current Plans
+## Completed Plans
 
-### Project Organization (2025-11-24)
+### Gaps Remediation (2025-11-29) ✅
+**Goal**: Close all identified gaps for production-ready system with zero technical debt.
+**Status**: ✅ **COMPLETE** - All 36 tasks verified
 
-**Goal**: Prepare the repository for organizational GitHub/GitLab deployment by cleaning up the root directory and organizing files professionally.
+- [gaps.md](gaps.md) - **Gap remediation plan with execution status**
 
-**Status**: ⏳ Planning Complete - Awaiting Approval & Execution
+| Category | Status |
+|----------|--------|
+| Validation System Config | ✅ 6/6 complete |
+| CLI/Web Parity | ✅ 18/18 complete |
+| Design Patterns | ✅ 3/3 complete |
+| Dashboard Admin Controls | ✅ 4/4 complete |
+| UI Testing Completion | ✅ 3/3 complete |
+| Test Infrastructure | ✅ 2/2 complete |
+
+**Verification**: 1606+ tests passing, 0 failures
+
+### Project Organization (2025-11-24) ✅
+**Goal**: Prepare the repository for organizational GitHub/GitLab deployment.
+**Status**: ✅ **COMPLETE** - See [reports/final-summary.md](../reports/final-summary.md)
+
+- [PROJECT_ORGANIZATION_PLAN.md](PROJECT_ORGANIZATION_PLAN.md) - Detailed plan
+- [EXECUTION_CHECKLIST.md](EXECUTION_CHECKLIST.md) - Step-by-step guide
+- [ORGANIZATION_SUMMARY.md](ORGANIZATION_SUMMARY.md) - Before/after comparison
+- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick reference
+
+**Results**: 70% reduction in root clutter, 27 files organized, all systems verified.
+
+### 100% Health Score (2025-11-24) ✅
+**Goal**: Fix all test failures and deprecation warnings.
+**Status**: ✅ **COMPLETE** - See [reports/100_PERCENT_HEALTH_ACHIEVED.md](../reports/100_PERCENT_HEALTH_ACHIEVED.md)
+
+- [ACHIEVE_100_PERCENT_HEALTH.md](ACHIEVE_100_PERCENT_HEALTH.md) - Full plan
+
+**Results**: 4/4 test failures fixed, SQLAlchemy warnings resolved, 100% pass rate.
+
+### Production Enhancement (2025-11-24) ✅
+**Goal**: Dashboard and workflow improvements.
+**Status**: ✅ **COMPLETE** - See [reports/PRODUCTION_ENHANCEMENT_COMPLETE.md](../reports/PRODUCTION_ENHANCEMENT_COMPLETE.md)
+
+- [PRODUCTION_ENHANCEMENT_PLAN.md](PRODUCTION_ENHANCEMENT_PLAN.md) - Enhancement plan
+
+---
+
+## Active Plans
+
+### MCP-First Architecture Migration (2025-11-30) 🚀
+**Goal**: Achieve 100% MCP coverage for all UI and CLI operations
+**Status**: 🚀 **READY FOR AUTONOMOUS EXECUTION**
+**Timeline**: 6-9 weeks
 
 **Documents**:
+- ⭐ [QUICK_START.md](QUICK_START.md) - **START HERE** - One-command execution
+- [EXECUTION_SUMMARY.md](EXECUTION_SUMMARY.md) - Timeline and execution overview
+- [AUTONOMOUS_EXECUTION_PLAN.md](AUTONOMOUS_EXECUTION_PLAN.md) - Parallel agent coordination
+- [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) - Production-ready code for all tasks
+- [comms.md](comms.md) - Master migration plan with gap analysis
+- [tasks/README.md](tasks/README.md) - Task index and progress tracking
+- [tasks/TASK-XXX.md](tasks/) - 18 detailed task cards
 
-1. **[PROJECT_ORGANIZATION_PLAN.md](PROJECT_ORGANIZATION_PLAN.md)** ⭐ START HERE
-   - Complete detailed plan with rationale
-   - Risk assessment and mitigation strategies
-   - 7 phases with verification steps
-   - 20+ pages of comprehensive guidance
+**Key Features**:
+- ✅ All 52 missing MCP methods identified
+- ✅ Production-ready code provided (no stubs/TODOs)
+- ✅ Autonomous execution with parallel agents
+- ✅ Comprehensive test coverage (>90%)
+- ✅ 18 detailed task cards with dependencies
+- ✅ Validation gates at each phase
+- ✅ Zero regression guarantee
 
-2. **[EXECUTION_CHECKLIST.md](EXECUTION_CHECKLIST.md)** 📋
-   - Step-by-step execution guide
-   - Copy-paste terminal commands
-   - Testing procedures after each phase
-   - Manual file creation templates
+**Metrics**:
+- Current: 7.1% coverage (4/56 methods)
+- Target: 100% coverage (56/56 methods)
+- CLI: 0% → 100% MCP usage (30+ commands)
+- API: 4% → 100% MCP usage (80+ endpoints)
 
-3. **[ORGANIZATION_SUMMARY.md](ORGANIZATION_SUMMARY.md)** 📊
-   - Visual before/after comparison
-   - Migration summary tables
-   - Statistics and metrics
-   - Quick approval checklist
+**Quick Start**:
+```bash
+# One-command autonomous execution
+bash scripts/start_autonomous_execution.sh
+```
 
-4. **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** ⚡
-   - One-page quick reference
-   - Essential commands only
-   - Emergency rollback procedures
-   - Success criteria checklist
-
----
-
-## How to Use These Documents
-
-### For Project Lead / Reviewer
-1. Read [PROJECT_ORGANIZATION_PLAN.md](PROJECT_ORGANIZATION_PLAN.md) for complete context
-2. Review [ORGANIZATION_SUMMARY.md](ORGANIZATION_SUMMARY.md) for visual overview
-3. Approve or request changes
-4. Assign execution to team member
-
-### For Executor / Developer
-1. Skim [PROJECT_ORGANIZATION_PLAN.md](PROJECT_ORGANIZATION_PLAN.md) to understand goals
-2. Use [EXECUTION_CHECKLIST.md](EXECUTION_CHECKLIST.md) as primary guide
-3. Keep [QUICK_REFERENCE.md](QUICK_REFERENCE.md) open for commands
-4. Reference [PROJECT_ORGANIZATION_PLAN.md](PROJECT_ORGANIZATION_PLAN.md) if questions arise
-
-### For Quick Review
-1. Read [QUICK_REFERENCE.md](QUICK_REFERENCE.md) only
-2. Review [ORGANIZATION_SUMMARY.md](ORGANIZATION_SUMMARY.md) statistics
-3. Execute if comfortable, or escalate to detailed plan
+See [reports/coms.md](../reports/coms.md) for detailed analysis.
 
 ---
 
-## Execution Strategy
+## Reference Plans (Historical)
 
-### Recommended: Incremental Approach
+These plans document completed or superseded initiatives:
 
-Execute one phase per session with testing between phases:
+| Plan | Purpose | Status |
+|------|---------|--------|
+| [validation_types.md](validation_types.md) | Validation type system | Reference |
+| [dashboard_coverage.md](dashboard_coverage.md) | Dashboard test coverage | Reference |
+| [cli_web_parity.md](cli_web_parity.md) | CLI/Web feature parity | Reference |
+| [playwright_ui_testing.md](playwright_ui_testing.md) | UI test setup | Reference |
+| [tests_coverage.md](tests_coverage.md) | Test coverage plan | Reference |
+| [failing_tests.md](failing_tests.md) | Test failure analysis | Reference |
 
-**Session 1** (30 min)
-- Phase 1: Documentation consolidation
-- Phase 2: Scripts organization
-- Test & commit
+### Taskcard Files
 
-**Session 2** (45 min)
-- Phase 3: Database move (CRITICAL - test thoroughly)
-- Phase 4: Cleanup
-- Test & commit
-
-**Session 3** (30 min)
-- Phase 5: Verification
-- Phase 6: Comprehensive testing
-- Phase 7: Documentation updates
-
-**Total**: ~2 hours across 3 sessions
-
-### Alternative: Single Session Approach
-
-Execute all phases in one 3-4 hour session with comprehensive testing at the end. Higher risk but faster.
+Supporting taskcard documents for the plans above:
+- `*_taskcards.md` files contain detailed task breakdowns
 
 ---
 
-## Key Metrics
+## Creating New Plans
 
-### Current State
-- **Root files**: 50+ (cluttered)
-- **Misplaced docs**: 10 markdown files
-- **Misplaced scripts**: 11 Python files
-- **Data files at root**: 5 files
+When creating new planning documents:
 
-### Target State
-- **Root files**: ~15 (clean)
-- **Misplaced docs**: 0
-- **Misplaced scripts**: 0
-- **Data files at root**: 0
+1. Create `PLAN_NAME.md` with:
+   - Executive summary
+   - Goals and success criteria
+   - Implementation steps
+   - Risk assessment
 
-### Impact
-- **70% reduction** in root file count
-- **Professional structure** suitable for organization deployment
-- **Zero functionality loss** (100% backward compatible)
+2. Create `PLAN_NAME_taskcards.md` with detailed tasks if needed
 
----
+3. Update this README with the new plan
 
-## Risk Level
-
-**Overall**: 🟡 **Medium Risk**
-
-- **Low Risk** (90% of changes): Documentation and script moves
-- **Medium Risk** (10% of changes): Database file move (requires code updates)
-
-**Mitigation**: Backup branch, phase-by-phase testing, git history preservation
-
----
-
-## Success Criteria
-
-The organization is successful when:
-- ✅ Root directory ≤15 files
-- ✅ All tests pass
-- ✅ API server starts
-- ✅ Database operations work
-- ✅ No broken imports
-
----
-
-## Timeline
-
-- **Planning**: ✅ Complete (2025-11-24)
-- **Approval**: ⏳ Pending
-- **Execution**: ⏳ Not started
-- **Verification**: ⏳ Not started
-
----
-
-## Questions or Concerns?
-
-Contact the plan author or project lead for clarification before execution.
-
----
-
-## Version History
-
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0 | 2025-11-24 | Claude AI | Initial planning documents created |
+4. After completion, update status and link to completion report
 
 ---
 
 ## Related Documentation
 
-- [../README.md](../README.md) - Main project README
-- [../docs/development.md](../docs/development.md) - Development guide
-- [../docs/architecture.md](../docs/architecture.md) - System architecture
+- [reports/](../reports/) - Completion reports and summaries
+- [docs/](../docs/) - User and developer documentation
+- [README.md](../README.md) - Project overview
 
 ---
 
-**Last Updated**: 2025-11-24
-**Status**: Ready for Review
+**Last Updated**: 2025-11-29
