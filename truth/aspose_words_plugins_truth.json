@@ -11,8 +11,8 @@
       "type": "processor",
       "patterns": {
         "format": ["\\bDOCX?\\b", "\\bDOC\\b", "\\.docx?\\b"],
-        "api": ["Document\\(", "new Document", "Document\\.Load"],
-        "method": ["Load", "Save", "new"]
+        "api": ["Document\\(", "\\bnew\\s+Document\\s*\\(", "Document\\.Load"],
+        "method": ["Load", "Save"]
       },
       "load_formats": ["DOC", "DOCX", "RTF", "ODT", "HTML", "PDF"],
       "save_formats": ["DOC", "DOCX", "PDF", "HTML", "RTF", "ODT", "TXT"],
