@@ -54,6 +54,7 @@ class MCPServer:
             QueryMethods
         )
         from svc.mcp_methods.workflow_methods import WorkflowMethods
+        from svc.mcp_methods.recommendation_methods import RecommendationMethods
 
         # Initialize method handler instances
         validation_handler = ValidationMethods(
@@ -86,6 +87,11 @@ class MCPServer:
             self.rule_manager,
             self.agent_registry
         )
+        recommendation_handler = RecommendationMethods(
+            self.db_manager,
+            self.rule_manager,
+            self.agent_registry
+        )
 
         # Register validation methods
         self.registry.register("validate_folder", validation_handler.validate_folder)
@@ -105,6 +111,10 @@ class MCPServer:
 
         # Register enhancement methods
         self.registry.register("enhance", enhancement_handler.enhance)
+        self.registry.register("enhance_batch", enhancement_handler.enhance_batch)
+        self.registry.register("enhance_preview", enhancement_handler.enhance_preview)
+        self.registry.register("enhance_auto_apply", enhancement_handler.enhance_auto_apply)
+        self.registry.register("get_enhancement_comparison", enhancement_handler.get_enhancement_comparison)
 
         # Register admin methods
         self.registry.register("get_system_status", admin_handler.get_system_status)
@@ -138,6 +148,16 @@ class MCPServer:
         self.registry.register("export_validation", query_handler.export_validation)
         self.registry.register("export_recommendations", query_handler.export_recommendations)
         self.registry.register("export_workflow", query_handler.export_workflow)
+
+        # Register recommendation methods
+        self.registry.register("generate_recommendations", recommendation_handler.generate_recommendations)
+        self.registry.register("rebuild_recommendations", recommendation_handler.rebuild_recommendations)
+        self.registry.register("get_recommendations", recommendation_handler.get_recommendations)
+        self.registry.register("review_recommendation", recommendation_handler.review_recommendation)
+        self.registry.register("bulk_review_recommendations", recommendation_handler.bulk_review_recommendations)
+        self.registry.register("apply_recommendations", recommendation_handler.apply_recommendations)
+        self.registry.register("delete_recommendation", recommendation_handler.delete_recommendation)
+        self.registry.register("mark_recommendations_applied", recommendation_handler.mark_recommendations_applied)
 
     def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """

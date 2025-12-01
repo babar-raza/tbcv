@@ -604,9 +604,671 @@ Enhance approved validation records using LLM (requires Ollama).
 }
 ```
 
+### 5. `enhance_batch`
+
+Enhance multiple validations with progress tracking (advanced enhancement method).
+
+**Parameters:**
+- `ids` (array, required): List of validation IDs to enhance
+- `batch_size` (integer, optional): Processing batch size, default 10
+- `threshold` (number, optional): Confidence threshold for recommendations, default 0.7
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "enhance_batch",
+  "params": {
+    "ids": ["val-123", "val-456", "val-789"],
+    "batch_size": 2,
+    "threshold": 0.7
+  },
+  "id": 5
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "total": 3,
+    "enhanced_count": 2,
+    "failed_count": 1,
+    "skipped_count": 0,
+    "errors": ["Enhancement failed for val-789: File not found"],
+    "results": [
+      {
+        "validation_id": "val-123",
+        "status": "enhanced"
+      },
+      {
+        "validation_id": "val-456",
+        "status": "enhanced"
+      }
+    ],
+    "processing_time_ms": 2450.5
+  },
+  "id": 5
+}
+```
+
+**Performance:**
+- Target performance: <500ms per enhancement (excluding LLM calls)
+- Processes validations in configurable batches
+- Tracks progress and provides detailed timing
+
+### 6. `enhance_preview`
+
+Preview enhancement without applying changes (dry-run mode).
+
+**Parameters:**
+- `validation_id` (string, required): Validation ID to preview
+- `recommendation_types` (array, optional): Filter by recommendation types
+- `threshold` (number, optional): Confidence threshold, default 0.7
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "enhance_preview",
+  "params": {
+    "validation_id": "val-123",
+    "threshold": 0.8
+  },
+  "id": 6
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "validation_id": "val-123",
+    "original_content": "# Title\n\nOriginal content...",
+    "enhanced_content": "# Title\n\nEnhanced content with improvements...",
+    "diff": {
+      "unified_diff": "--- original\n+++ enhanced\n@@ -1,3 +1,3 @@\n # Title\n \n-Original content...\n+Enhanced content with improvements...",
+      "side_by_side": [
+        {"type": "unchanged", "content": "# Title\n"},
+        {"type": "deletion", "content": "Original content...\n"},
+        {"type": "addition", "content": "Enhanced content with improvements...\n"}
+      ],
+      "additions_count": 1,
+      "deletions_count": 1,
+      "modifications_count": 1,
+      "total_changes": 2
+    },
+    "recommendations_count": 5,
+    "changes_summary": {
+      "additions": 1,
+      "deletions": 1,
+      "modifications": 1
+    }
+  },
+  "id": 6
+}
+```
+
+**Features:**
+- Does not modify original files
+- Generates unified and side-by-side diff formats
+- Shows detailed change statistics
+- Perfect for reviewing changes before applying
+
+### 7. `enhance_auto_apply`
+
+Automatically apply recommendations above confidence threshold.
+
+**Parameters:**
+- `validation_id` (string, required): Validation ID
+- `threshold` (number, optional): Confidence threshold, default 0.9
+- `recommendation_types` (array, optional): Types to auto-apply
+- `preview_first` (boolean, optional): Generate preview before applying, default true
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "enhance_auto_apply",
+  "params": {
+    "validation_id": "val-123",
+    "threshold": 0.95,
+    "preview_first": true
+  },
+  "id": 7
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "validation_id": "val-123",
+    "applied_count": 8,
+    "skipped_count": 2,
+    "applied_recommendations": [
+      {
+        "id": "rec-1",
+        "type": "grammar",
+        "confidence": 0.98,
+        "description": "Fixed subject-verb agreement"
+      }
+    ],
+    "preview": {
+      "validation_id": "val-123",
+      "diff": {...}
+    }
+  },
+  "id": 7
+}
+```
+
+**Use Cases:**
+- Automatically apply high-confidence recommendations
+- Filter by recommendation type for selective application
+- Preview changes before committing
+- Streamline enhancement workflow
+
+### 8. `get_enhancement_comparison`
+
+Get detailed before/after comparison of enhancement.
+
+**Parameters:**
+- `validation_id` (string, required): Enhanced validation ID
+- `format` (string, optional): Diff format ("unified" or "side-by-side"), default "unified"
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_enhancement_comparison",
+  "params": {
+    "validation_id": "val-123",
+    "format": "unified"
+  },
+  "id": 8
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "validation_id": "val-123",
+    "original_content": "# Title\n\nOriginal content...",
+    "enhanced_content": "# Title\n\nEnhanced content...",
+    "diff": {
+      "unified_diff": "--- original\n+++ enhanced\n...",
+      "side_by_side": [...],
+      "additions_count": 5,
+      "deletions_count": 2,
+      "modifications_count": 2,
+      "total_changes": 9
+    },
+    "statistics": {
+      "lines_added": 5,
+      "lines_removed": 2,
+      "lines_modified": 2,
+      "total_changes": 9
+    },
+    "recommendations_applied": []
+  },
+  "id": 8
+}
+```
+
+**Requirements:**
+- Validation must have status "enhanced"
+- Original content is stored during enhancement
+- Supports multiple diff formats
+
+## Recommendation Methods
+
+TBCV provides a complete recommendation lifecycle management system. Recommendations are generated from validation failures, reviewed (approved/rejected), and optionally applied to content files.
+
+### generate_recommendations
+
+Generate recommendations for a validation result.
+
+**Parameters:**
+- `validation_id` (string, required): Validation ID to generate recommendations for
+- `threshold` (float, optional): Confidence threshold (0.0-1.0), default 0.7
+- `types` (array of strings, optional): Filter to specific recommendation types
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "generate_recommendations",
+  "params": {
+    "validation_id": "val-123",
+    "threshold": 0.8,
+    "types": ["markdown", "structure"]
+  },
+  "id": 1
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "validation_id": "val-123",
+    "recommendation_count": 5,
+    "recommendations": [
+      {
+        "id": "rec-1",
+        "validation_id": "val-123",
+        "type": "markdown",
+        "scope": "line:42",
+        "instruction": "Fix heading hierarchy by changing h3 to h2",
+        "rationale": "Proper heading hierarchy improves document structure and accessibility",
+        "severity": "medium",
+        "confidence": 0.95,
+        "status": "pending"
+      }
+    ],
+    "threshold_used": 0.8
+  },
+  "id": 1
+}
+```
+
+**Errors:**
+- `ValueError`: Validation not found
+- `RuntimeError`: Recommendation agent not available
+
+**Python Example:**
+```python
+from svc.mcp_client import get_mcp_sync_client
+
+client = get_mcp_sync_client()
+
+# Generate recommendations with default threshold
+result = client.generate_recommendations("val-123")
+
+print(f"Generated {result['recommendation_count']} recommendations")
+for rec in result['recommendations']:
+    print(f"  - {rec['instruction']} (confidence: {rec['confidence']})")
+
+# Generate with high threshold for more confident recommendations
+high_confidence = client.generate_recommendations(
+    "val-456",
+    threshold=0.9,
+    types=["structure", "seo"]
+)
+```
+
+### rebuild_recommendations
+
+Rebuild recommendations for a validation after rules or validation changes.
+
+**Parameters:**
+- `validation_id` (string, required): Validation ID to rebuild recommendations for
+- `threshold` (float, optional): Confidence threshold (0.0-1.0), default 0.7
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "rebuild_recommendations",
+  "params": {
+    "validation_id": "val-123",
+    "threshold": 0.7
+  },
+  "id": 2
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "validation_id": "val-123",
+    "deleted_count": 8,
+    "generated_count": 6
+  },
+  "id": 2
+}
+```
+
+**Python Example:**
+```python
+# Rebuild recommendations after updating validation rules
+result = client.rebuild_recommendations("val-123", threshold=0.8)
+print(f"Deleted {result['deleted_count']}, generated {result['generated_count']}")
+```
+
+### get_recommendations
+
+Retrieve recommendations for a validation with optional filtering.
+
+**Parameters:**
+- `validation_id` (string, required): Validation ID to get recommendations for
+- `status` (string, optional): Filter by status (pending, approved, rejected, applied)
+- `type` (string, optional): Filter by recommendation type
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_recommendations",
+  "params": {
+    "validation_id": "val-123",
+    "status": "approved"
+  },
+  "id": 3
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "validation_id": "val-123",
+    "recommendations": [
+      {
+        "id": "rec-1",
+        "validation_id": "val-123",
+        "type": "markdown",
+        "title": "Fix heading hierarchy by changing h3 to h2",
+        "description": "Proper heading hierarchy improves document structure",
+        "scope": "line:42",
+        "instruction": "Change ### to ##",
+        "rationale": "Maintains sequential heading levels",
+        "severity": "medium",
+        "confidence": 0.95,
+        "status": "approved",
+        "reviewed_by": "user@example.com",
+        "reviewed_at": "2025-01-15T10:30:00Z",
+        "created_at": "2025-01-15T10:00:00Z"
+      }
+    ],
+    "total": 1
+  },
+  "id": 3
+}
+```
+
+**Python Example:**
+```python
+# Get all recommendations
+all_recs = client.get_recommendations("val-123")
+
+# Get only approved recommendations
+approved = client.get_recommendations("val-123", status="approved")
+
+# Get recommendations by type
+markdown_recs = client.get_recommendations("val-123", rec_type="markdown")
+```
+
+### review_recommendation
+
+Review (approve or reject) a single recommendation.
+
+**Parameters:**
+- `recommendation_id` (string, required): Recommendation ID to review
+- `action` (string, required): Action to take ("approve" or "reject")
+- `notes` (string, optional): Optional review notes
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "review_recommendation",
+  "params": {
+    "recommendation_id": "rec-1",
+    "action": "approve",
+    "notes": "Good suggestion, implements best practices"
+  },
+  "id": 4
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "recommendation_id": "rec-1",
+    "action": "approve",
+    "new_status": "approved"
+  },
+  "id": 4
+}
+```
+
+**Errors:**
+- `ValueError`: Invalid action (must be "approve" or "reject")
+- `ValueError`: Recommendation not found
+
+**Python Example:**
+```python
+# Approve a recommendation
+result = client.review_recommendation(
+    "rec-1",
+    "approve",
+    notes="Improves document structure"
+)
+
+# Reject a recommendation
+result = client.review_recommendation(
+    "rec-2",
+    "reject",
+    notes="Not applicable to this document"
+)
+```
+
+### bulk_review_recommendations
+
+Review multiple recommendations in a single operation.
+
+**Parameters:**
+- `recommendation_ids` (array of strings, required): List of recommendation IDs
+- `action` (string, required): Action to take ("approve" or "reject")
+- `notes` (string, optional): Optional review notes
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "bulk_review_recommendations",
+  "params": {
+    "recommendation_ids": ["rec-1", "rec-2", "rec-3"],
+    "action": "approve",
+    "notes": "Batch approval of structural improvements"
+  },
+  "id": 5
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "reviewed_count": 3,
+    "errors": [],
+    "action": "approve"
+  },
+  "id": 5
+}
+```
+
+**Python Example:**
+```python
+# Bulk approve recommendations
+rec_ids = ["rec-1", "rec-2", "rec-3", "rec-4", "rec-5"]
+result = client.bulk_review_recommendations(
+    rec_ids,
+    "approve",
+    notes="Batch approval"
+)
+print(f"Reviewed {result['reviewed_count']} recommendations")
+if result['errors']:
+    print(f"Errors: {len(result['errors'])}")
+```
+
+### apply_recommendations
+
+Apply approved recommendations to content files.
+
+**Parameters:**
+- `validation_id` (string, required): Validation ID with recommendations to apply
+- `recommendation_ids` (array of strings, optional): Specific recommendation IDs to apply (applies all approved if omitted)
+- `dry_run` (boolean, optional): Preview changes without applying (default false)
+- `create_backup` (boolean, optional): Create backup before applying (default true)
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "apply_recommendations",
+  "params": {
+    "validation_id": "val-123",
+    "recommendation_ids": ["rec-1", "rec-2"],
+    "dry_run": false,
+    "create_backup": true
+  },
+  "id": 6
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "validation_id": "val-123",
+    "applied_count": 2,
+    "skipped_count": 0,
+    "errors": [],
+    "backup_path": "/path/to/document.md.bak_20250115_103000"
+  },
+  "id": 6
+}
+```
+
+**Features:**
+- Automatic backup creation with timestamp
+- Dry-run mode for previewing changes
+- Selective application by recommendation ID
+- Only applies approved recommendations
+- Graceful error handling
+
+**Python Example:**
+```python
+# Preview changes (dry run)
+preview = client.apply_recommendations("val-123", dry_run=True)
+print(f"Would apply {preview['applied_count']} recommendations")
+
+# Apply all approved recommendations with backup
+result = client.apply_recommendations("val-123", create_backup=True)
+print(f"Applied {result['applied_count']} recommendations")
+print(f"Backup created at: {result['backup_path']}")
+
+# Apply specific recommendations only
+result = client.apply_recommendations(
+    "val-123",
+    recommendation_ids=["rec-1", "rec-3"],
+    create_backup=True
+)
+```
+
+### delete_recommendation
+
+Delete a recommendation record.
+
+**Parameters:**
+- `recommendation_id` (string, required): Recommendation ID to delete
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "delete_recommendation",
+  "params": {
+    "recommendation_id": "rec-1"
+  },
+  "id": 7
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "recommendation_id": "rec-1"
+  },
+  "id": 7
+}
+```
+
+**Python Example:**
+```python
+# Delete a recommendation
+result = client.delete_recommendation("rec-1")
+```
+
+### mark_recommendations_applied
+
+Mark recommendations as applied without actually modifying files. Useful when recommendations are applied manually.
+
+**Parameters:**
+- `recommendation_ids` (array of strings, required): List of recommendation IDs to mark as applied
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "mark_recommendations_applied",
+  "params": {
+    "recommendation_ids": ["rec-1", "rec-2", "rec-3"]
+  },
+  "id": 8
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "marked_count": 3,
+    "errors": []
+  },
+  "id": 8
+}
+```
+
+**Python Example:**
+```python
+# Mark recommendations as manually applied
+result = client.mark_recommendations_applied(["rec-1", "rec-2", "rec-3"])
+print(f"Marked {result['marked_count']} recommendations as applied")
+```
+
 ## Admin & Maintenance Methods
 
-### 5. `get_system_status`
+### 9. `get_system_status`
 
 Get comprehensive system health status.
 

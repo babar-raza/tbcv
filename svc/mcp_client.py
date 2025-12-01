@@ -410,6 +410,110 @@ class MCPSyncClient:
         """
         return self._call("enhance", {"ids": ids})
 
+    def enhance_batch(
+        self,
+        validation_ids: List[str],
+        batch_size: int = 10,
+        threshold: float = 0.7
+    ) -> Dict[str, Any]:
+        """
+        Enhance multiple validations with progress tracking.
+
+        Args:
+            validation_ids: List of validation IDs to enhance
+            batch_size: Processing batch size (default 10)
+            threshold: Confidence threshold for recommendations (default 0.7)
+
+        Returns:
+            Batch enhancement results with counts and timing
+
+        Raises:
+            MCPError: If batch enhancement fails
+        """
+        return self._call("enhance_batch", {
+            "ids": validation_ids,
+            "batch_size": batch_size,
+            "threshold": threshold
+        })
+
+    def enhance_preview(
+        self,
+        validation_id: str,
+        recommendation_types: Optional[List[str]] = None,
+        threshold: float = 0.7
+    ) -> Dict[str, Any]:
+        """
+        Preview enhancement without applying changes.
+
+        Args:
+            validation_id: Validation ID to preview
+            recommendation_types: Filter by recommendation types (optional)
+            threshold: Confidence threshold (default 0.7)
+
+        Returns:
+            Preview results with original, enhanced content, and diff
+
+        Raises:
+            MCPError: If preview fails
+        """
+        return self._call("enhance_preview", {
+            "validation_id": validation_id,
+            "recommendation_types": recommendation_types,
+            "threshold": threshold
+        })
+
+    def enhance_auto_apply(
+        self,
+        validation_id: str,
+        threshold: float = 0.9,
+        recommendation_types: Optional[List[str]] = None,
+        preview_first: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Auto-apply recommendations above threshold.
+
+        Args:
+            validation_id: Validation ID
+            threshold: Confidence threshold (default 0.9)
+            recommendation_types: Types to auto-apply (optional)
+            preview_first: Generate preview before applying (default True)
+
+        Returns:
+            Auto-apply results with counts and optional preview
+
+        Raises:
+            MCPError: If auto-apply fails
+        """
+        return self._call("enhance_auto_apply", {
+            "validation_id": validation_id,
+            "threshold": threshold,
+            "recommendation_types": recommendation_types,
+            "preview_first": preview_first
+        })
+
+    def get_enhancement_comparison(
+        self,
+        validation_id: str,
+        format: str = "unified"
+    ) -> Dict[str, Any]:
+        """
+        Get before/after comparison of enhancement.
+
+        Args:
+            validation_id: Enhanced validation ID
+            format: Diff format ("unified" or "side-by-side"), default "unified"
+
+        Returns:
+            Comparison with original, enhanced content, diff, and statistics
+
+        Raises:
+            MCPError: If comparison fails
+        """
+        return self._call("get_enhancement_comparison", {
+            "validation_id": validation_id,
+            "format": format
+        })
+
     # ========================================================================
     # Admin Methods
     # ========================================================================
@@ -963,6 +1067,203 @@ class MCPSyncClient:
             "include_validations": include_validations
         })
 
+    # ========================================================================
+    # Recommendation Methods
+    # ========================================================================
+
+    def generate_recommendations(
+        self,
+        validation_id: str,
+        threshold: float = 0.7,
+        types: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate recommendations for a validation.
+
+        Args:
+            validation_id: ID of validation to generate recommendations for
+            threshold: Confidence threshold (0.0-1.0), default 0.7
+            types: List of recommendation types to filter (optional)
+
+        Returns:
+            Dictionary with recommendations list and count
+
+        Raises:
+            MCPError: If generation fails
+        """
+        return self._call("generate_recommendations", {
+            "validation_id": validation_id,
+            "threshold": threshold,
+            "types": types
+        })
+
+    def rebuild_recommendations(
+        self,
+        validation_id: str,
+        threshold: float = 0.7
+    ) -> Dict[str, Any]:
+        """
+        Rebuild recommendations for a validation.
+
+        Args:
+            validation_id: ID of validation to rebuild recommendations for
+            threshold: Confidence threshold (0.0-1.0), default 0.7
+
+        Returns:
+            Dictionary with deleted and generated counts
+
+        Raises:
+            MCPError: If rebuild fails
+        """
+        return self._call("rebuild_recommendations", {
+            "validation_id": validation_id,
+            "threshold": threshold
+        })
+
+    def get_recommendations(
+        self,
+        validation_id: str,
+        status: Optional[str] = None,
+        rec_type: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get recommendations for a validation.
+
+        Args:
+            validation_id: ID of validation to get recommendations for
+            status: Filter by status (optional)
+            rec_type: Filter by recommendation type (optional)
+
+        Returns:
+            Dictionary with recommendations list and total count
+
+        Raises:
+            MCPError: If retrieval fails
+        """
+        return self._call("get_recommendations", {
+            "validation_id": validation_id,
+            "status": status,
+            "type": rec_type
+        })
+
+    def review_recommendation(
+        self,
+        recommendation_id: str,
+        action: str,
+        notes: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Review (approve/reject) a recommendation.
+
+        Args:
+            recommendation_id: ID of recommendation to review
+            action: Action to take ("approve" or "reject")
+            notes: Optional review notes
+
+        Returns:
+            Success status and new status
+
+        Raises:
+            MCPError: If review fails
+        """
+        return self._call("review_recommendation", {
+            "recommendation_id": recommendation_id,
+            "action": action,
+            "notes": notes
+        })
+
+    def bulk_review_recommendations(
+        self,
+        recommendation_ids: List[str],
+        action: str,
+        notes: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Bulk review multiple recommendations.
+
+        Args:
+            recommendation_ids: List of recommendation IDs to review
+            action: Action to take ("approve" or "reject")
+            notes: Optional review notes
+
+        Returns:
+            Dictionary with reviewed count and errors
+
+        Raises:
+            MCPError: If bulk review fails
+        """
+        return self._call("bulk_review_recommendations", {
+            "recommendation_ids": recommendation_ids,
+            "action": action,
+            "notes": notes
+        })
+
+    def apply_recommendations(
+        self,
+        validation_id: str,
+        recommendation_ids: Optional[List[str]] = None,
+        dry_run: bool = False,
+        create_backup: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Apply recommendations to content.
+
+        Args:
+            validation_id: ID of validation with recommendations to apply
+            recommendation_ids: Specific recommendation IDs to apply (optional, applies all approved if None)
+            dry_run: If True, preview changes without applying (default False)
+            create_backup: If True, create backup before applying (default True)
+
+        Returns:
+            Dictionary with applied count, skipped count, errors, and backup path
+
+        Raises:
+            MCPError: If application fails
+        """
+        return self._call("apply_recommendations", {
+            "validation_id": validation_id,
+            "recommendation_ids": recommendation_ids,
+            "dry_run": dry_run,
+            "create_backup": create_backup
+        })
+
+    def delete_recommendation(self, recommendation_id: str) -> Dict[str, Any]:
+        """
+        Delete a recommendation.
+
+        Args:
+            recommendation_id: ID of recommendation to delete
+
+        Returns:
+            Success status and recommendation_id
+
+        Raises:
+            MCPError: If deletion fails
+        """
+        return self._call("delete_recommendation", {
+            "recommendation_id": recommendation_id
+        })
+
+    def mark_recommendations_applied(
+        self,
+        recommendation_ids: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Mark recommendations as applied.
+
+        Args:
+            recommendation_ids: List of recommendation IDs to mark as applied
+
+        Returns:
+            Dictionary with marked count and errors
+
+        Raises:
+            MCPError: If marking fails
+        """
+        return self._call("mark_recommendations_applied", {
+            "recommendation_ids": recommendation_ids
+        })
+
 
 class MCPAsyncClient:
     """
@@ -1365,6 +1666,58 @@ class MCPAsyncClient:
             MCPError: If enhancement fails
         """
         return await self._call("enhance", {"ids": ids})
+
+    async def enhance_batch(
+        self,
+        validation_ids: List[str],
+        batch_size: int = 10,
+        threshold: float = 0.7
+    ) -> Dict[str, Any]:
+        """Enhance multiple validations with progress tracking asynchronously."""
+        return await self._call("enhance_batch", {
+            "ids": validation_ids,
+            "batch_size": batch_size,
+            "threshold": threshold
+        })
+
+    async def enhance_preview(
+        self,
+        validation_id: str,
+        recommendation_types: Optional[List[str]] = None,
+        threshold: float = 0.7
+    ) -> Dict[str, Any]:
+        """Preview enhancement without applying changes asynchronously."""
+        return await self._call("enhance_preview", {
+            "validation_id": validation_id,
+            "recommendation_types": recommendation_types,
+            "threshold": threshold
+        })
+
+    async def enhance_auto_apply(
+        self,
+        validation_id: str,
+        threshold: float = 0.9,
+        recommendation_types: Optional[List[str]] = None,
+        preview_first: bool = True
+    ) -> Dict[str, Any]:
+        """Auto-apply recommendations above threshold asynchronously."""
+        return await self._call("enhance_auto_apply", {
+            "validation_id": validation_id,
+            "threshold": threshold,
+            "recommendation_types": recommendation_types,
+            "preview_first": preview_first
+        })
+
+    async def get_enhancement_comparison(
+        self,
+        validation_id: str,
+        format: str = "unified"
+    ) -> Dict[str, Any]:
+        """Get before/after comparison of enhancement asynchronously."""
+        return await self._call("get_enhancement_comparison", {
+            "validation_id": validation_id,
+            "format": format
+        })
 
     # ========================================================================
     # Admin Methods
