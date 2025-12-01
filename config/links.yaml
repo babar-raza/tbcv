@@ -1,0 +1,105 @@
+# Link Validation Configuration
+# Controls validation of links and URLs in content
+
+links:
+  enabled: true
+  profile: "default"
+
+  rules:
+    empty_url:
+      enabled: true
+      level: error
+      message: "Link has empty URL"
+
+    localhost_link:
+      enabled: true
+      level: warning
+      message: "Link points to localhost"
+
+    placeholder_url:
+      enabled: true
+      level: warning
+      message: "Link contains placeholder"
+      params:
+        patterns:
+          - "#$"
+          - "TODO"
+          - "FIXME"
+          - "example.com"
+          - "placeholder"
+
+    invalid_scheme:
+      enabled: true
+      level: warning
+      message: "Unknown URL scheme"
+      params:
+        allowed:
+          - http
+          - https
+          - mailto
+          - ftp
+          - tel
+
+    spaces_in_url:
+      enabled: true
+      level: error
+      message: "Spaces in URL"
+
+    broken_reference:
+      enabled: true
+      level: error
+      message: "Broken reference-style link"
+
+    relative_path_warning:
+      enabled: true
+      level: info
+      message: "Relative path link"
+      params:
+        allow_relative: true
+
+    external_link_warning:
+      enabled: true
+      level: info
+      message: "External link detected"
+      params:
+        warn_external: false
+
+  profiles:
+    strict:
+      rules:
+        - empty_url
+        - localhost_link
+        - placeholder_url
+        - invalid_scheme
+        - spaces_in_url
+        - broken_reference
+        - relative_path_warning
+        - external_link_warning
+      overrides:
+        localhost_link:
+          level: error
+        placeholder_url:
+          level: error
+        external_link_warning:
+          params:
+            warn_external: true
+
+    default:
+      rules:
+        - empty_url
+        - localhost_link
+        - spaces_in_url
+        - broken_reference
+
+    relaxed:
+      rules:
+        - empty_url
+        - spaces_in_url
+
+  family_overrides:
+    words:
+      profile: "strict"
+    pdf:
+      profile: "default"
+    cells:
+      profile: "default"

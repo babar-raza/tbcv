@@ -1,0 +1,97 @@
+# Markdown Validation Configuration
+# Controls validation of Markdown syntax and formatting
+
+markdown:
+  enabled: true
+  profile: "default"
+
+  rules:
+    unclosed_code_block:
+      enabled: true
+      level: error
+      message: "Unclosed code block detected"
+
+    empty_link_text:
+      enabled: true
+      level: warning
+      message: "Link has empty text"
+
+    empty_link_url:
+      enabled: true
+      level: error
+      message: "Link has empty URL"
+
+    missing_alt_text:
+      enabled: true
+      level: warning
+      message: "Image missing alt text"
+
+    empty_image_url:
+      enabled: true
+      level: error
+      message: "Image missing URL"
+
+    excessive_whitespace:
+      enabled: true
+      level: info
+      message: "Multiple consecutive blank lines detected"
+
+    trailing_whitespace:
+      enabled: true
+      level: info
+      message: "Trailing whitespace detected"
+
+    unbalanced_formatting:
+      enabled: true
+      level: warning
+      message: "Unbalanced formatting markers"
+      params:
+        markers: ["**", "__", "*", "_", "~~", "```"]
+
+    broken_reference_link:
+      enabled: true
+      level: error
+      message: "Broken reference-style link"
+
+  profiles:
+    strict:
+      rules:
+        - unclosed_code_block
+        - empty_link_text
+        - empty_link_url
+        - missing_alt_text
+        - empty_image_url
+        - excessive_whitespace
+        - trailing_whitespace
+        - unbalanced_formatting
+        - broken_reference_link
+      overrides:
+        empty_link_text:
+          level: error
+        missing_alt_text:
+          level: error
+        excessive_whitespace:
+          level: warning
+        trailing_whitespace:
+          level: warning
+
+    default:
+      rules:
+        - unclosed_code_block
+        - empty_link_url
+        - missing_alt_text
+        - empty_image_url
+
+    relaxed:
+      rules:
+        - unclosed_code_block
+        - empty_link_url
+        - empty_image_url
+
+  family_overrides:
+    words:
+      profile: "strict"
+    pdf:
+      profile: "default"
+    cells:
+      profile: "default"

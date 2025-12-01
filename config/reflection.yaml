@@ -1,0 +1,105 @@
+# Reflection Pattern Configuration
+# Controls self-critique and refinement of recommendations
+
+reflection:
+  # Master switch for reflection pattern
+  enabled: true
+
+  # Quality thresholds
+  thresholds:
+    # Minimum quality score to accept without refinement (0.0-1.0)
+    quality_threshold: 0.7
+    # Below this score, recommendation is discarded (0.0-1.0)
+    discard_threshold: 0.3
+    # Similarity threshold for deduplication (0.0-1.0)
+    similarity_threshold: 0.85
+
+  # Refinement settings
+  refinement:
+    # Maximum refinement iterations per recommendation
+    max_iterations: 2
+    # Whether to use LLM for critique (false = rule-based only)
+    use_llm: true
+    # LLM model for critique (if use_llm is true)
+    llm_model: "mistral"
+    # Temperature for critique generation
+    temperature: 0.3
+
+  # Deduplication settings
+  deduplication:
+    # Enable semantic deduplication
+    enabled: true
+    # Method: "exact" | "fuzzy" | "semantic"
+    method: "fuzzy"
+    # Fields to compare for similarity
+    compare_fields:
+      - instruction
+      - scope
+
+  # Critique dimensions (weights for quality scoring)
+  dimensions:
+    actionable:
+      weight: 0.3
+      description: "Can the recommendation be implemented?"
+    fixes_issue:
+      weight: 0.3
+      description: "Does it actually resolve the problem?"
+    specific:
+      weight: 0.2
+      description: "Is it specific enough to act on?"
+    side_effects:
+      weight: 0.2
+      description: "Are there unintended consequences?"
+
+  # Validation rules for critique
+  rules:
+    # Require all recommendations to have rationale
+    require_rationale: true
+    # Minimum instruction length (characters)
+    min_instruction_length: 20
+    # Maximum instruction length (characters)
+    max_instruction_length: 500
+    # Disallow generic phrases
+    banned_phrases:
+      - "review and fix"
+      - "check and update"
+      - "ensure proper"
+      - "make sure"
+
+  # Logging and monitoring
+  monitoring:
+    # Log critique details
+    log_critiques: true
+    # Log refinement steps
+    log_refinements: true
+    # Track metrics for quality improvement
+    track_metrics: true
+    # Metrics to track
+    metrics:
+      - quality_score_distribution
+      - discard_rate
+      - refinement_rate
+      - deduplication_rate
+
+# Profiles for different use cases
+profiles:
+  strict:
+    thresholds:
+      quality_threshold: 0.85
+      discard_threshold: 0.5
+    refinement:
+      max_iterations: 3
+
+  permissive:
+    thresholds:
+      quality_threshold: 0.5
+      discard_threshold: 0.2
+    refinement:
+      max_iterations: 1
+
+  fast:
+    refinement:
+      use_llm: false
+      max_iterations: 1
+    deduplication:
+      method: "exact"

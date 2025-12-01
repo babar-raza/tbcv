@@ -1,0 +1,102 @@
+# Frontmatter (YAML) Validation Configuration
+# Controls validation of YAML frontmatter in markdown files
+
+frontmatter:
+  enabled: true
+  profile: "default"
+
+  rules:
+    required_title:
+      enabled: true
+      level: error
+      message: "Missing required field: title"
+      params:
+        field: title
+
+    required_description:
+      enabled: true
+      level: warning
+      message: "Missing recommended field: description"
+      params:
+        field: description
+
+    field_type_string:
+      enabled: true
+      level: error
+      message: "Field must be a string"
+      params:
+        fields: [title, description, author]
+
+    field_type_list:
+      enabled: true
+      level: warning
+      message: "Field should be a list"
+      params:
+        fields: [tags, categories, keywords]
+
+    field_type_date:
+      enabled: true
+      level: warning
+      message: "Date field should be in YYYY-MM-DD format"
+      params:
+        fields: [date, published_date, updated_date]
+
+    title_length:
+      enabled: true
+      level: warning
+      message: "Title should be between min and max length"
+      params:
+        min_length: 10
+        max_length: 100
+
+    description_length:
+      enabled: true
+      level: info
+      message: "Description should be between min and max length for SEO"
+      params:
+        min_length: 50
+        max_length: 160
+
+    yaml_parse_error:
+      enabled: true
+      level: error
+      message: "Failed to parse YAML frontmatter"
+
+  profiles:
+    strict:
+      rules:
+        - required_title
+        - required_description
+        - field_type_string
+        - field_type_list
+        - field_type_date
+        - title_length
+        - description_length
+        - yaml_parse_error
+      overrides:
+        required_description:
+          level: error
+        title_length:
+          level: error
+
+    default:
+      rules:
+        - required_title
+        - field_type_string
+        - field_type_list
+        - yaml_parse_error
+
+    relaxed:
+      rules:
+        - yaml_parse_error
+
+  family_overrides:
+    words:
+      profile: "strict"
+      rules:
+        required_description:
+          level: error
+    pdf:
+      profile: "default"
+    cells:
+      profile: "default"

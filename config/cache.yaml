@@ -1,0 +1,135 @@
+# file: config/cache.yaml
+# Cache Configuration for TBCV Validation System
+# Controls caching strategies for validation results, LLM responses, and truth data
+
+cache:
+  enabled: true
+  profile: "default"
+
+  # Validation Results Cache
+  validation:
+    enabled: true
+    ttl_seconds: 3600  # 1 hour
+    max_entries: 500
+    # Cache key is based on content hash + validation types + profile
+    key_components:
+      - content_hash
+      - validation_types
+      - profile
+      - family
+    # Only cache results with confidence above threshold
+    min_confidence_to_cache: 0.5
+    # Don't cache results with critical errors
+    exclude_on_critical: false
+
+  # LLM Response Cache
+  llm:
+    enabled: true
+    ttl_seconds: 86400  # 24 hours
+    max_entries: 1000
+    # Cache key is based on prompt hash + model name
+    key_components:
+      - prompt_hash
+      - model_name
+      - temperature
+    # Cache both successful and failed responses
+    cache_errors: false
+    # Maximum response size to cache (bytes)
+    max_response_size: 102400  # 100KB
+
+  # Truth Data Cache
+  truth:
+    enabled: true
+    ttl_seconds: 604800  # 7 days
+    # Preload truth data at startup
+    preload_on_startup: true
+    # Watch for file changes and invalidate
+    watch_file_changes: true
+    # Paths to watch for changes
+    watch_paths:
+      - "truth/"
+      - "config/"
+
+  # Content Hash Cache (for deduplication)
+  content_hash:
+    enabled: true
+    algorithm: "sha256"
+    # Truncate hash for key efficiency
+    hash_length: 16
+    # Include metadata in hash
+    include_metadata: false
+
+  # Cache Invalidation Settings
+  invalidation:
+    # Invalidate on config file changes
+    on_config_change: true
+    # Invalidate on truth file changes
+    on_truth_change: true
+    # Patterns to watch
+    watch_patterns:
+      - "config/*.yaml"
+      - "truth/*.json"
+    # Debounce file change events (ms)
+    debounce_ms: 500
+
+  # Performance Settings
+  performance:
+    # Enable cache warming for frequently used validators
+    enable_warming: true
+    # Validators to pre-warm
+    warm_validators:
+      - yaml
+      - markdown
+      - structure
+    # Background cleanup interval (seconds)
+    cleanup_interval: 300  # 5 minutes
+    # Compress cached data above this size (bytes)
+    compression_threshold: 1024
+
+  # Profiles for different use cases
+  profiles:
+    strict:
+      validation:
+        ttl_seconds: 1800  # 30 minutes (fresher results)
+        min_confidence_to_cache: 0.7
+      llm:
+        ttl_seconds: 43200  # 12 hours
+        cache_errors: false
+
+    default:
+      validation:
+        ttl_seconds: 3600
+        min_confidence_to_cache: 0.5
+      llm:
+        ttl_seconds: 86400
+
+    aggressive:
+      description: "Maximum caching for performance"
+      validation:
+        ttl_seconds: 7200  # 2 hours
+        min_confidence_to_cache: 0.3
+      llm:
+        ttl_seconds: 172800  # 48 hours
+        max_entries: 2000
+
+    disabled:
+      validation:
+        enabled: false
+      llm:
+        enabled: false
+      truth:
+        preload_on_startup: false
+
+  # Family-specific overrides
+  family_overrides:
+    words:
+      validation:
+        ttl_seconds: 1800  # Stricter TTL for words
+      llm:
+        ttl_seconds: 43200
+    pdf:
+      validation:
+        ttl_seconds: 7200  # Longer TTL for PDF (less frequent updates)
+    cells:
+      validation:
+        ttl_seconds: 7200

@@ -1,0 +1,133 @@
+# Truth Validation Configuration
+# Controls truth-based validation with optional LLM enhancement
+
+truth:
+  enabled: true
+  profile: "default"
+
+  rules:
+    # Phase 1: Rule-based validation rules
+    check_plugin_mentions:
+      enabled: true
+      level: warning
+      message: "Plugin mention validation"
+
+    check_api_patterns:
+      enabled: true
+      level: info
+      message: "API pattern validation"
+
+    check_forbidden_patterns:
+      enabled: true
+      level: error
+      message: "Forbidden pattern detected"
+      params:
+        patterns:
+          - "hardcoded_path"
+          - "deprecated_api"
+
+    unknown_plugin:
+      enabled: true
+      level: error
+      message: "Unknown plugin referenced"
+
+    # Phase 2: LLM-detected rules
+    missing_prerequisite:
+      enabled: true
+      level: warning
+      message: "Missing prerequisite plugin detected by LLM"
+
+    invalid_combination:
+      enabled: true
+      level: warning
+      message: "Invalid plugin combination detected by LLM"
+
+    missing_plugin:
+      enabled: true
+      level: warning
+      message: "Missing required plugin detected by LLM"
+
+  # Phase 1: Rule-based validation settings
+  rule_based:
+    check_plugin_mentions: true
+    check_api_patterns: true
+    check_forbidden_patterns: true
+    case_insensitive: true
+
+  # Phase 2: LLM enhancement settings
+  llm_enhancement:
+    enabled: true
+    timeout_seconds: 30
+    confidence_threshold: 0.7
+
+    # Content limits
+    min_content_length: 100
+    max_content_length: 50000
+
+    # Fallback behavior
+    fallback_on_error: true
+    fallback_on_timeout: true
+    fallback_on_unavailable: true
+
+    # What to check with LLM
+    check_plugin_requirements: true
+    check_plugin_combinations: true
+    check_missing_plugins: true
+    check_format_compatibility: true
+
+  # Phase 3: Merge settings
+  merge:
+    dedup_strategy: "rule_based_priority"  # rule_based_priority | llm_priority | both
+    tag_sources: true
+    combine_suggestions: true
+
+  profiles:
+    strict:
+      rules:
+        - check_plugin_mentions
+        - check_api_patterns
+        - check_forbidden_patterns
+        - unknown_plugin
+        - missing_prerequisite
+        - invalid_combination
+        - missing_plugin
+      overrides:
+        unknown_plugin:
+          level: error
+        missing_prerequisite:
+          level: error
+        invalid_combination:
+          level: error
+        missing_plugin:
+          level: error
+
+    default:
+      rules:
+        - check_plugin_mentions
+        - check_api_patterns
+        - unknown_plugin
+        - missing_prerequisite
+        - missing_plugin
+
+    relaxed:
+      rules:
+        - check_plugin_mentions
+        - unknown_plugin
+
+    rule_based_only:
+      rules:
+        - check_plugin_mentions
+        - check_api_patterns
+        - check_forbidden_patterns
+        - unknown_plugin
+
+  family_overrides:
+    words:
+      profile: "strict"
+      llm_enhancement:
+        enabled: true
+        confidence_threshold: 0.75
+    pdf:
+      profile: "default"
+    cells:
+      profile: "default"
