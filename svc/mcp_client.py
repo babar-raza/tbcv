@@ -1969,6 +1969,203 @@ class MCPAsyncClient:
             "include_validations": include_validations
         })
 
+    # ========================================================================
+    # Recommendation Methods
+    # ========================================================================
+
+    async def generate_recommendations(
+        self,
+        validation_id: str,
+        threshold: float = 0.7,
+        types: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate recommendations for a validation asynchronously.
+
+        Args:
+            validation_id: ID of validation to generate recommendations for
+            threshold: Confidence threshold (0.0-1.0), default 0.7
+            types: List of recommendation types to filter (optional)
+
+        Returns:
+            Dictionary with recommendations list and count
+
+        Raises:
+            MCPError: If generation fails
+        """
+        return await self._call("generate_recommendations", {
+            "validation_id": validation_id,
+            "threshold": threshold,
+            "types": types
+        })
+
+    async def rebuild_recommendations(
+        self,
+        validation_id: str,
+        threshold: float = 0.7
+    ) -> Dict[str, Any]:
+        """
+        Rebuild recommendations for a validation asynchronously.
+
+        Args:
+            validation_id: ID of validation to rebuild recommendations for
+            threshold: Confidence threshold (0.0-1.0), default 0.7
+
+        Returns:
+            Dictionary with deleted and generated counts
+
+        Raises:
+            MCPError: If rebuild fails
+        """
+        return await self._call("rebuild_recommendations", {
+            "validation_id": validation_id,
+            "threshold": threshold
+        })
+
+    async def get_recommendations(
+        self,
+        validation_id: str,
+        status: Optional[str] = None,
+        rec_type: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get recommendations for a validation asynchronously.
+
+        Args:
+            validation_id: ID of validation to get recommendations for
+            status: Filter by status (optional)
+            rec_type: Filter by recommendation type (optional)
+
+        Returns:
+            Dictionary with recommendations list and total count
+
+        Raises:
+            MCPError: If retrieval fails
+        """
+        return await self._call("get_recommendations", {
+            "validation_id": validation_id,
+            "status": status,
+            "type": rec_type
+        })
+
+    async def review_recommendation(
+        self,
+        recommendation_id: str,
+        action: str,
+        notes: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Review (approve/reject) a recommendation asynchronously.
+
+        Args:
+            recommendation_id: ID of recommendation to review
+            action: Action to take ("approve" or "reject")
+            notes: Optional review notes
+
+        Returns:
+            Success status and new status
+
+        Raises:
+            MCPError: If review fails
+        """
+        return await self._call("review_recommendation", {
+            "recommendation_id": recommendation_id,
+            "action": action,
+            "notes": notes
+        })
+
+    async def bulk_review_recommendations(
+        self,
+        recommendation_ids: List[str],
+        action: str,
+        notes: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Bulk review multiple recommendations asynchronously.
+
+        Args:
+            recommendation_ids: List of recommendation IDs to review
+            action: Action to take ("approve" or "reject")
+            notes: Optional review notes
+
+        Returns:
+            Dictionary with reviewed count and errors
+
+        Raises:
+            MCPError: If bulk review fails
+        """
+        return await self._call("bulk_review_recommendations", {
+            "recommendation_ids": recommendation_ids,
+            "action": action,
+            "notes": notes
+        })
+
+    async def apply_recommendations(
+        self,
+        validation_id: str,
+        recommendation_ids: Optional[List[str]] = None,
+        dry_run: bool = False,
+        create_backup: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Apply recommendations to content asynchronously.
+
+        Args:
+            validation_id: ID of validation with recommendations to apply
+            recommendation_ids: Specific recommendation IDs to apply (optional, applies all approved if None)
+            dry_run: If True, preview changes without applying (default False)
+            create_backup: If True, create backup before applying (default True)
+
+        Returns:
+            Dictionary with applied count, skipped count, errors, and backup path
+
+        Raises:
+            MCPError: If application fails
+        """
+        return await self._call("apply_recommendations", {
+            "validation_id": validation_id,
+            "recommendation_ids": recommendation_ids,
+            "dry_run": dry_run,
+            "create_backup": create_backup
+        })
+
+    async def delete_recommendation(self, recommendation_id: str) -> Dict[str, Any]:
+        """
+        Delete a recommendation asynchronously.
+
+        Args:
+            recommendation_id: ID of recommendation to delete
+
+        Returns:
+            Success status and recommendation_id
+
+        Raises:
+            MCPError: If deletion fails
+        """
+        return await self._call("delete_recommendation", {
+            "recommendation_id": recommendation_id
+        })
+
+    async def mark_recommendations_applied(
+        self,
+        recommendation_ids: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Mark recommendations as applied asynchronously.
+
+        Args:
+            recommendation_ids: List of recommendation IDs to mark as applied
+
+        Returns:
+            Dictionary with marked count and errors
+
+        Raises:
+            MCPError: If marking fails
+        """
+        return await self._call("mark_recommendations_applied", {
+            "recommendation_ids": recommendation_ids
+        })
+
 
 def get_mcp_sync_client(
     timeout: int = 30,

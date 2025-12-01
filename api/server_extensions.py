@@ -21,66 +21,186 @@ websocket_router = APIRouter(tags=["websocket"])
 async def workflow_progress_websocket(websocket: WebSocket, workflow_id: str):
     """
     WebSocket endpoint for real-time workflow progress updates (O05, I05, I20).
-    
+
+    Uses MCP async client to stream workflow status updates.
+
     Clients can connect to receive real-time updates about:
     - Workflow status changes (started, paused, resumed, completed, failed)
-    - Individual file progress 
+    - Individual file progress
     - Error notifications
     - Performance metrics
-    
+
     Clients can also send commands:
     - pause_workflow: Pause the workflow
-    - resume_workflow: Resume the workflow  
+    - resume_workflow: Resume the workflow
     - cancel_workflow: Cancel the workflow
     - ping: Keep connection alive
     """
-    await websocket_endpoint(websocket, workflow_id)
+    from api.mcp_helpers import get_api_mcp_client
+    import asyncio
+
+    await websocket.accept()
+    mcp = await get_api_mcp_client()
+
+    # Track last known workflow status
+    last_status = None
+
+    try:
+        while True:
+            # Get workflow status from MCP
+            try:
+                result = await mcp.get_workflow(workflow_id)
+                workflow = result.get("workflow", {})
+                current_status = workflow.get("status", "unknown")
+
+                # Send update if status changed or first time
+                if current_status != last_status:
+                    await websocket.send_json({
+                        "type": "workflow_update",
+                        "workflow_id": workflow_id,
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "data": workflow
+                    })
+                    last_status = current_status
+
+                # Exit if workflow completed or failed
+                if current_status in ["completed", "failed", "cancelled"]:
+                    await websocket.send_json({
+                        "type": "workflow_complete",
+                        "workflow_id": workflow_id,
+                        "status": current_status,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                    break
+
+            except Exception as e:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": f"Failed to fetch workflow: {str(e)}"
+                })
+
+            # Check for client commands
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=0.5)
+                message = json.loads(data)
+
+                if message.get("type") == "ping":
+                    await websocket.send_json({
+                        "type": "pong",
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+            except asyncio.TimeoutError:
+                pass  # No message received, continue
+            except WebSocketDisconnect:
+                break
+            except json.JSONDecodeError:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Invalid JSON"
+                })
+
+    except WebSocketDisconnect:
+        pass  # Client disconnected
+    except Exception as e:
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": str(e)
+            })
+        except:
+            pass  # Connection may be closed
 
 @websocket_router.websocket("/ws/live-dashboard")
 async def dashboard_live_updates(websocket: WebSocket):
     """
     WebSocket endpoint for live dashboard updates.
+
+    Uses MCP async client to stream dashboard metrics and status updates.
     Broadcasts dashboard metrics and status updates to all connected clients.
     """
+    from api.mcp_helpers import get_api_mcp_client
+    import asyncio
+
     await websocket.accept()
-    
+    mcp = await get_api_mcp_client()
+
     try:
-        # Send initial dashboard state
-        from core.database import db_manager
-        
-        initial_state = {
-            "type": "dashboard_state",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "pending_validations": len(db_manager.list_validation_results(limit=1000)),
-                "pending_recommendations": len(db_manager.list_recommendations(status="pending", limit=1000)),
-                "active_workflows": len(db_manager.list_workflows(state="running", limit=100)),
+        # Send initial dashboard state using MCP
+        try:
+            validations = await mcp.list_validations(limit=1000)
+            recommendations = await mcp.list_recommendations(limit=1000, status="pending")
+            workflows = await mcp.list_workflows(limit=100, status="running")
+
+            initial_state = {
+                "type": "dashboard_state",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": {
+                    "pending_validations": validations.get("total", 0),
+                    "pending_recommendations": recommendations.get("total", 0),
+                    "active_workflows": workflows.get("total", 0),
+                }
             }
-        }
-        
-        await websocket.send_text(json.dumps(initial_state))
-        
+
+            await websocket.send_text(json.dumps(initial_state))
+        except Exception as e:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": f"Failed to load dashboard state: {str(e)}"
+            }))
+
         # Keep connection alive and send periodic updates
         while True:
             try:
-                # Wait for client messages or timeout after 30 seconds
-                data = await websocket.receive_text()
+                # Wait for client messages with timeout
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
                 message = json.loads(data)
-                
+
                 if message.get("type") == "ping":
                     await websocket.send_text(json.dumps({
                         "type": "pong",
                         "timestamp": datetime.utcnow().isoformat()
                     }))
-                    
+                elif message.get("type") == "refresh":
+                    # Client requested dashboard refresh
+                    try:
+                        validations = await mcp.list_validations(limit=1000)
+                        recommendations = await mcp.list_recommendations(limit=1000, status="pending")
+                        workflows = await mcp.list_workflows(limit=100, status="running")
+
+                        await websocket.send_text(json.dumps({
+                            "type": "dashboard_update",
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "data": {
+                                "pending_validations": validations.get("total", 0),
+                                "pending_recommendations": recommendations.get("total", 0),
+                                "active_workflows": workflows.get("total", 0),
+                            }
+                        }))
+                    except Exception as e:
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "message": f"Failed to refresh dashboard: {str(e)}"
+                        }))
+
+            except asyncio.TimeoutError:
+                # Send heartbeat after timeout
+                await websocket.send_text(json.dumps({
+                    "type": "heartbeat",
+                    "timestamp": datetime.utcnow().isoformat()
+                }))
             except WebSocketDisconnect:
                 break
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": "Invalid JSON"
+                }))
             except Exception as e:
                 await websocket.send_text(json.dumps({
                     "type": "error",
                     "message": str(e)
                 }))
-                
+
     except Exception:
         pass  # Connection closed
     
