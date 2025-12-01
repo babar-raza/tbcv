@@ -115,8 +115,8 @@ class Workflow(Base):
     type = Column(String(50), nullable=False, index=True)
     state = Column(SQLEnum(WorkflowState), nullable=False, index=True, default=WorkflowState.PENDING)
     input_params = Column(JSONField)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime)
     workflow_metadata = Column("metadata", JSONField)
     total_steps = Column(Integer, default=0)
@@ -158,7 +158,7 @@ class Checkpoint(Base):
     name = Column(String(100), nullable=False)
     step_number = Column(Integer, nullable=False)
     state_data = Column(LargeBinary)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     validation_hash = Column(String(32))
     can_resume_from = Column(Boolean, default=True)
 
@@ -187,10 +187,10 @@ class CacheEntry(Base):
     method_name = Column(String(100), nullable=False, index=True)
     input_hash = Column(String(64), nullable=False)
     result_data = Column(LargeBinary)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime, nullable=False, index=True)
     access_count = Column(Integer, default=1)
-    last_accessed = Column(DateTime, default=datetime.utcnow)
+    last_accessed = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     size_bytes = Column(Integer)
 
     __table_args__ = (
@@ -239,8 +239,8 @@ class ValidationResult(Base):
     file_hash = Column(String(64), index=True)  # Hash of the actual file for history tracking
     version_number = Column(Integer, default=1)  # Version number for this file path
 
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     workflow = relationship("Workflow", back_populates="validation_results")
@@ -322,8 +322,8 @@ class Recommendation(Base):
     applied_at = Column(DateTime)
     applied_by = Column(String(100))
 
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Additional context
     recommendation_metadata = Column("metadata", JSONField)
@@ -420,6 +420,7 @@ class DatabaseManager:
         self._lock = Lock()
         if SQLALCHEMY_AVAILABLE:
             db_url = os.getenv("DATABASE_URL", "sqlite:///./data/tbcv.db")
+            self.db_url = db_url  # Store for later access
             # Ensure SQLite path exists
             if db_url.startswith('sqlite:///'):
                 db_path = db_url.replace('sqlite:///', '')
@@ -429,6 +430,7 @@ class DatabaseManager:
             self.create_tables()
         else:
             # In-memory fallbacks if SQLAlchemy missing
+            self.db_url = None
             self.engine = None
             self.SessionLocal = None
             self._workflows = {}
@@ -502,6 +504,17 @@ class DatabaseManager:
 
     def get_session(self) -> Session:
         return self.SessionLocal()  # type: ignore
+
+    def get_database_path(self) -> Optional[str]:
+        """
+        Get the path to the SQLite database file.
+
+        Returns:
+            Path to database file or None if not using SQLite
+        """
+        if self.db_url and self.db_url.startswith('sqlite:///'):
+            return self.db_url.replace('sqlite:///', '')
+        return None
 
     # ---- Workflow helpers ----
     def get_workflow(self, workflow_id: str) -> Optional[Workflow]:
@@ -610,6 +623,17 @@ class DatabaseManager:
         workflow_id: Optional[str] = None,
         validation_types: Optional[List[str]] = None,
     ) -> ValidationResult:
+        # Normalize file path to ensure it's absolute and valid
+        try:
+            from core.file_utils import normalize_file_path
+            # Don't copy temp files here - they should already be handled by the API
+            normalized_file_path, was_temp = normalize_file_path(file_path, content=content, copy_temp=False)
+            if was_temp:
+                logger.warning(f"Temp file path received in create_validation_result: {file_path}. Path normalized to: {normalized_file_path}")
+        except Exception as e:
+            logger.error(f"Error normalizing file path '{file_path}': {e}. Using original path.")
+            normalized_file_path = file_path
+
         content_hash = self._sha256(content) if content else None
 
         # Convert string status to enum if needed
@@ -618,7 +642,7 @@ class DatabaseManager:
 
         vr = ValidationResult(
             workflow_id=workflow_id,
-            file_path=file_path,
+            file_path=normalized_file_path,
             rules_applied=rules_applied,
             validation_results=validation_results,
             validation_types=validation_types,
@@ -633,7 +657,7 @@ class DatabaseManager:
             session.add(vr)
             session.commit()
             session.refresh(vr)
-        logger.info("Validation result stored", extra={"validation_id": vr.id})
+        logger.info("Validation result stored", extra={"validation_id": vr.id, "file_path": normalized_file_path})
         
         # Auto-generate recommendations if validation has results
         if validation_results:
@@ -692,6 +716,16 @@ class DatabaseManager:
         with self.get_session() as session:
             return session.query(ValidationResult).filter(ValidationResult.id == validation_id).first()
 
+    def count_validations(self) -> int:
+        """
+        Count total number of validation results.
+
+        Returns:
+            Total count of validation results
+        """
+        with self.get_session() as session:
+            return session.query(ValidationResult).count()
+
     def get_latest_validation_result(self, *, file_path: str) -> Optional[ValidationResult]:
         with self.get_session() as session:
             return (
@@ -700,6 +734,40 @@ class DatabaseManager:
                 .order_by(ValidationResult.created_at.desc())
                 .first()
             )
+
+    def update_validation_status(self, validation_id: str, status: str) -> Optional[ValidationResult]:
+        """Update the status of a validation result.
+
+        Args:
+            validation_id: The ID of the validation to update
+            status: The new status (e.g., 'approved', 'rejected', 'enhanced')
+
+        Returns:
+            The updated ValidationResult or None if not found
+        """
+        with self.get_session() as session:
+            validation = session.query(ValidationResult).filter(
+                ValidationResult.id == validation_id
+            ).first()
+
+            if validation:
+                # Handle enum conversion if status is an enum
+                if hasattr(ValidationStatus, status.upper()):
+                    validation.status = getattr(ValidationStatus, status.upper())
+                else:
+                    # Try to set as string if not a valid enum
+                    try:
+                        validation.status = ValidationStatus(status)
+                    except (ValueError, KeyError):
+                        # If not a valid enum value, just store as-is if schema allows
+                        validation.status = status
+
+                validation.updated_at = datetime.now(timezone.utc)
+                session.commit()
+                session.refresh(validation)
+                return validation
+
+            return None
 
     def get_validation_history(
         self,

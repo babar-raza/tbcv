@@ -524,6 +524,29 @@ class AgentRegistry:
             })
         return summary
 
+    def reload_agent(self, agent_id: str) -> None:
+        """
+        Reload a specific agent.
+
+        Args:
+            agent_id: Agent ID to reload
+
+        Raises:
+            ValueError: If agent not found
+        """
+        if agent_id not in self.agents:
+            raise ValueError(f"Agent not found: {agent_id}")
+
+        agent = self.agents[agent_id]
+
+        # Clear agent's cache
+        cache_manager.clear_agent_cache(agent_id)
+
+        # Update contract
+        self.contracts[agent_id] = agent.get_contract()
+
+        self.logger.info("Agent reloaded", agent_id=agent_id)
+
     async def broadcast_message(self, message: MCPMessage, target_agents: Optional[List[str]] = None) -> Dict[str, MCPMessage]:
         """
         Send the same MCP message to multiple agents; collect responses.

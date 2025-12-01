@@ -6,7 +6,7 @@ import websockets
 import json
 
 async def test_websocket():
-    uri = "ws://127.0.0.1:8586/ws/validation_updates"
+    uri = "ws://127.0.0.1:8585/ws/validation_updates"
 
     try:
         print(f"Connecting to {uri}...")

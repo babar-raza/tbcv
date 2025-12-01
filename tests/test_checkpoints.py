@@ -225,6 +225,26 @@ class TestAgentCheckpoints:
 class TestCheckpointDatabase:
     """Tests for checkpoint database operations."""
 
+    @pytest.fixture
+    def test_agent(self):
+        """Create a test agent for checkpoint testing."""
+        class TestCheckpointAgent(BaseAgent):
+            def __init__(self):
+                super().__init__(agent_id="test_checkpoint_db_agent")
+
+            def get_contract(self):
+                return {
+                    "agent_id": self.agent_id,
+                    "name": "Test Checkpoint DB Agent",
+                    "description": "Agent for testing checkpoints in database",
+                    "capabilities": []
+                }
+
+            def _register_message_handlers(self):
+                pass  # No handlers needed for checkpoint testing
+
+        return TestCheckpointAgent()
+
     def test_checkpoint_stored_in_database(self, test_agent):
         """Checkpoint should be stored in database."""
         checkpoint_id = test_agent.create_checkpoint(

@@ -7,12 +7,13 @@ import asyncio
 import tempfile
 import json
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 class TestRuleManager:
     
     def test_load_family_rules_words(self):
         """Test loading rules for words family."""
-        from rule_manager import RuleManager
+        from core.rule_manager import RuleManager
         
         rm = RuleManager()
         rules = rm.get_family_rules("words")
@@ -24,7 +25,7 @@ class TestRuleManager:
         
     def test_api_patterns_loaded(self):
         """Test that API patterns are loaded from rules."""
-        from rule_manager import RuleManager
+        from core.rule_manager import RuleManager
         
         rm = RuleManager()
         patterns = rm.get_api_patterns("words")
@@ -35,7 +36,7 @@ class TestRuleManager:
 
     def test_non_editable_fields_include_global(self):
         """Test that non-editable fields include global defaults."""
-        from rule_manager import RuleManager
+        from core.rule_manager import RuleManager
         
         rm = RuleManager()
         fields = rm.get_non_editable_fields("words")
@@ -80,12 +81,21 @@ doc.Save("output.pdf");
         """Test YAML validation with family-specific non-editable fields."""
         # Enhance mock to return non_editable_fields
         async def mock_with_fields(params):
-            result = await mock_content_validator.handle_validate_content.__wrapped__(params)
-            result['metrics']['yaml_metrics'] = {
-                'fields_checked': 5,
-                'non_editable_fields': ['layout', 'plugin_family', 'categories', 'date', 'title']
+            return {
+                "success": True,
+                "confidence": 0.85,
+                "issues_count": 0,
+                "issues": [],
+                "metrics": {
+                    "yaml_metrics": {
+                        "fields_checked": 5,
+                        "non_editable_fields": ['layout', 'plugin_family', 'categories', 'date', 'title']
+                    },
+                    "family_rules_loaded": True
+                },
+                "family": params.get("family", "words"),
+                "validation_types": params.get("validation_types", [])
             }
-            return result
 
         mock_content_validator.handle_validate_content = AsyncMock(side_effect=mock_with_fields)
         agent = mock_content_validator

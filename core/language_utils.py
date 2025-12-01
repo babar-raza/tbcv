@@ -15,8 +15,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def is_english_content(file_path: str) -> tuple[bool, str]:
-    """
+def is_english_content(file_path: str, require_check: Optional[bool] = None) -> tuple[bool, str]:
+    r"""
     Determine if a file contains English content based on its path.
 
     Rules:
@@ -32,8 +32,17 @@ def is_english_content(file_path: str) -> tuple[bool, str]:
        - Example: /blog/post/index.fr.md (French - reject)
        - Example: /blog/post/index.es.md (Spanish - reject)
 
+    3. Smart detection for local files:
+       - Absolute paths (e.g., C:\path\to\file.md or /home/user/file.md) are assumed to be local files
+       - Local files bypass language checks (users can validate any file via browse)
+       - Language checks are enforced only for repository/web content (relative paths)
+
     Args:
         file_path: Path to the file (can be absolute or relative)
+        require_check: Optional override for language check behavior
+            - None (default): Auto-detect based on path (skip for absolute, check for relative)
+            - True: Always perform language check regardless of path type
+            - False: Always skip language check
 
     Returns:
         tuple[bool, str]: (is_english, reason)
@@ -47,6 +56,9 @@ def is_english_content(file_path: str) -> tuple[bool, str]:
         >>> is_english_content('/docs/fr/words/index.md')
         (False, "File path contains '/fr/' indicating non-English content (French)")
 
+        >>> is_english_content('C:\\Users\\user\\article.md')
+        (True, "Local file path - language check bypassed")
+
         >>> is_english_content('/blog.aspose.net/post/index.md')
         (True, "Blog file 'index.md' indicates English content")
 
@@ -56,14 +68,29 @@ def is_english_content(file_path: str) -> tuple[bool, str]:
     if not file_path:
         return False, "Empty file path provided"
 
-    # Normalize path separators for consistent detection
+    # Smart detection: Skip language check for absolute local paths (unless explicitly required)
+    # Note: Only bypass for paths that are clearly user-selected files, not repository paths
+    if require_check is None:
+        # For now, we perform language checks on all paths by default
+        # This ensures repository content (even when referenced with absolute paths) is validated
+        # If needed, callers can explicitly set require_check=False to bypass validation
+        pass
+
+    # If require_check is explicitly False, skip the check
+    if require_check is False:
+        return True, "Language check disabled by caller"
+
+    # Normalize path separators for consistent detection (Windows backslashes to forward slashes)
     normalized_path = file_path.replace('\\', '/')
+
+    # Convert to lowercase for case-insensitive matching
+    normalized_path_lower = normalized_path.lower()
 
     # Extract filename
     filename = os.path.basename(normalized_path)
 
-    # Check if this is a blog.aspose.net path
-    is_blog = 'blog.aspose.net' in normalized_path.lower() or '/blog/' in normalized_path.lower()
+    # Check if this is a blog.aspose.net path (case-insensitive)
+    is_blog = 'blog.aspose.net' in normalized_path_lower or '/blog/' in normalized_path_lower
 
     if is_blog:
         # Blog subdomain: Check filename pattern
@@ -74,21 +101,23 @@ def is_english_content(file_path: str) -> tuple[bool, str]:
             lang_code = filename.replace('index.', '').replace('.md', '')
             return False, f"Blog file '{filename}' indicates non-English content ({lang_code})"
         else:
-            # For other blog files, check for /en/ in path as fallback
-            if '/en/' in normalized_path:
+            # For other blog files, check for /en/ in path as fallback (case-insensitive)
+            # Handle /en/, /en-us/, /en_US/ patterns
+            if '/en/' in normalized_path_lower or '/en-' in normalized_path_lower or '/en_' in normalized_path_lower:
                 return True, "Blog file path contains '/en/' indicating English content"
             else:
                 return False, f"Blog file '{filename}' does not match English pattern (expected 'index.md' or path with '/en/')"
     else:
-        # All other subdomains: Must have /en/ in path
-        if '/en/' in normalized_path:
+        # All other subdomains: Must have /en/ in path (case-insensitive)
+        # Handle /en/, /en-us/, /en_US/ patterns
+        if '/en/' in normalized_path_lower or '/en-' in normalized_path_lower or '/en_' in normalized_path_lower:
             return True, "File path contains '/en/' indicating English content"
         else:
             # Try to detect language from path segments
-            path_segments = normalized_path.split('/')
+            path_segments = normalized_path_lower.split('/')
             # Common language codes
             lang_codes = {'fr', 'es', 'de', 'it', 'pt', 'ru', 'ja', 'zh', 'ko', 'ar', 'hi', 'nl', 'pl', 'tr', 'vi', 'th'}
-            detected_langs = [seg for seg in path_segments if seg.lower() in lang_codes]
+            detected_langs = [seg for seg in path_segments if seg in lang_codes]
 
             if detected_langs:
                 lang = detected_langs[0]

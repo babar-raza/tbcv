@@ -220,32 +220,46 @@ class TestTruthManagerAgentBasics:
     """Test TruthManagerAgent initialization and basic operations."""
 
     def test_truth_manager_initialization(self):
-        """Test TruthManagerAgent initialization."""
+        """Test TruthManagerAgent initialization with explicit ID."""
         agent = TruthManagerAgent("test_truth_manager")
 
         assert agent.agent_id == "test_truth_manager"
-        assert agent.truth_index is None
+        # Note: truth_index may be loaded automatically on initialization
+        # if truth data files are available
         assert isinstance(agent.truth_directories, list)
         assert isinstance(agent.validation_issues, list)
         assert "words" in agent.supported_families
 
     def test_truth_manager_default_id(self):
-        """Test TruthManagerAgent with default ID."""
+        """Test TruthManagerAgent with auto-generated ID."""
         agent = TruthManagerAgent()
 
-        assert agent.agent_id == "truth_manager"
+        # Agent ID should be auto-generated with prefix
+        assert agent.agent_id.startswith("truthmanageragent_")
+        assert len(agent.agent_id) > len("truthmanageragent_")
 
-    def test_get_contract(self):
-        """Test TruthManagerAgent contract."""
-        agent = TruthManagerAgent()
+    def test_get_contract_with_explicit_id(self):
+        """Test TruthManagerAgent contract with explicit ID."""
+        agent = TruthManagerAgent("test_truth_manager")
         contract = agent.get_contract()
 
-        assert contract.agent_id == "truth_manager"
+        assert contract.agent_id == "test_truth_manager"
         assert contract.name == "TruthManagerAgent"
         assert contract.version == "1.0.0"
         assert len(contract.capabilities) >= 3
         assert contract.max_runtime_s == 60
         assert contract.confidence_threshold == 0.9
+
+    def test_get_contract_with_auto_id(self):
+        """Test TruthManagerAgent contract with auto-generated ID."""
+        agent = TruthManagerAgent()
+        contract = agent.get_contract()
+
+        # Contract should use the auto-generated agent_id
+        assert contract.agent_id == agent.agent_id
+        assert contract.agent_id.startswith("truthmanageragent_")
+        assert contract.name == "TruthManagerAgent"
+        assert contract.version == "1.0.0"
 
     def test_get_contract_capabilities(self):
         """Test contract capabilities are properly defined."""
@@ -261,13 +275,13 @@ class TestTruthManagerAgentBasics:
         """Test that message handlers are registered."""
         agent = TruthManagerAgent()
 
-        # Check handlers are registered
-        assert "ping" in agent.handlers
-        assert "get_status" in agent.handlers
-        assert "load_truth_data" in agent.handlers
-        assert "get_plugin_info" in agent.handlers
-        assert "search_plugins" in agent.handlers
-        assert "get_combination_rules" in agent.handlers
+        # Check handlers are registered using the correct attribute name
+        assert "ping" in agent.message_handlers
+        assert "get_status" in agent.message_handlers
+        assert "load_truth_data" in agent.message_handlers
+        assert "get_plugin_info" in agent.message_handlers
+        assert "search_plugins" in agent.message_handlers
+        assert "get_combination_rules" in agent.message_handlers
 
 
 # =============================================================================
@@ -284,8 +298,10 @@ class TestTruthManagerHandlers:
         agent = TruthManagerAgent()
         response = await agent.handle_ping({})
 
-        assert response["status"] == "ok"
+        # BaseAgent.handle_ping returns {"pong": True, "timestamp": ..., "agent_id": ...}
+        assert response["pong"] is True
         assert "timestamp" in response
+        assert "agent_id" in response
 
     async def test_handle_get_status(self):
         """Test get_status handler."""
@@ -294,7 +310,8 @@ class TestTruthManagerHandlers:
 
         assert "agent_id" in response
         assert "status" in response
-        assert response["agent_id"] == "truth_manager"
+        # Agent ID is auto-generated, so just check it exists
+        assert response["agent_id"].startswith("truthmanageragent_")
 
     async def test_handle_load_truth_data_default_family(self):
         """Test loading truth data with default family."""
@@ -503,7 +520,9 @@ class TestTruthManagerHandlers:
 
         response = await agent.handle_get_truth_statistics({})
 
-        assert "total_plugins" in response or "error" in response
+        # When no index loaded, should return loaded: False
+        assert "loaded" in response
+        assert response["loaded"] is False
 
     async def test_handle_get_truth_statistics_with_data(self):
         """Test get_truth_statistics with loaded data."""
@@ -537,9 +556,13 @@ class TestTruthManagerHandlers:
 
         response = await agent.handle_get_truth_statistics({})
 
-        assert response["total_plugins"] == 1
-        assert "families" in response
+        # Check the actual response structure returned by the handler
+        assert response["loaded"] is True
+        assert response["plugins_count"] == 1
+        assert response["families_count"] == 1
+        assert response["rules_count"] == 0
         assert "version_hash" in response
+        assert "supported_families" in response
 
     async def test_handle_reload_truth_data(self):
         """Test reload_truth_data handler."""
@@ -556,7 +579,7 @@ class TestTruthManagerHandlers:
         agent.truth_index = None
 
         response = await agent.handle_check_plugin_combination({
-            "plugin_ids": ["plugin1", "plugin2"]
+            "plugins": ["plugin1", "plugin2"]
         })
 
         assert "valid" in response or "error" in response
@@ -590,7 +613,7 @@ class TestTruthManagerHandlers:
         )
 
         response = await agent.handle_check_plugin_combination({
-            "plugin_ids": ["plugin1", "plugin2"]
+            "plugins": ["plugin1", "plugin2"]
         })
 
         assert "valid" in response
@@ -635,7 +658,8 @@ class TestTruthManagerIntegration:
         if load_response.get("success"):
             # Get statistics
             stats_response = await agent.handle_get_truth_statistics({})
-            assert stats_response["total_plugins"] > 0
+            assert stats_response["loaded"] is True
+            assert stats_response["plugins_count"] > 0
 
             # Search for plugins
             search_response = await agent.handle_search_plugins({"query": "aspose"})

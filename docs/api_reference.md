@@ -46,7 +46,7 @@ Comprehensive health check with full system status.
 {
   "status": "healthy",
   "timestamp": "2025-11-19T16:48:00.000Z",
-  "agents_registered": 8,
+  "agents_registered": 11,
   "database_connected": true,
   "schema_present": true,
   "version": "2.0.0"
@@ -124,7 +124,7 @@ List all registered agents with their capabilities.
       }
     }
   ],
-  "total_count": 8
+  "total_count": 11
 }
 ```
 

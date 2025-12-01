@@ -101,6 +101,10 @@ class TestPromptLoader:
 
     def test_load_file_read_error(self, temp_dir):
         """Test handling of file read errors."""
+        # Create the file so file_path.exists() returns True
+        error_file = temp_dir / "error.json"
+        error_file.write_text("{}")  # Create valid JSON file
+
         loader = PromptLoader(str(temp_dir))
 
         with patch('builtins.open', side_effect=IOError("Cannot read")):

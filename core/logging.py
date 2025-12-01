@@ -2,7 +2,8 @@
 Structured logging configuration for the TBCV system.
 
 Goals:
-- Provide JSON-structured logs by default (good for log shipping / analysis).
+- Provide clean, professional console output for development.
+- Provide JSON-structured logs for file output (good for log shipping / analysis).
 - Avoid hard dependency on `python-json-logger`; gracefully fallback if it's missing.
 - Offer simple helpers (get_logger, LoggerMixin, PerformanceLogger, @log_performance).
 
@@ -36,18 +37,76 @@ from .config import get_settings
 
 
 # =========================
-# JSON formatter (fallback)
+# Console formatter (clean, human-readable)
 # =========================
-class _FallbackJsonFormatter(logging.Formatter):
+class _ConsoleFormatter(logging.Formatter):
     """
-    Minimal JSON formatter used when `python-json-logger` is not available.
+    Clean, professional console formatter for development.
 
-    Behavior:
-    - Emits a single JSON object per log line.
-    - Includes timestamp, level, name, message, plus any extra attributes bound
-      to the record (e.g., via logger = logger.bind(...) in structlog or logger.xyz=...).
+    Produces output like:
+        2025-11-26 11:28:18 [info     ] Database tables ensured
+        2025-11-26 11:28:18 [info     ] Agent registered              agent_id=truth_manager
+    """
 
-    This is intentionally simple and dependency-free.
+    # ANSI color codes for terminal output
+    COLORS = {
+        'DEBUG': '\033[36m',     # Cyan
+        'INFO': '\033[32m',      # Green
+        'WARNING': '\033[33m',   # Yellow
+        'ERROR': '\033[31m',     # Red
+        'CRITICAL': '\033[35m',  # Magenta
+        'RESET': '\033[0m',      # Reset
+    }
+
+    def __init__(self, use_colors: bool = True):
+        super().__init__()
+        self.use_colors = use_colors and sys.stdout.isatty()
+
+    def format(self, record: logging.LogRecord) -> str:
+        # Get timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Get level with padding
+        level = record.levelname.lower()
+        level_padded = f"[{level:<8}]"
+
+        # Get the message - handle structlog JSON output
+        message = record.getMessage()
+        extra_fields = ""
+
+        # Check if message is JSON from structlog
+        if message.startswith('{') and message.endswith('}'):
+            try:
+                data = json.loads(message)
+                # Extract event as main message
+                event = data.get('event', message)
+                # Build extra fields string from other keys
+                skip_keys = {'event', 'logger', 'level', 'timestamp', 'metadata'}
+                extras = {k: v for k, v in data.items() if k not in skip_keys}
+                if extras:
+                    extra_fields = " " + " ".join(f"{k}={v}" for k, v in extras.items())
+                message = event
+            except json.JSONDecodeError:
+                pass  # Not JSON, use as-is
+
+        # Apply colors if enabled
+        if self.use_colors:
+            color = self.COLORS.get(record.levelname, '')
+            reset = self.COLORS['RESET']
+            level_padded = f"{color}{level_padded}{reset}"
+
+        return f"{timestamp} {level_padded} {message}{extra_fields}"
+
+
+# =========================
+# JSON formatter (for file output)
+# =========================
+class _JsonFormatter(logging.Formatter):
+    """
+    JSON formatter for file output and log shipping.
+
+    Handles structlog's pre-formatted JSON by extracting and re-structuring it
+    to avoid double-wrapping.
     """
 
     # Keys that logging.LogRecord uses internally; we don't want to duplicate them
@@ -59,12 +118,26 @@ class _FallbackJsonFormatter(logging.Formatter):
     }
 
     def format(self, record: logging.LogRecord) -> str:
-        # Base payload
+        message = record.getMessage()
+
+        # Check if message is already JSON from structlog
+        if message.startswith('{') and message.endswith('}'):
+            try:
+                # Parse and return as-is (already properly formatted by structlog)
+                data = json.loads(message)
+                # Add logger name if not present
+                if 'name' not in data:
+                    data['name'] = record.name
+                return json.dumps(data, ensure_ascii=False)
+            except json.JSONDecodeError:
+                pass  # Not JSON, format normally
+
+        # Build payload for non-structlog messages
         payload: Dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(timespec="milliseconds") + "Z",
-            "level": record.levelname,
+            "level": record.levelname.lower(),
             "name": record.name,
-            "message": record.getMessage(),
+            "event": message,
         }
 
         # Merge extras (anything the LogRecord has that isn't reserved)
@@ -76,32 +149,17 @@ class _FallbackJsonFormatter(logging.Formatter):
                 except TypeError:
                     payload[k] = str(v)
 
-        # Ensure consistent one-line JSON output
         return json.dumps(payload, ensure_ascii=False)
 
 
-def _build_formatter(fmt_style: str) -> logging.Formatter:
-    """
-    Create a logging.Formatter instance based on requested style.
+def _build_console_formatter() -> logging.Formatter:
+    """Create formatter for console output (clean, human-readable)."""
+    return _ConsoleFormatter(use_colors=True)
 
-    If `fmt_style == 'json'`, we prefer python-json-logger if installed,
-    otherwise we fallback to _FallbackJsonFormatter. For any other style,
-    we output a standard human-readable format.
-    """
-    fmt_style = (fmt_style or "json").lower()
 
-    if fmt_style == "json":
-        # Try to use python-json-logger if available
-        try:
-            from pythonjsonlogger import jsonlogger  # type: ignore
-            # A lean JSON layout; structlog already adds rich context.
-            return jsonlogger.JsonFormatter("%(timestamp)s %(level)s %(name)s %(message)s")
-        except Exception:
-            # Fallback if module missing or import fails
-            return _FallbackJsonFormatter()
-
-    # Plain text formatter (useful during local dev)
-    return logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+def _build_file_formatter() -> logging.Formatter:
+    """Create formatter for file output (JSON for log shipping)."""
+    return _JsonFormatter()
 
 
 # =================================
@@ -201,10 +259,7 @@ def setup_logging() -> None:
     # 3) Stdlib logging root config: no handlers here; we attach explicit handlers below
     logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO), handlers=[])
 
-    # Choose formatter based on settings.log_format ("json" by default)
-    formatter = _build_formatter(getattr(settings, "log_format", "json"))
-
-    # File handler with rotation (if file path configured)
+    # File handler with rotation (if file path configured) - uses JSON format
     if log_file_path:
         file_handler: Handler = RotatingFileHandler(
             filename=str(log_file_path),
@@ -212,25 +267,23 @@ def setup_logging() -> None:
             backupCount=int(settings.log_backup_count),
             encoding="utf-8",
         )
-        file_handler.setFormatter(formatter)
+        file_handler.setFormatter(_build_file_formatter())
         logging.getLogger().addHandler(file_handler)
 
-    # Console handler (stdout) with UTF-8 encoding to handle Unicode characters
-    # Reconfigure stdout to use UTF-8 encoding (fixes Windows cp1252 issues)
-    if hasattr(sys.stdout, 'reconfigure'):
-        try:
-            sys.stdout.reconfigure(encoding='utf-8')
-        except Exception:
-            pass  # Ignore if reconfigure not available
+    # Console handler (stdout) - uses clean, human-readable format
+    # Note: Do NOT reconfigure stdout/stderr as it interferes with pytest's capture
+    # mechanism. Use PYTHONIOENCODING=utf-8 environment variable instead.
 
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
+    console_handler.setFormatter(_build_console_formatter())
     logging.getLogger().addHandler(console_handler)
 
     # 4) Quiet noisy libraries to sensible defaults
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
     logging.getLogger("fastapi").setLevel(logging.INFO)
     logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 # ======================

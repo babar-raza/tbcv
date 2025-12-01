@@ -49,7 +49,8 @@ class MCPServer:
         from svc.mcp_methods import (
             ValidationMethods,
             ApprovalMethods,
-            EnhancementMethods
+            EnhancementMethods,
+            AdminMethods
         )
 
         # Initialize method handler instances
@@ -68,9 +69,21 @@ class MCPServer:
             self.rule_manager,
             self.agent_registry
         )
+        admin_handler = AdminMethods(
+            self.db_manager,
+            self.rule_manager,
+            self.agent_registry
+        )
 
         # Register validation methods
         self.registry.register("validate_folder", validation_handler.validate_folder)
+        self.registry.register("validate_file", validation_handler.validate_file)
+        self.registry.register("validate_content", validation_handler.validate_content)
+        self.registry.register("get_validation", validation_handler.get_validation)
+        self.registry.register("list_validations", validation_handler.list_validations)
+        self.registry.register("update_validation", validation_handler.update_validation)
+        self.registry.register("delete_validation", validation_handler.delete_validation)
+        self.registry.register("revalidate", validation_handler.revalidate)
 
         # Register approval methods
         self.registry.register("approve", approval_handler.approve)
@@ -78,6 +91,18 @@ class MCPServer:
 
         # Register enhancement methods
         self.registry.register("enhance", enhancement_handler.enhance)
+
+        # Register admin methods
+        self.registry.register("get_system_status", admin_handler.get_system_status)
+        self.registry.register("clear_cache", admin_handler.clear_cache)
+        self.registry.register("get_cache_stats", admin_handler.get_cache_stats)
+        self.registry.register("cleanup_cache", admin_handler.cleanup_cache)
+        self.registry.register("rebuild_cache", admin_handler.rebuild_cache)
+        self.registry.register("reload_agent", admin_handler.reload_agent)
+        self.registry.register("run_gc", admin_handler.run_gc)
+        self.registry.register("enable_maintenance_mode", admin_handler.enable_maintenance_mode)
+        self.registry.register("disable_maintenance_mode", admin_handler.disable_maintenance_mode)
+        self.registry.register("create_checkpoint", admin_handler.create_checkpoint)
     def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """
         Handle JSON-RPC request using registry pattern.

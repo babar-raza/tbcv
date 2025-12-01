@@ -207,7 +207,7 @@ class TestBaseAgent:
             self.register_handler("test_method", self.handle_test_method)
             self.register_handler("ping", self.handle_ping)
             self.register_handler("get_status", self.handle_get_status)
-            self.register_handler("get_contract", self.get_contract)
+            self.register_handler("get_contract", self.handle_get_contract)
 
         def get_contract(self) -> AgentContract:
             return AgentContract(
@@ -264,10 +264,12 @@ class TestBaseAgent:
         """Test processing request with invalid method."""
         agent = self.ConcreteAgent("test_agent")
 
-        result = await agent.process_request("nonexistent_method", {})
+        # Invalid method should raise an exception (per process_request implementation)
+        with pytest.raises(Exception) as exc_info:
+            await agent.process_request("nonexistent_method", {})
 
-        # Should handle gracefully with error
-        assert "error" in result or "success" in result
+        # Verify error message contains expected info
+        assert "Agent error" in str(exc_info.value) or "Method not found" in str(exc_info.value)
 
     def test_agent_get_status(self):
         """Test getting agent status."""
@@ -280,21 +282,23 @@ class TestBaseAgent:
         assert status["agent_id"] == "test_agent"
 
     @pytest.mark.asyncio
-    async def test_agent_start(self):
-        """Test agent start lifecycle method."""
+    async def test_agent_lifecycle_initialization(self):
+        """Test agent lifecycle: initialization to READY state."""
         agent = self.ConcreteAgent("test_agent")
 
-        await agent.start()
-
+        # Agent should initialize to READY automatically
         assert agent.status == AgentStatus.READY
 
     @pytest.mark.asyncio
-    async def test_agent_stop(self):
-        """Test agent stop lifecycle method."""
+    async def test_agent_lifecycle_shutdown(self):
+        """Test agent lifecycle: shutdown method."""
         agent = self.ConcreteAgent("test_agent")
 
-        await agent.start()
-        await agent.stop()
+        # Ensure agent is ready first
+        assert agent.status == AgentStatus.READY
+
+        # Shutdown should transition to STOPPED
+        await agent.shutdown()
 
         assert agent.status == AgentStatus.STOPPED
 
@@ -311,7 +315,7 @@ class TestBaseAgentEdgeCases:
             self.register_handler("error_method", self.handle_error_method)
             self.register_handler("ping", self.handle_ping)
             self.register_handler("get_status", self.handle_get_status)
-            self.register_handler("get_contract", self.get_contract)
+            self.register_handler("get_contract", self.handle_get_contract)
 
         def get_contract(self) -> AgentContract:
             return AgentContract(
@@ -333,7 +337,9 @@ class TestBaseAgentEdgeCases:
         """Test that agent handles errors in method handlers."""
         agent = self.ErrorAgent("error_agent")
 
-        result = await agent.process_request("error_method", {})
+        # process_request wraps errors from handle_message and raises
+        with pytest.raises(Exception) as exc_info:
+            await agent.process_request("error_method", {})
 
-        # Should return error response instead of crashing
-        assert isinstance(result, dict)
+        # Should have meaningful error message
+        assert "Agent error" in str(exc_info.value) or "Intentional error" in str(exc_info.value)

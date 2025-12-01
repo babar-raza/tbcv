@@ -80,21 +80,34 @@ Examples:
 
 ### validate
 
-Validate a file via workflow (enhanced validation).
+Validate a file via workflow (enhanced validation with tiered execution).
 
 ```bash
 tbcv validate <file_path> [OPTIONS]
 
 Options:
   --type TEXT                Validation type (basic, full, enhanced)
+  --profile TEXT             Validation profile from validation_flow.yaml
+                             (strict, default, quick, content_only)
   --confidence FLOAT         Confidence threshold (0.0-1.0) [default: 0.6]
   --output TEXT              Output format (table, json, yaml)
   --fix                      Apply automatic fixes
   --no-cache                 Skip cache lookup
+  --validators TEXT          Comma-separated list of validators to run
+                             (yaml,markdown,structure,code,links,seo,FuzzyLogic,Truth,llm)
+
+Validation Profiles:
+  strict       - All validators enabled, strict error checking, LLM enabled
+  default      - Standard validation, LLM disabled by default
+  quick        - Only Tier 1 validators (yaml, markdown, structure)
+  content_only - Content validators only, no advanced truth/LLM checks
 
 Examples:
   tbcv validate example.md --type full
   tbcv validate code.py --confidence 0.8 --output json
+  tbcv validate content.md --profile strict  # Use strict profile
+  tbcv validate docs/api.md --profile quick  # Fast validation
+  tbcv validate tutorial.md --validators yaml,markdown,links  # Specific validators
 ```
 
 ### batch

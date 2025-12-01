@@ -2,84 +2,63 @@
 # -*- coding: utf-8 -*-
 """Test script to verify OpenAPI schema fixes."""
 
-import sys
-import io
+import pytest
 
-# Fix Windows console encoding issues
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-from api.server import app
+class TestOpenAPISchemaFixes:
+    """Test that OpenAPI schema uses professional naming."""
 
-schema = app.openapi()
-schemas = schema.get('components', {}).get('schemas', {})
+    @pytest.fixture
+    def openapi_schema(self):
+        """Get OpenAPI schema from app."""
+        from api.server import app
+        return app.openapi()
 
-print("=" * 70)
-print("OpenAPI Schema Verification")
-print("=" * 70)
+    def test_no_ugly_auto_generated_schema_names(self, openapi_schema):
+        """Verify no ugly auto-generated schema names like 'Body_dashboard'."""
+        schemas = openapi_schema.get('components', {}).get('schemas', {})
+        ugly_names = [name for name in schemas.keys() if name.startswith('Body_dashboard')]
+        assert len(ugly_names) == 0, f"Found ugly schema names: {ugly_names}"
 
-# Check for ugly names
-ugly_found = [name for name in schemas.keys() if name.startswith('Body_dashboard')]
-if ugly_found:
-    print("\n[ERROR] Found ugly schema names:")
-    for name in ugly_found:
-        print(f"   - {name}")
-else:
-    print("\n[SUCCESS] No ugly auto-generated schema names found!")
+    def test_has_professional_schema_names(self, openapi_schema):
+        """Verify professional schema names are present."""
+        schemas = openapi_schema.get('components', {}).get('schemas', {})
+        schema_names = list(schemas.keys())
 
-# Check for professional names
-professional_names = ['DashboardReviewForm', 'DashboardBulkReviewForm']
-professional_found = [name for name in schemas.keys() if name in professional_names]
-if professional_found:
-    print("\n[SUCCESS] Found professional schema names:")
-    for name in professional_found:
-        print(f"   - {name}")
-else:
-    print("\n[WARNING] Professional schema names not found")
+        professional_names = ['DashboardReviewForm', 'DashboardBulkReviewForm']
+        for name in professional_names:
+            assert name in schema_names, f"Professional schema name '{name}' not found"
 
-# Check endpoint references
-print("\n" + "=" * 70)
-print("Endpoint Schema References")
-print("=" * 70)
+    def test_single_review_endpoint_uses_professional_schema(self, openapi_schema):
+        """Verify single review endpoint references professional schema."""
+        paths = openapi_schema.get('paths', {})
+        ep_path = '/dashboard/recommendations/{recommendation_id}/review'
 
-paths = schema.get('paths', {})
+        assert ep_path in paths, f"Endpoint {ep_path} not found"
 
-# Single review endpoint
-ep1_path = '/dashboard/recommendations/{recommendation_id}/review'
-if ep1_path in paths:
-    ep1 = paths[ep1_path].get('post', {})
-    req_body = ep1.get('requestBody', {})
-    content = req_body.get('content', {})
-    form_content = content.get('application/x-www-form-urlencoded', {})
-    form_schema = form_content.get('schema', {})
-    ref = form_schema.get('$ref', 'No reference')
+        ep = paths[ep_path].get('post', {})
+        req_body = ep.get('requestBody', {})
+        content = req_body.get('content', {})
+        form_content = content.get('application/x-www-form-urlencoded', {})
+        form_schema = form_content.get('schema', {})
+        ref = form_schema.get('$ref', '')
 
-    print(f"\nSingle Review Endpoint: {ep1_path}")
-    print(f"  Schema Reference: {ref}")
+        assert 'DashboardReviewForm' in ref, f"Expected DashboardReviewForm in schema ref, got: {ref}"
+        assert 'Body_dashboard' not in ref, f"Ugly schema name found in ref: {ref}"
 
-    if 'DashboardReviewForm' in ref:
-        print("  [OK] Using professional schema name")
-    elif 'Body_dashboard' in ref:
-        print("  [ERROR] Still using ugly schema name")
+    def test_bulk_review_endpoint_uses_professional_schema(self, openapi_schema):
+        """Verify bulk review endpoint references professional schema."""
+        paths = openapi_schema.get('paths', {})
+        ep_path = '/dashboard/recommendations/bulk-review'
 
-# Bulk review endpoint
-ep2_path = '/dashboard/recommendations/bulk-review'
-if ep2_path in paths:
-    ep2 = paths[ep2_path].get('post', {})
-    req_body = ep2.get('requestBody', {})
-    content = req_body.get('content', {})
-    form_content = content.get('application/x-www-form-urlencoded', {})
-    form_schema = form_content.get('schema', {})
-    ref = form_schema.get('$ref', 'No reference')
+        assert ep_path in paths, f"Endpoint {ep_path} not found"
 
-    print(f"\nBulk Review Endpoint: {ep2_path}")
-    print(f"  Schema Reference: {ref}")
+        ep = paths[ep_path].get('post', {})
+        req_body = ep.get('requestBody', {})
+        content = req_body.get('content', {})
+        form_content = content.get('application/x-www-form-urlencoded', {})
+        form_schema = form_content.get('schema', {})
+        ref = form_schema.get('$ref', '')
 
-    if 'DashboardBulkReviewForm' in ref:
-        print("  [OK] Using professional schema name")
-    elif 'Body_dashboard' in ref:
-        print("  [ERROR] Still using ugly schema name")
-
-print("\n" + "=" * 70)
-print("Fix Status: COMPLETE")
-print("=" * 70)
+        assert 'DashboardBulkReviewForm' in ref, f"Expected DashboardBulkReviewForm in schema ref, got: {ref}"
+        assert 'Body_dashboard' not in ref, f"Ugly schema name found in ref: {ref}"
