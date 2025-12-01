@@ -6,26 +6,23 @@ This document provides comprehensive documentation for all agents in the TBCV sy
 
 TBCV uses a multi-agent architecture with two categories:
 
-### Core Agents (8 agents)
-Specialized agents that communicate via Model Context Protocol (MCP):
+### Core Agents (11 agents)
+Specialized agents in `agents/` directory that communicate via message passing:
 
-1. **OrchestratorAgent** - Workflow coordination with concurrency control
-2. **TruthManagerAgent** - Plugin truth data management and indexing
-3. **FuzzyDetectorAgent** - Pattern matching and plugin detection
-4. **ContentValidatorAgent** - Multi-scope content validation (legacy, being replaced by modular validators)
-5. **LLMValidatorAgent** - Semantic LLM validation via Ollama
-6. **ContentEnhancerAgent** - Content enhancement with safety gating
-7. **RecommendationAgent** - Actionable recommendation generation
-8. **CodeAnalyzerAgent** - Code quality and security analysis
+1. **OrchestratorAgent** (`orchestrator.py`) - Workflow coordination with concurrency control
+2. **TruthManagerAgent** (`truth_manager.py`) - Plugin truth data management and indexing
+3. **FuzzyDetectorAgent** (`fuzzy_detector.py`) - Pattern matching and plugin detection
+4. **ContentValidatorAgent** (`content_validator.py`) - Multi-scope content validation (legacy, being replaced by modular validators)
+5. **LLMValidatorAgent** (`llm_validator.py`) - Semantic LLM validation via Ollama
+6. **ContentEnhancerAgent** (`content_enhancer.py`) - Content enhancement with safety gating
+7. **RecommendationAgent** (`recommendation_agent.py`) - Actionable recommendation generation
+8. **CodeAnalyzerAgent** (`code_analyzer.py`) - Code quality and security analysis
+9. **EnhancementAgent** (`enhancement_agent.py`) - Apply approved recommendations to content
+10. **RuleManager** (`rule_manager.py`) - Configuration rule management
+11. **BaseAgent** (`base.py`) - Abstract base class with agent registry
 
-### Enhancement Agents (2 agents)
-Specialized agents for applying recommendations:
-
-9. **EnhancementAgent** - Apply approved recommendations to content
-10. **RecommendationAgent** - Generate actionable recommendations (dual role)
-
-### Modular Validator Agents (8+ validators)
-New modular architecture replacing ContentValidatorAgent:
+### Modular Validator Agents (7-8 validators)
+New modular architecture in `agents/validators/` replacing monolithic ContentValidatorAgent:
 
 - **BaseValidatorAgent** - Abstract base for all validators
 - **ValidatorRouter** - Routes validation requests to appropriate validators
@@ -858,16 +855,8 @@ seo_validator:
     min_length: 30
     max_length: 60
 
-# config/heading_sizes.yaml
-heading_sizes:
-  h1:
-    min: 30
-    max: 60
-  h2:
-    min: 20
-    max: 80
-  h3:
-    max: 100
+# Note: heading_sizes is now part of config/seo.yaml under seo.heading_sizes
+# See config/seo.yaml for the unified SEO configuration
 ```
 
 **Example Issues:**

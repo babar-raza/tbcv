@@ -1,0 +1,114 @@
+# LLM Validation Configuration
+# Controls LLM-based semantic validation settings
+
+llm:
+  enabled: true
+  profile: "default"
+
+  # Model settings
+  model:
+    name: "qwen2.5"  # Default Ollama model
+    temperature: 0.1
+    top_p: 0.9
+    num_predict: 2000
+    timeout: 60
+
+  # Retry policy
+  retry:
+    max_attempts: 3
+    initial_delay_ms: 1000
+    max_delay_ms: 10000
+    backoff_multiplier: 2.0
+    retry_on_errors:
+      - "Connection"
+      - "timeout"
+      - "ECONNREFUSED"
+
+  # Validation rules
+  rules:
+    validate_plugins:
+      enabled: true
+      level: warning
+      message: "Plugin validation using LLM"
+      params:
+        content_excerpt_length: 2000
+        max_plugins_in_prompt: 15
+        max_rules_in_prompt: 10
+
+    detect_missing_plugins:
+      enabled: true
+      level: warning
+      message: "Missing required plugin detected"
+      params:
+        confidence_threshold: 0.7
+
+    detect_incorrect_plugins:
+      enabled: true
+      level: warning
+      message: "Incorrect plugin reference detected"
+      params:
+        confidence_threshold: 0.8
+
+    verify_plugin_combinations:
+      enabled: true
+      level: info
+      message: "Plugin combination verification"
+      params:
+        check_processor_requirements: true
+        check_converter_requirements: true
+
+  # Response parsing settings
+  parsing:
+    extract_json: true
+    fallback_on_parse_error: true
+    log_raw_responses: false
+
+  profiles:
+    strict:
+      rules:
+        - validate_plugins
+        - detect_missing_plugins
+        - detect_incorrect_plugins
+        - verify_plugin_combinations
+      overrides:
+        detect_missing_plugins:
+          level: error
+          params:
+            confidence_threshold: 0.6
+        detect_incorrect_plugins:
+          level: error
+          params:
+            confidence_threshold: 0.7
+
+    default:
+      rules:
+        - validate_plugins
+        - detect_missing_plugins
+        - detect_incorrect_plugins
+
+    relaxed:
+      rules:
+        - validate_plugins
+
+    disabled:
+      rules: []
+
+  # Family-specific overrides
+  family_overrides:
+    words:
+      profile: "strict"
+      model:
+        temperature: 0.05
+      rules:
+        detect_missing_plugins:
+          level: error
+    pdf:
+      profile: "default"
+    cells:
+      profile: "default"
+
+  # Availability settings
+  availability:
+    require_ollama: false
+    fallback_when_unavailable: true
+    log_unavailability: true

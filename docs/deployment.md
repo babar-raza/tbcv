@@ -131,86 +131,87 @@ sc query TBCV
 
 ## Docker Deployment
 
-### Dockerfile
+TBCV includes a ready-to-use `Dockerfile` and `docker-compose.yml` in the repository root.
+
+### Dockerfile (Actual)
 ```dockerfile
 FROM python:3.12-slim
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV TBCV_SYSTEM_ENVIRONMENT=production
-ENV TBCV_DATA_DIRECTORY=/app/data
+WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    curl \
+    build-essential \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app user
-RUN useradd --create-home --shell /bin/bash tbcv
-
-# Set working directory
-WORKDIR /app
-
-# Copy requirements first for better caching
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
 
-# Create data directory
-RUN mkdir -p data && chown -R tbcv:tbcv /app
+# Create necessary directories
+RUN mkdir -p data data/logs data/cache
 
-# Switch to non-root user
-USER tbcv
+# Run startup validation
+RUN python startup_check.py || true
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health/live || exit 1
-
-# Expose port
 EXPOSE 8080
 
-# Start application
-CMD ["uvicorn", "tbcv.api.server:app", "--host", "0.0.0.0", "--port", "8080"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD python -c "import requests; requests.get('http://localhost:8080/health/live').raise_for_status()" || exit 1
+
+# Set environment variables
+ENV TBCV_SYSTEM_ENVIRONMENT=production \
+    TBCV_SYSTEM_DEBUG=false \
+    TBCV_SYSTEM_LOG_LEVEL=info \
+    TBCV_SERVER_HOST=0.0.0.0 \
+    TBCV_SERVER_PORT=8080
+
+# Run the application
+CMD ["python", "main.py", "--mode", "api", "--host", "0.0.0.0", "--port", "8080"]
 ```
 
-### Docker Compose
+### Docker Compose (Actual)
 ```yaml
 version: '3.8'
 
 services:
   tbcv:
     build: .
+    container_name: tbcv-app
     ports:
       - "8080:8080"
     volumes:
-      - tbcv_data:/app/data
+      - ./data:/app/data
       - ./config:/app/config:ro
+      - ./truth:/app/truth:ro
     environment:
       - TBCV_SYSTEM_ENVIRONMENT=production
-      - TBCV_DATABASE_URL=sqlite:////app/data/tbcv.db
+      - TBCV_SYSTEM_DEBUG=false
+      - TBCV_SYSTEM_LOG_LEVEL=info
+      - TBCV_SERVER_HOST=0.0.0.0
+      - TBCV_SERVER_PORT=8080
+      - TBCV_DATABASE_URL=sqlite:///./data/tbcv.db
+      - TBCV_PERFORMANCE_WORKER_POOL_SIZE=8
+      - TBCV_PERFORMANCE_MAX_CONCURRENT_WORKFLOWS=50
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health/live').raise_for_status()"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    command: serve
-    profiles:
-      - with-ollama
-
-volumes:
-  tbcv_data:
-  ollama_data:
+  # Optional: Redis for distributed caching (not yet implemented)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: tbcv-redis
+  #   ports:
+  #     - "6379:6379"
 ```
 
 ### Building and Running
@@ -323,34 +324,36 @@ gunicorn==20.1.0
 
 ## Database Configuration
 
-### SQLite (Default)
+### SQLite (Default - Currently Only Supported Backend)
+
+TBCV currently uses **SQLite only**. PostgreSQL and MySQL support are planned but not yet implemented.
+
 ```bash
-# Local file database
+# Local file database (default)
 export TBCV_DATABASE_URL=sqlite:///./data/tbcv.db
 
 # In-memory (for testing)
 export TBCV_DATABASE_URL=sqlite:///:memory:
+
+# Custom path
+export TBCV_DATABASE_URL=sqlite:///path/to/custom/database.db
 ```
 
-### PostgreSQL
+**Note**: The SQLite database is created automatically on first run. For production deployments with high concurrency requirements, consider the following:
+- Use SSD storage for the database file
+- Configure WAL mode for better concurrent access
+- Implement regular backups (see Backup section)
+
+### Future Database Support (Not Yet Implemented)
+
+PostgreSQL and MySQL support are planned for future releases. The configuration will use:
+
 ```bash
-# Install psycopg2
-pip install psycopg2-binary
+# PostgreSQL (planned)
+# export TBCV_DATABASE_URL=postgresql://user:password@localhost:5432/tbcv
 
-# Connection string
-export TBCV_DATABASE_URL=postgresql://user:password@localhost:5432/tbcv
-
-# AWS RDS
-export TBCV_DATABASE_URL=postgresql://user:password@rds-instance.region.rds.amazonaws.com:5432/tbcv
-```
-
-### MySQL
-```bash
-# Install PyMySQL
-pip install pymysql
-
-# Connection string
-export TBCV_DATABASE_URL=mysql+pymysql://user:password@localhost:3306/tbcv
+# MySQL (planned)
+# export TBCV_DATABASE_URL=mysql+pymysql://user:password@localhost:3306/tbcv
 ```
 
 ## External Services Integration

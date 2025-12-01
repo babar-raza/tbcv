@@ -1,29 +1,185 @@
-# SEO Validation Configuration
+# SEO Validation Configuration (Unified)
 # Controls SEO-related validation rules for headings and content structure
+# Combines previous seo.yaml and heading_sizes.yaml
 
 seo:
-  # Heading validation rules
+  enabled: true
+  profile: "default"
+
+  # Heading configuration (for ContentValidatorAgent._validate_seo_headings)
   headings:
-    # H1 requirements
     h1:
-      required: true  # Document must have at least one H1
-      unique: true  # Only one H1 allowed per document
-      min_length: 20  # Minimum characters for SEO
-      max_length: 70  # Maximum characters for SEO
+      required: true
+      unique: true
+      min_length: 20
+      max_length: 70
       recommended_min: 30
       recommended_max: 60
 
-    # General heading rules
     allow_empty_headings: false
-    enforce_hierarchy: true  # No skipping levels (H1 -> H3 invalid)
-    max_depth: 6  # Maximum heading level (H1-H6)
+    enforce_hierarchy: true
+    max_depth: 6
+    h1_must_be_first: true
 
-    # Heading order
-    h1_must_be_first: true  # H1 should come before other headings
-
-  # Strictness levels
+  # Strictness levels for different types of violations
   strictness:
-    h1_violations: error  # Missing/multiple H1: error, warning, or info
-    hierarchy_skip: error  # Heading level skip: error, warning, or info
-    empty_heading: warning  # Empty heading: error, warning, or info
-    h1_length: warning  # H1 length outside range: error, warning, or info
+    h1_violations: "error"
+    hierarchy_skip: "error"
+    empty_heading: "warning"
+    h1_length: "warning"
+
+  rules:
+    # H1 requirements
+    h1_required:
+      enabled: true
+      level: error
+      message: "H1 heading is required for SEO"
+
+    h1_unique:
+      enabled: true
+      level: error
+      message: "Only one H1 heading allowed per document"
+
+    h1_first:
+      enabled: true
+      level: warning
+      message: "H1 heading should be the first heading"
+
+    # Heading hierarchy
+    hierarchy_skip:
+      enabled: true
+      level: error
+      message: "Heading hierarchy skip detected"
+
+    empty_heading:
+      enabled: true
+      level: warning
+      message: "Empty heading detected"
+
+    # Heading length validation
+    heading_too_short:
+      enabled: true
+      level: error
+      message: "Heading below minimum length"
+
+    heading_too_long:
+      enabled: true
+      level: warning
+      message: "Heading exceeds maximum length"
+
+    heading_below_recommended:
+      enabled: true
+      level: info
+      message: "Heading below recommended length"
+
+    heading_above_recommended:
+      enabled: true
+      level: info
+      message: "Heading exceeds recommended length"
+
+  # Heading size limits by level (for SeoValidatorAgent)
+  heading_sizes:
+    h1:
+      min_length: 20
+      max_length: 70
+      recommended_min: 30
+      recommended_max: 60
+      description: "H1 should be concise yet descriptive for SEO"
+
+    h2:
+      min_length: 10
+      max_length: 100
+      recommended_min: 20
+      recommended_max: 80
+      description: "H2 should clearly describe section content"
+
+    h3:
+      min_length: 5
+      max_length: 100
+      recommended_min: 15
+      recommended_max: 70
+      description: "H3 should be specific and concise"
+
+    h4:
+      min_length: 5
+      max_length: 80
+      recommended_min: 10
+      recommended_max: 60
+      description: "H4 for detailed subsections"
+
+    h5:
+      min_length: 3
+      max_length: 70
+      recommended_min: 8
+      recommended_max: 50
+      description: "H5 for granular organization"
+
+    h6:
+      min_length: 3
+      max_length: 60
+      recommended_min: 8
+      recommended_max: 40
+      description: "H6 for lowest level organization"
+
+  # Additional settings (for SeoValidatorAgent)
+  settings:
+    allow_empty_headings: false
+    enforce_hierarchy: true
+    max_depth: 6
+    h1_must_be_first: true
+
+  profiles:
+    strict:
+      rules:
+        - h1_required
+        - h1_unique
+        - h1_first
+        - hierarchy_skip
+        - empty_heading
+        - heading_too_short
+        - heading_too_long
+        - heading_below_recommended
+        - heading_above_recommended
+      overrides:
+        h1_first:
+          level: error
+        empty_heading:
+          level: error
+        heading_too_long:
+          level: error
+
+    default:
+      rules:
+        - h1_required
+        - h1_unique
+        - h1_first
+        - hierarchy_skip
+        - empty_heading
+        - heading_too_short
+        - heading_too_long
+
+    relaxed:
+      rules:
+        - h1_required
+        - hierarchy_skip
+        - empty_heading
+
+    heading_sizes_only:
+      rules:
+        - heading_too_short
+        - heading_too_long
+        - heading_below_recommended
+        - heading_above_recommended
+
+  family_overrides:
+    words:
+      profile: "strict"
+      rules:
+        h1_first:
+          level: error
+        hierarchy_skip:
+          level: error
+    pdf:
+      profile: "default"
+    cells:
+      profile: "default"

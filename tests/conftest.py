@@ -13,10 +13,22 @@ from pathlib import Path
 from typing import Dict, Any
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
-# Put the project root (the folder that contains the "tbcv" package) on sys.path.
-ROOT = Path(__file__).resolve().parents[1]  # .../scripts/tbcv
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+# =============================================================================
+# Windows UTF-8 Setup - MUST BE FIRST
+# =============================================================================
+# Fix Windows cp1252 encoding issues with Unicode symbols (✓, ✗, →, etc.)
+# This must happen before any output occurs
+if sys.platform == "win32":
+    # Set environment variables for Python's default encoding
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+
+    # Note: Do NOT reconfigure sys.stdout/sys.stderr here as it interferes
+    # with pytest's capture mechanism. The PYTHONIOENCODING environment
+    # variable handles encoding for new streams, and pytest-capture manages
+    # the test output streams properly.
+
+# NOTE: pythonpath = . in pytest.ini handles path setup
+# Don't modify sys.path here to avoid duplicate conftest registration
 
 # Helpful in code paths that switch behavior by environment
 # Must be set BEFORE any imports that load config
@@ -29,20 +41,98 @@ os.environ.setdefault("OLLAMA_MODEL", "mistral")
 os.environ.setdefault("L1_CONFIG", "{}")
 os.environ.setdefault("L2_CONFIG", "{}")
 
-# Configure pytest-asyncio
-pytest_plugins = ("pytest_asyncio",)
+# pytest_plugins moved to root conftest.py per pytest requirements
 
 
 # =============================================================================
 # Event Loop Fixture
 # =============================================================================
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+# Note: We use function-scoped event loops to prevent state contamination
+# between tests. pytest-asyncio handles this automatically with asyncio_mode=auto
+# in pytest.ini. Do NOT override with session-scoped event_loop as it causes
+# "Event loop is closed" errors when running the full test suite.
+
+
+@pytest.fixture(scope="function", autouse=True)
+def reset_global_state(request):
+    """Reset global state before and after each test to prevent contamination.
+
+    Skips cleanup for tests marked with 'local_heavy' since they manage their own
+    agent registration with module-scoped fixtures.
+    """
+    # Skip cleanup for local_heavy tests - they manage their own agent lifecycle
+    if request.node.get_closest_marker("local_heavy"):
+        yield
+        return
+
+    _cleanup_global_state()
+    yield
+    _cleanup_global_state()
+
+
+def _cleanup_global_state():
+    """Helper to thoroughly clean up global state."""
+    # Reset live_bus
+    try:
+        import api.services.live_bus as live_bus_module
+        if hasattr(live_bus_module, '_live_bus_instance') and live_bus_module._live_bus_instance:
+            live_bus_module._live_bus_instance.enabled = False
+        live_bus_module._live_bus_instance = None
+    except (ImportError, AttributeError):
+        pass
+
+    # Reset agent registry thoroughly
+    try:
+        from agents.base import agent_registry
+        if hasattr(agent_registry, '_agents'):
+            agent_registry._agents.clear()
+        if hasattr(agent_registry, 'agents') and isinstance(agent_registry.agents, dict):
+            agent_registry.agents.clear()
+        if hasattr(agent_registry, '_instance'):
+            agent_registry._instance = None
+    except (ImportError, AttributeError):
+        pass
+
+    # Reset CLI agents initialized flag
+    try:
+        import cli.main as cli_module
+        if hasattr(cli_module, '_agents_initialized'):
+            cli_module._agents_initialized = False
+    except (ImportError, AttributeError):
+        pass
+
+    # Reset database manager singleton state
+    try:
+        from core.database import db_manager
+        # Don't fully reset db_manager, but ensure fresh session
+        if hasattr(db_manager, '_engine') and db_manager._engine:
+            pass  # Keep engine, but sessions will be fresh
+    except (ImportError, AttributeError):
+        pass
+
+    # Clear any cached settings
+    try:
+        from core.config import _settings_cache
+        if hasattr(_settings_cache, 'clear'):
+            _settings_cache.clear()
+    except (ImportError, AttributeError):
+        pass
+
+    # Reset cache manager state
+    try:
+        from core.cache import cache_manager
+        if hasattr(cache_manager, '_l1_cache'):
+            cache_manager._l1_cache.clear() if hasattr(cache_manager._l1_cache, 'clear') else None
+    except (ImportError, AttributeError):
+        pass
+
+    # Reset ContentEnhancerAgent enhancement cache
+    try:
+        from agents.content_enhancer import ContentEnhancerAgent
+        ContentEnhancerAgent.clear_enhancement_cache()
+    except (ImportError, AttributeError):
+        pass
 
 
 # =============================================================================
@@ -60,12 +150,7 @@ def db_manager():
     # Initialize with in-memory database
     db_manager.init_database()
     yield db_manager
-
-    # Cleanup after test
-    try:
-        db_manager.close()
-    except Exception:
-        pass
+    # Note: db.close() removed - context managers handle cleanup
 
 
 @pytest.fixture(scope="function")
@@ -546,3 +631,1045 @@ def assert_valid_validation_result():
         assert result["confidence"] >= 0 and result["confidence"] <= 1
         return True
     return _assert
+
+
+# =============================================================================
+# Taskcard 2: Validation Workflow Test Fixtures
+# =============================================================================
+
+@pytest.fixture(scope="function")
+def mock_file_system(tmp_path):
+    """Temp directory with test.md file for validation testing."""
+    test_file = tmp_path / "test.md"
+    test_file.write_text("""---
+title: Test Document
+family: words
+---
+
+# Test Document
+
+This is a test document for validation testing.
+
+```csharp
+// Sample code
+Document doc = new Document();
+doc.Save("output.pdf");
+```
+""", encoding="utf-8")
+
+    return {
+        "directory": tmp_path,
+        "test_file": test_file,
+        "file_path": str(test_file)
+    }
+
+
+@pytest.fixture(scope="function")
+def validation_with_file(db_manager, mock_file_system):
+    """Validation record pointing to real temp file."""
+    from core.database import ValidationStatus
+
+    validation = db_manager.create_validation_result(
+        file_path=mock_file_system["file_path"],
+        rules_applied=["yaml", "markdown", "code"],
+        validation_results={
+            "passed": True,
+            "confidence": 0.85,
+            "issues": []
+        },
+        notes="Test validation with file",
+        severity="low",
+        status="pass",
+        validation_types=["yaml", "markdown", "code"]
+    )
+
+    return {
+        "validation": validation,
+        "file_path": mock_file_system["file_path"],
+        "file_system": mock_file_system
+    }
+
+
+@pytest.fixture(scope="function")
+def approved_validation(db_manager, mock_file_system):
+    """Validation in approved status with recommendations."""
+    from core.database import ValidationStatus, RecommendationStatus
+
+    # Create validation with APPROVED status
+    validation = db_manager.create_validation_result(
+        file_path=mock_file_system["file_path"],
+        rules_applied=["yaml", "markdown", "code"],
+        validation_results={
+            "passed": True,
+            "confidence": 0.90,
+            "issues": [
+                {"category": "markdown", "level": "info", "message": "Consider adding more headers"}
+            ]
+        },
+        notes="Approved validation for testing",
+        severity="low",
+        status="approved",
+        validation_types=["yaml", "markdown", "code"]
+    )
+
+    # Create recommendations for this validation
+    rec1 = db_manager.create_recommendation(
+        validation_id=validation.id,
+        type="fix_format",
+        title="Fix formatting",
+        description="Fix code block formatting",
+        original_content="```csharp",
+        proposed_content="```cs",
+        status=RecommendationStatus.APPROVED,
+        scope="line:10"
+    )
+
+    rec2 = db_manager.create_recommendation(
+        validation_id=validation.id,
+        type="add_info_text",
+        title="Add description",
+        description="Add plugin description",
+        original_content="",
+        proposed_content="This plugin allows document processing.",
+        status=RecommendationStatus.PENDING,
+        scope="line:5"
+    )
+
+    return {
+        "validation": validation,
+        "recommendations": [rec1, rec2],
+        "file_path": mock_file_system["file_path"],
+        "file_system": mock_file_system
+    }
+
+
+@pytest.fixture(scope="function")
+def multiple_validations(db_manager, mock_file_system):
+    """Multiple validations for bulk operation testing."""
+    from core.database import ValidationStatus
+
+    validations = []
+
+    # Create 3 test files and validations
+    for i in range(3):
+        test_file = mock_file_system["directory"] / f"test_{i}.md"
+        test_file.write_text(f"""---
+title: Test Document {i}
+family: words
+---
+
+# Test Document {i}
+
+Content for test {i}.
+""", encoding="utf-8")
+
+        validation = db_manager.create_validation_result(
+            file_path=str(test_file),
+            rules_applied=["yaml", "markdown"],
+            validation_results={"passed": True, "confidence": 0.8 + i * 0.05},
+            notes=f"Test validation {i}",
+            severity="low",
+            status="pass",
+            validation_types=["yaml", "markdown"]
+        )
+        validations.append(validation)
+
+    return {
+        "validations": validations,
+        "file_system": mock_file_system
+    }
+
+
+@pytest.fixture(scope="function")
+def mock_mcp_client():
+    """Mock MCP client for testing approve/reject/enhance endpoints."""
+    with patch('svc.mcp_server.create_mcp_client') as mock_create:
+        mock_client = MagicMock()
+
+        # Default successful response
+        mock_client.handle_request.return_value = {
+            "result": {
+                "success": True,
+                "approved_count": 1,
+                "rejected_count": 0,
+                "enhanced_count": 0,
+                "errors": []
+            }
+        }
+
+        mock_create.return_value = mock_client
+        yield mock_client
+
+
+@pytest.fixture(scope="function")
+def mock_websocket_manager():
+    """Mock WebSocket connection manager."""
+    with patch('api.websocket_endpoints.connection_manager') as mock_manager:
+        mock_manager.send_progress_update = AsyncMock()
+        yield mock_manager
+
+
+# =============================================================================
+# Taskcard 3: Recommendation Workflow Test Fixtures
+# =============================================================================
+
+@pytest.fixture(scope="function")
+def recommendations_various_types(db_manager, mock_file_system):
+    """Recommendations with link_plugin, fix_format, add_info_text types."""
+    from core.database import RecommendationStatus
+
+    # Create a validation to attach recommendations to
+    validation = db_manager.create_validation_result(
+        file_path=mock_file_system["file_path"],
+        rules_applied=["yaml", "markdown", "code"],
+        validation_results={"passed": True, "confidence": 0.85},
+        notes="Validation for various recommendation types",
+        severity="low",
+        status="pass",
+        validation_types=["yaml", "markdown", "code"]
+    )
+
+    recommendations = []
+
+    # Create link_plugin type recommendation
+    rec_link = db_manager.create_recommendation(
+        validation_id=validation.id,
+        type="link_plugin",
+        title="Link to Plugin",
+        description="Add link to the referenced plugin documentation",
+        original_content="See plugin docs",
+        proposed_content="See [Plugin Documentation](/plugins/word-processor)",
+        status=RecommendationStatus.PENDING,
+        scope="line:15"
+    )
+    recommendations.append(rec_link)
+
+    # Create fix_format type recommendation
+    rec_format = db_manager.create_recommendation(
+        validation_id=validation.id,
+        type="fix_format",
+        title="Fix Code Formatting",
+        description="Fix code block language identifier",
+        original_content="```csharp",
+        proposed_content="```cs",
+        status=RecommendationStatus.PENDING,
+        scope="line:20"
+    )
+    recommendations.append(rec_format)
+
+    # Create add_info_text type recommendation
+    rec_info = db_manager.create_recommendation(
+        validation_id=validation.id,
+        type="add_info_text",
+        title="Add Plugin Description",
+        description="Add description text for the plugin",
+        original_content="",
+        proposed_content="This plugin enables document conversion to PDF format.",
+        status=RecommendationStatus.APPROVED,
+        scope="line:5"
+    )
+    recommendations.append(rec_info)
+
+    return {
+        "validation": validation,
+        "recommendations": recommendations,
+        "file_path": mock_file_system["file_path"],
+        "file_system": mock_file_system
+    }
+
+
+@pytest.fixture(scope="function")
+def approved_recommendation(db_manager, approved_validation):
+    """Single approved recommendation ready to apply."""
+    from core.database import RecommendationStatus
+
+    # The approved_validation fixture already has recommendations,
+    # but we'll create a specific one that's clearly approved and ready
+    rec = db_manager.create_recommendation(
+        validation_id=approved_validation["validation"].id,
+        type="fix_format",
+        title="Approved Fix Ready to Apply",
+        description="This recommendation is approved and ready to apply",
+        original_content="old content",
+        proposed_content="new improved content",
+        status=RecommendationStatus.APPROVED,
+        scope="line:8",
+        confidence=0.95
+    )
+
+    return {
+        "recommendation": rec,
+        "validation": approved_validation["validation"],
+        "file_path": approved_validation["file_path"],
+        "file_system": approved_validation["file_system"]
+    }
+
+
+@pytest.fixture(scope="function")
+def rejected_recommendation(db_manager, mock_file_system):
+    """Recommendation in rejected status."""
+    from core.database import RecommendationStatus
+
+    # Create a validation first
+    validation = db_manager.create_validation_result(
+        file_path=mock_file_system["file_path"],
+        rules_applied=["yaml", "markdown"],
+        validation_results={"passed": True, "confidence": 0.80},
+        notes="Validation with rejected recommendation",
+        severity="low",
+        status="pass",
+        validation_types=["yaml", "markdown"]
+    )
+
+    rec = db_manager.create_recommendation(
+        validation_id=validation.id,
+        type="fix_format",
+        title="Rejected Recommendation",
+        description="This recommendation was rejected by reviewer",
+        original_content="original",
+        proposed_content="proposed change",
+        status=RecommendationStatus.REJECTED,
+        scope="line:10"
+    )
+
+    return {
+        "recommendation": rec,
+        "validation": validation,
+        "file_path": mock_file_system["file_path"],
+        "file_system": mock_file_system
+    }
+
+
+@pytest.fixture(scope="function")
+def multiple_recommendations(db_manager, mock_file_system):
+    """Multiple recommendations for bulk operation testing."""
+    from core.database import RecommendationStatus
+
+    # Create a validation
+    validation = db_manager.create_validation_result(
+        file_path=mock_file_system["file_path"],
+        rules_applied=["yaml", "markdown"],
+        validation_results={"passed": True},
+        notes="Validation with multiple recommendations",
+        severity="low",
+        status="pass",
+        validation_types=["yaml", "markdown"]
+    )
+
+    recommendations = []
+    for i in range(5):
+        rec = db_manager.create_recommendation(
+            validation_id=validation.id,
+            type="fix_format" if i % 2 == 0 else "add_info_text",
+            title=f"Recommendation {i}",
+            description=f"Description for recommendation {i}",
+            original_content=f"original_{i}",
+            proposed_content=f"proposed_{i}",
+            status=RecommendationStatus.PENDING,
+            scope=f"line:{10 + i}"
+        )
+        recommendations.append(rec)
+
+    return {
+        "validation": validation,
+        "recommendations": recommendations,
+        "file_path": mock_file_system["file_path"],
+        "file_system": mock_file_system
+    }
+
+
+# =============================================================================
+# Taskcard 4: Workflow Operations Test Fixtures
+# =============================================================================
+
+@pytest.fixture(scope="function")
+def test_directory(tmp_path):
+    """Directory with multiple .md files for workflow testing."""
+    # Create main directory with test files
+    for i in range(5):
+        test_file = tmp_path / f"document_{i}.md"
+        test_file.write_text(f"""---
+title: Test Document {i}
+family: words
+---
+
+# Test Document {i}
+
+This is test document {i} for workflow testing.
+
+## Features
+
+- Feature {i}.1
+- Feature {i}.2
+- Feature {i}.3
+
+```csharp
+// Code sample {i}
+Document doc = new Document();
+doc.Save("output_{i}.pdf");
+```
+""", encoding="utf-8")
+
+    # Create a subdirectory with more files
+    subdir = tmp_path / "subdocs"
+    subdir.mkdir()
+    for i in range(3):
+        sub_file = subdir / f"subdoc_{i}.md"
+        sub_file.write_text(f"""---
+title: Subdocument {i}
+family: cells
+---
+
+# Subdocument {i}
+
+Content for subdocument {i}.
+""", encoding="utf-8")
+
+    return {
+        "directory": tmp_path,
+        "path": str(tmp_path),
+        "file_count": 5,
+        "subdir": subdir,
+        "total_files": 8
+    }
+
+
+@pytest.fixture(scope="function")
+def running_workflow(db_manager):
+    """Workflow in running state with progress."""
+    from core.database import WorkflowState
+
+    workflow = db_manager.create_workflow(
+        workflow_type="batch_validation",
+        input_params={
+            "directory_path": "/test/path",
+            "file_pattern": "*.md",
+            "max_workers": 4
+        },
+        metadata={
+            "source": "test",
+            "file_count": 10
+        }
+    )
+
+    # Update to running state with progress
+    db_manager.update_workflow(
+        workflow_id=workflow.id,
+        state="running",
+        total_steps=10,
+        current_step=5,
+        progress_percent=50
+    )
+
+    # Refresh to get updated state
+    workflow = db_manager.get_workflow(workflow.id)
+
+    return {
+        "workflow": workflow,
+        "workflow_id": workflow.id
+    }
+
+
+@pytest.fixture(scope="function")
+def completed_workflow(db_manager):
+    """Workflow in completed state."""
+    from core.database import WorkflowState
+    from datetime import datetime, timezone
+
+    workflow = db_manager.create_workflow(
+        workflow_type="directory_validation",
+        input_params={
+            "directory_path": "/test/completed",
+            "file_pattern": "*.md"
+        },
+        metadata={
+            "source": "test",
+            "file_count": 5
+        }
+    )
+
+    # Update to completed state
+    db_manager.update_workflow(
+        workflow_id=workflow.id,
+        state="completed",
+        total_steps=5,
+        current_step=5,
+        progress_percent=100
+    )
+
+    # Refresh to get updated state
+    workflow = db_manager.get_workflow(workflow.id)
+
+    return {
+        "workflow": workflow,
+        "workflow_id": workflow.id
+    }
+
+
+@pytest.fixture(scope="function")
+def multiple_workflows(db_manager):
+    """Multiple workflows for bulk operation testing."""
+    from core.database import WorkflowState
+
+    workflows = []
+
+    # Create workflows in various states
+    states = ["pending", "running", "completed", "failed", "completed"]
+    for i, state in enumerate(states):
+        workflow = db_manager.create_workflow(
+            workflow_type="batch_validation",
+            input_params={
+                "directory_path": f"/test/path_{i}",
+                "file_pattern": "*.md"
+            },
+            metadata={
+                "source": "test",
+                "index": i
+            }
+        )
+
+        if state != "pending":
+            db_manager.update_workflow(
+                workflow_id=workflow.id,
+                state=state,
+                progress_percent=100 if state == "completed" else 50
+            )
+
+        workflow = db_manager.get_workflow(workflow.id)
+        workflows.append(workflow)
+
+    return {
+        "workflows": workflows,
+        "workflow_ids": [w.id for w in workflows]
+    }
+
+
+# =============================================================================
+# Taskcard 5: Enhancement Workflow Test Fixtures
+# =============================================================================
+
+@pytest.fixture(scope="function")
+def enhanced_validation(db_manager, mock_file_system):
+    """Validation that has been enhanced with content changes."""
+    from core.database import ValidationStatus, RecommendationStatus
+
+    # Create validation in ENHANCED status
+    validation = db_manager.create_validation_result(
+        file_path=mock_file_system["file_path"],
+        rules_applied=["yaml", "markdown", "code"],
+        validation_results={
+            "passed": True,
+            "confidence": 0.95,
+            "issues": []
+        },
+        notes="Enhanced validation for testing",
+        severity="low",
+        status="enhanced",
+        validation_types=["yaml", "markdown", "code"],
+        content="""---
+title: Test Document
+family: words
+---
+
+# Test Document
+
+This is a test document for validation testing.
+
+```csharp
+// Sample code
+Document doc = new Document();
+doc.Save("output.pdf");
+```
+"""
+    )
+
+    # Create applied recommendations
+    rec = db_manager.create_recommendation(
+        validation_id=validation.id,
+        type="fix_format",
+        title="Applied Enhancement",
+        description="This recommendation was applied",
+        original_content="```csharp",
+        proposed_content="```cs",
+        status=RecommendationStatus.APPLIED,
+        scope="line:10"
+    )
+
+    return {
+        "validation": validation,
+        "validation_id": validation.id,
+        "recommendations": [rec],
+        "file_path": mock_file_system["file_path"],
+        "file_system": mock_file_system
+    }
+
+
+@pytest.fixture(scope="function")
+def validation_ready_for_enhancement(db_manager, mock_file_system):
+    """Approved validation with approved recommendations ready for enhancement."""
+    from core.database import RecommendationStatus
+
+    # Read the test file content
+    original_content = mock_file_system["test_file"].read_text(encoding="utf-8")
+
+    # Create approved validation with content stored
+    validation = db_manager.create_validation_result(
+        file_path=mock_file_system["file_path"],
+        rules_applied=["yaml", "markdown", "code"],
+        validation_results={
+            "passed": True,
+            "confidence": 0.88,
+            "issues": [
+                {"category": "code", "level": "warning", "message": "Code block language mismatch"}
+            ]
+        },
+        notes="Validation ready for enhancement",
+        severity="low",
+        status="approved",
+        validation_types=["yaml", "markdown", "code"],
+        content=original_content
+    )
+
+    # Create approved recommendations ready to apply
+    recs = []
+    rec1 = db_manager.create_recommendation(
+        validation_id=validation.id,
+        type="fix_format",
+        title="Fix Code Block",
+        description="Change csharp to cs for consistency",
+        original_content="```csharp",
+        proposed_content="```cs",
+        status=RecommendationStatus.APPROVED,
+        scope="line:10"
+    )
+    recs.append(rec1)
+
+    rec2 = db_manager.create_recommendation(
+        validation_id=validation.id,
+        type="add_info_text",
+        title="Add Comment",
+        description="Add explanatory comment",
+        original_content="// Sample code",
+        proposed_content="// Sample code demonstrating document creation",
+        status=RecommendationStatus.APPROVED,
+        scope="line:11"
+    )
+    recs.append(rec2)
+
+    return {
+        "validation": validation,
+        "validation_id": validation.id,
+        "recommendations": recs,
+        "recommendation_ids": [r.id for r in recs],
+        "file_path": mock_file_system["file_path"],
+        "file_system": mock_file_system,
+        "original_content": original_content
+    }
+
+
+@pytest.fixture(scope="function")
+def multiple_validations_for_enhancement(db_manager, mock_file_system):
+    """Multiple approved validations for batch enhancement testing."""
+    from core.database import RecommendationStatus
+
+    validations = []
+
+    # Create multiple test files and validations
+    for i in range(3):
+        test_file = mock_file_system["directory"] / f"enhance_test_{i}.md"
+        content = f"""---
+title: Enhancement Test {i}
+family: words
+---
+
+# Enhancement Test Document {i}
+
+This is test document {i} for batch enhancement.
+
+```csharp
+// Code sample {i}
+Document doc{i} = new Document();
+doc{i}.Save("output_{i}.pdf");
+```
+"""
+        test_file.write_text(content, encoding="utf-8")
+
+        validation = db_manager.create_validation_result(
+            file_path=str(test_file),
+            rules_applied=["yaml", "markdown", "code"],
+            validation_results={"passed": True, "confidence": 0.85 + i * 0.03},
+            notes=f"Validation {i} for batch enhancement",
+            severity="low",
+            status="approved",
+            validation_types=["yaml", "markdown", "code"],
+            content=content
+        )
+
+        # Add an approved recommendation for each
+        rec = db_manager.create_recommendation(
+            validation_id=validation.id,
+            type="fix_format",
+            title=f"Enhancement {i}",
+            description=f"Enhancement recommendation {i}",
+            original_content=f"```csharp",
+            proposed_content=f"```cs",
+            status=RecommendationStatus.APPROVED,
+            scope="line:12"
+        )
+
+        validations.append({
+            "validation": validation,
+            "validation_id": validation.id,
+            "recommendation": rec,
+            "file_path": str(test_file),
+            "content": content
+        })
+
+    return {
+        "validations": validations,
+        "validation_ids": [v["validation_id"] for v in validations],
+        "file_system": mock_file_system
+    }
+
+
+# =============================================================================
+# Task Card 1: WebSocket Test Fixtures
+# =============================================================================
+
+@pytest.fixture(scope="function")
+def websocket_client(api_client):
+    """
+    Provide WebSocket client for testing WebSocket connections.
+    Uses the TestClient's websocket_connect context manager.
+    """
+    from fastapi.testclient import TestClient
+    from api.server import app
+
+    client = TestClient(app)
+
+    def connect(path: str):
+        """Connect to WebSocket endpoint and return context manager."""
+        return client.websocket_connect(path)
+
+    return connect
+
+
+@pytest.fixture(scope="function")
+def workflow_websocket_client(running_workflow):
+    """
+    Provide WebSocket client pre-configured for a running workflow.
+    Returns a context manager for the WebSocket connection.
+    """
+    from fastapi.testclient import TestClient
+    from api.server import app
+
+    client = TestClient(app)
+    workflow_id = running_workflow["workflow_id"]
+
+    def connect():
+        """Connect to workflow WebSocket endpoint."""
+        return client.websocket_connect(f"/ws/{workflow_id}")
+
+    return {
+        "connect": connect,
+        "workflow_id": workflow_id,
+        "workflow": running_workflow["workflow"]
+    }
+
+
+# =============================================================================
+# Task Card 2: Modal Form Test Fixtures
+# =============================================================================
+
+@pytest.fixture(scope="function")
+def windows_test_path(tmp_path):
+    """Create a test file with Windows-style path for modal testing."""
+    test_file = tmp_path / "windows_test.md"
+    test_file.write_text("""---
+title: Windows Path Test
+family: words
+---
+
+# Windows Path Test Document
+
+This document tests Windows path handling.
+""", encoding="utf-8")
+
+    # Return both the actual path and a Windows-style representation
+    return {
+        "actual_path": test_file,
+        "file_path": str(test_file),
+        # Simulate Windows path format
+        "windows_path": str(test_file).replace("/", "\\") if "/" in str(test_file) else str(test_file)
+    }
+
+
+@pytest.fixture(scope="function")
+def unix_test_path(tmp_path):
+    """Create a test file with Unix-style path for modal testing."""
+    test_file = tmp_path / "unix_test.md"
+    test_file.write_text("""---
+title: Unix Path Test
+family: words
+---
+
+# Unix Path Test Document
+
+This document tests Unix path handling.
+""", encoding="utf-8")
+
+    return {
+        "actual_path": test_file,
+        "file_path": str(test_file),
+        # Ensure Unix-style forward slashes
+        "unix_path": str(test_file).replace("\\", "/")
+    }
+
+
+# =============================================================================
+# Task Card 4: Bulk Action Test Fixtures (Extended)
+# =============================================================================
+
+@pytest.fixture(scope="function")
+def five_validations(db_manager, mock_file_system):
+    """Create exactly 5 validations for bulk action testing."""
+    from core.database import ValidationStatus
+
+    validations = []
+
+    for i in range(5):
+        test_file = mock_file_system["directory"] / f"bulk_test_{i}.md"
+        test_file.write_text(f"""---
+title: Bulk Test Document {i}
+family: words
+---
+
+# Bulk Test Document {i}
+
+Content for bulk test {i}.
+""", encoding="utf-8")
+
+        validation = db_manager.create_validation_result(
+            file_path=str(test_file),
+            rules_applied=["yaml", "markdown"],
+            validation_results={"passed": True, "confidence": 0.80 + i * 0.03},
+            notes=f"Bulk test validation {i}",
+            severity="low",
+            status="pass",
+            validation_types=["yaml", "markdown"]
+        )
+        validations.append(validation)
+
+    return {
+        "validations": validations,
+        "validation_ids": [v.id for v in validations],
+        "file_system": mock_file_system
+    }
+
+
+@pytest.fixture(scope="function")
+def five_recommendations(db_manager, mock_file_system):
+    """Create 5 recommendations for bulk action testing."""
+    from core.database import RecommendationStatus
+
+    # Create a validation to attach recommendations to
+    validation = db_manager.create_validation_result(
+        file_path=mock_file_system["file_path"],
+        rules_applied=["yaml", "markdown"],
+        validation_results={"passed": True},
+        notes="Validation for 5 recommendations",
+        severity="low",
+        status="pass",
+        validation_types=["yaml", "markdown"]
+    )
+
+    recommendations = []
+    for i in range(5):
+        rec = db_manager.create_recommendation(
+            validation_id=validation.id,
+            type="fix_format" if i % 2 == 0 else "add_info_text",
+            title=f"Bulk Recommendation {i}",
+            description=f"Description for bulk recommendation {i}",
+            original_content=f"original_{i}",
+            proposed_content=f"proposed_{i}",
+            status=RecommendationStatus.PENDING,
+            scope=f"line:{10 + i}"
+        )
+        recommendations.append(rec)
+
+    return {
+        "validation": validation,
+        "recommendations": recommendations,
+        "recommendation_ids": [r.id for r in recommendations],
+        "file_system": mock_file_system
+    }
+
+
+@pytest.fixture(scope="function")
+def five_workflows(db_manager):
+    """Create 5 workflows for bulk action testing."""
+    from core.database import WorkflowState
+
+    workflows = []
+    states = ["pending", "running", "completed", "failed", "completed"]
+
+    for i, state in enumerate(states):
+        workflow = db_manager.create_workflow(
+            workflow_type="batch_validation",
+            input_params={
+                "directory_path": f"/test/bulk_path_{i}",
+                "file_pattern": "*.md"
+            },
+            metadata={
+                "source": "bulk_test",
+                "index": i
+            }
+        )
+
+        if state != "pending":
+            db_manager.update_workflow(
+                workflow_id=workflow.id,
+                state=state,
+                progress_percent=100 if state == "completed" else 50
+            )
+
+        workflow = db_manager.get_workflow(workflow.id)
+        workflows.append(workflow)
+
+    return {
+        "workflows": workflows,
+        "workflow_ids": [w.id for w in workflows]
+    }
+
+
+# =============================================================================
+# Task Card 5: Navigation & E2E Test Fixtures
+# =============================================================================
+
+@pytest.fixture(scope="function")
+def validation_ready_for_enhance(db_manager, mock_file_system):
+    """Create an approved validation ready for enhancement."""
+    from core.database import RecommendationStatus
+
+    original_content = mock_file_system["test_file"].read_text(encoding="utf-8")
+
+    validation = db_manager.create_validation_result(
+        file_path=mock_file_system["file_path"],
+        rules_applied=["yaml", "markdown", "code"],
+        validation_results={
+            "passed": True,
+            "confidence": 0.88,
+            "issues": [{"category": "code", "level": "warning", "message": "Minor issue"}]
+        },
+        notes="Validation ready for enhancement",
+        severity="low",
+        status="approved",
+        validation_types=["yaml", "markdown", "code"],
+        content=original_content
+    )
+
+    # Create approved recommendations ready to apply
+    recs = []
+    rec1 = db_manager.create_recommendation(
+        validation_id=validation.id,
+        type="fix_format",
+        title="Fix Code Block",
+        description="Change csharp to cs",
+        original_content="```csharp",
+        proposed_content="```cs",
+        status=RecommendationStatus.APPROVED,
+        scope="line:10"
+    )
+    recs.append(rec1)
+
+    return {
+        "validation": validation,
+        "validation_id": validation.id,
+        "recommendations": recs,
+        "recommendation_ids": [r.id for r in recs],
+        "file_path": mock_file_system["file_path"],
+        "file_system": mock_file_system,
+        "original_content": original_content
+    }
+
+
+@pytest.fixture(scope="function")
+def complete_validation_chain(db_manager, mock_file_system):
+    """
+    Create a complete validation chain for E2E testing:
+    - Workflow with validations
+    - Validations with recommendations
+    - Mix of statuses
+    """
+    from core.database import RecommendationStatus, WorkflowState
+
+    # Create workflow
+    workflow = db_manager.create_workflow(
+        workflow_type="batch_validation",
+        input_params={"directory_path": str(mock_file_system["directory"])},
+        metadata={"source": "e2e_test"}
+    )
+
+    validations = []
+    all_recommendations = []
+
+    # Create 3 validations with different statuses
+    statuses = ["pass", "approved", "enhanced"]
+    for i, status in enumerate(statuses):
+        test_file = mock_file_system["directory"] / f"chain_test_{i}.md"
+        content = f"""---
+title: Chain Test {i}
+family: words
+---
+
+# Chain Test Document {i}
+
+Content for E2E chain test {i}.
+"""
+        test_file.write_text(content, encoding="utf-8")
+
+        validation = db_manager.create_validation_result(
+            file_path=str(test_file),
+            rules_applied=["yaml", "markdown"],
+            validation_results={"passed": True, "confidence": 0.85 + i * 0.05},
+            notes=f"Chain validation {i}",
+            severity="low",
+            status=status,
+            validation_types=["yaml", "markdown"],
+            workflow_id=workflow.id,
+            content=content
+        )
+        validations.append(validation)
+
+        # Create recommendations for each validation
+        rec_statuses = [RecommendationStatus.PENDING, RecommendationStatus.APPROVED, RecommendationStatus.APPLIED]
+        for j, rec_status in enumerate(rec_statuses[:2]):  # 2 recs per validation
+            rec = db_manager.create_recommendation(
+                validation_id=validation.id,
+                type="fix_format",
+                title=f"Rec {i}-{j}",
+                description=f"Recommendation {j} for validation {i}",
+                original_content=f"old_{i}_{j}",
+                proposed_content=f"new_{i}_{j}",
+                status=rec_status,
+                scope=f"line:{5 + j}"
+            )
+            all_recommendations.append(rec)
+
+    # Update workflow to completed
+    db_manager.update_workflow(
+        workflow_id=workflow.id,
+        state="completed",
+        progress_percent=100
+    )
+    workflow = db_manager.get_workflow(workflow.id)
+
+    return {
+        "workflow": workflow,
+        "workflow_id": workflow.id,
+        "validations": validations,
+        "validation_ids": [v.id for v in validations],
+        "recommendations": all_recommendations,
+        "recommendation_ids": [r.id for r in all_recommendations],
+        "file_system": mock_file_system
+    }

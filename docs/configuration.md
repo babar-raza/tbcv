@@ -317,6 +317,600 @@ global:
   enable_performance_metrics: true
 ```
 
+### config/validation_flow.yaml
+**Critical configuration for tiered validation execution.** Controls which validators run, in what order, and with what dependencies.
+
+```yaml
+# Tiered Validation Flow Configuration
+validation_flow:
+  enabled: true
+  profile: "default"  # Available: strict, default, quick, content_only
+
+  settings:
+    early_termination_on_critical: true
+    max_critical_errors: 3
+    continue_on_error: true
+    validator_timeout: 60
+    tier_timeout: 180
+
+  # Tier definitions - validators in same tier run in parallel
+  tiers:
+    tier1:
+      name: "Quick Checks"
+      description: "Fast, rule-based validations"
+      parallel: true
+      validators:
+        - yaml
+        - markdown
+        - structure
+
+    tier2:
+      name: "Content Analysis"
+      description: "Deeper content analysis"
+      parallel: true
+      validators:
+        - code
+        - links
+        - seo
+        - heading_sizes
+
+    tier3:
+      name: "Advanced Validation"
+      description: "Fuzzy matching and truth checks"
+      parallel: false  # Sequential due to dependencies
+      validators:
+        - FuzzyLogic
+        - Truth
+        - llm
+
+  # Validator dependencies
+  dependencies:
+    Truth:
+      - FuzzyLogic  # Truth validator uses fuzzy detection results
+    llm:
+      - Truth  # LLM uses truth data for context
+
+  # Validation profiles
+  profiles:
+    strict:
+      settings:
+        early_termination_on_critical: true
+        max_critical_errors: 1
+        continue_on_error: false
+      validators:
+        llm:
+          enabled: true
+
+    default:
+      validators:
+        llm:
+          enabled: false  # LLM disabled by default
+
+    quick:
+      description: "Fast validation using only tier 1 validators"
+      validators:
+        code:
+          enabled: false
+        links:
+          enabled: false
+        FuzzyLogic:
+          enabled: false
+        Truth:
+          enabled: false
+        llm:
+          enabled: false
+
+    content_only:
+      description: "Content-focused validation (no advanced)"
+      validators:
+        FuzzyLogic:
+          enabled: false
+        Truth:
+          enabled: false
+        llm:
+          enabled: false
+
+  # Family-specific overrides (per product family)
+  family_overrides:
+    words:
+      profile: "strict"
+    pdf:
+      validators:
+        code:
+          enabled: false
+        links:
+          enabled: false
+    cells:
+      validators:
+        seo:
+          enabled: false
+```
+
+## Modular Validator Configuration Files
+
+TBCV uses separate YAML files for each validator module, allowing fine-grained control over validation rules.
+
+### config/cache.yaml
+Cache configuration for validation results, LLM responses, and truth data.
+
+```yaml
+cache:
+  enabled: true
+  profile: "default"
+
+  validation:
+    enabled: true
+    ttl_seconds: 3600
+    max_entries: 500
+    key_components:
+      - content_hash
+      - validation_types
+      - profile
+      - family
+
+  llm:
+    enabled: true
+    ttl_seconds: 86400
+    max_entries: 1000
+
+  truth:
+    enabled: true
+    ttl_seconds: 604800
+    preload_on_startup: true
+    watch_file_changes: true
+
+  profiles:
+    strict:
+      validation:
+        ttl_seconds: 1800
+    aggressive:
+      validation:
+        ttl_seconds: 7200
+      llm:
+        ttl_seconds: 172800
+    disabled:
+      validation:
+        enabled: false
+      llm:
+        enabled: false
+```
+
+### config/code.yaml
+Code block validation rules.
+
+```yaml
+code:
+  enabled: true
+  profile: "default"
+
+  rules:
+    no_language_specified:
+      enabled: true
+      level: warning
+      message: "Code block has no language specified"
+
+    empty_code_block:
+      enabled: true
+      level: warning
+
+    code_block_too_long:
+      enabled: true
+      level: info
+      params:
+        max_lines: 100
+
+    hardcoded_path:
+      enabled: true
+      level: warning
+      params:
+        patterns:
+          - "C:\\"
+          - "/home/"
+          - "/Users/"
+
+    sensitive_data:
+      enabled: true
+      level: warning
+      params:
+        patterns:
+          - "password"
+          - "api_key"
+          - "secret"
+
+  profiles:
+    strict:
+      overrides:
+        no_language_specified:
+          level: error
+        sensitive_data:
+          level: error
+```
+
+### config/frontmatter.yaml
+YAML frontmatter validation rules.
+
+```yaml
+frontmatter:
+  enabled: true
+  profile: "default"
+
+  rules:
+    required_title:
+      enabled: true
+      level: error
+      params:
+        field: title
+
+    required_description:
+      enabled: true
+      level: warning
+      params:
+        field: description
+
+    title_length:
+      enabled: true
+      level: warning
+      params:
+        min_length: 10
+        max_length: 100
+
+    description_length:
+      enabled: true
+      level: info
+      params:
+        min_length: 50
+        max_length: 160
+
+    yaml_parse_error:
+      enabled: true
+      level: error
+
+  profiles:
+    strict:
+      overrides:
+        required_description:
+          level: error
+```
+
+### config/links.yaml
+Link validation rules.
+
+```yaml
+links:
+  enabled: true
+  profile: "default"
+
+  rules:
+    empty_url:
+      enabled: true
+      level: error
+
+    localhost_link:
+      enabled: true
+      level: warning
+
+    placeholder_url:
+      enabled: true
+      level: warning
+      params:
+        patterns:
+          - "#$"
+          - "TODO"
+          - "example.com"
+
+    invalid_scheme:
+      enabled: true
+      level: warning
+      params:
+        allowed:
+          - http
+          - https
+          - mailto
+
+    spaces_in_url:
+      enabled: true
+      level: error
+
+    broken_reference:
+      enabled: true
+      level: error
+
+  profiles:
+    strict:
+      overrides:
+        localhost_link:
+          level: error
+        placeholder_url:
+          level: error
+```
+
+### config/markdown.yaml
+Markdown syntax validation rules.
+
+```yaml
+markdown:
+  enabled: true
+  profile: "default"
+
+  rules:
+    unclosed_code_block:
+      enabled: true
+      level: error
+
+    empty_link_text:
+      enabled: true
+      level: warning
+
+    empty_link_url:
+      enabled: true
+      level: error
+
+    missing_alt_text:
+      enabled: true
+      level: warning
+
+    empty_image_url:
+      enabled: true
+      level: error
+
+    unbalanced_formatting:
+      enabled: true
+      level: warning
+      params:
+        markers: ["**", "__", "*", "_", "~~", "```"]
+
+  profiles:
+    strict:
+      overrides:
+        empty_link_text:
+          level: error
+        missing_alt_text:
+          level: error
+```
+
+### config/structure.yaml
+Document structure validation rules.
+
+```yaml
+structure:
+  enabled: true
+  profile: "default"
+
+  rules:
+    content_too_short:
+      enabled: true
+      level: warning
+      params:
+        min_chars: 100
+        min_words: 20
+
+    no_headings:
+      enabled: true
+      level: warning
+
+    too_many_h1:
+      enabled: true
+      level: warning
+      params:
+        max_h1: 3
+
+    empty_section:
+      enabled: true
+      level: warning
+      params:
+        min_lines_between_headings: 2
+
+    consecutive_headings:
+      enabled: true
+      level: warning
+
+    deep_nesting:
+      enabled: true
+      level: info
+      params:
+        max_depth: 4
+
+  profiles:
+    strict:
+      overrides:
+        content_too_short:
+          level: error
+          params:
+            min_chars: 200
+        no_headings:
+          level: error
+```
+
+### config/seo.yaml
+SEO and heading validation rules (combines SEO structure and heading size limits).
+
+```yaml
+seo:
+  enabled: true
+  profile: "default"
+
+  headings:
+    h1:
+      required: true
+      unique: true
+      min_length: 20
+      max_length: 70
+      recommended_min: 30
+      recommended_max: 60
+
+  rules:
+    h1_required:
+      enabled: true
+      level: error
+      message: "H1 heading is required for SEO"
+
+    h1_unique:
+      enabled: true
+      level: error
+
+    hierarchy_skip:
+      enabled: true
+      level: error
+      message: "Heading hierarchy skip detected"
+
+    empty_heading:
+      enabled: true
+      level: warning
+
+    heading_too_short:
+      enabled: true
+      level: error
+
+    heading_too_long:
+      enabled: true
+      level: warning
+
+  heading_sizes:
+    h1:
+      min_length: 20
+      max_length: 70
+    h2:
+      min_length: 10
+      max_length: 100
+    h3:
+      min_length: 5
+      max_length: 100
+
+  profiles:
+    strict:
+      overrides:
+        empty_heading:
+          level: error
+        heading_too_long:
+          level: error
+```
+
+### config/truth.yaml
+Truth-based validation with optional LLM enhancement.
+
+```yaml
+truth:
+  enabled: true
+  profile: "default"
+
+  rules:
+    check_plugin_mentions:
+      enabled: true
+      level: warning
+
+    check_api_patterns:
+      enabled: true
+      level: info
+
+    check_forbidden_patterns:
+      enabled: true
+      level: error
+      params:
+        patterns:
+          - "hardcoded_path"
+          - "deprecated_api"
+
+    unknown_plugin:
+      enabled: true
+      level: error
+
+    # LLM-detected rules
+    missing_prerequisite:
+      enabled: true
+      level: warning
+
+    invalid_combination:
+      enabled: true
+      level: warning
+
+  rule_based:
+    check_plugin_mentions: true
+    check_api_patterns: true
+    case_insensitive: true
+
+  llm_enhancement:
+    enabled: true
+    timeout_seconds: 30
+    confidence_threshold: 0.7
+    fallback_on_error: true
+
+  merge:
+    dedup_strategy: "rule_based_priority"
+    tag_sources: true
+
+  profiles:
+    strict:
+      overrides:
+        unknown_plugin:
+          level: error
+        missing_prerequisite:
+          level: error
+    rule_based_only:
+      rules:
+        - check_plugin_mentions
+        - check_api_patterns
+        - unknown_plugin
+```
+
+### config/llm.yaml
+LLM-based semantic validation settings (requires Ollama).
+
+```yaml
+llm:
+  enabled: true
+  profile: "default"
+
+  model:
+    name: "qwen2.5"  # Default Ollama model
+    temperature: 0.1
+    top_p: 0.9
+    num_predict: 2000
+    timeout: 60
+
+  retry:
+    max_attempts: 3
+    initial_delay_ms: 1000
+    max_delay_ms: 10000
+    backoff_multiplier: 2.0
+
+  rules:
+    validate_plugins:
+      enabled: true
+      level: warning
+      params:
+        content_excerpt_length: 2000
+        max_plugins_in_prompt: 15
+
+    detect_missing_plugins:
+      enabled: true
+      level: warning
+      params:
+        confidence_threshold: 0.7
+
+    detect_incorrect_plugins:
+      enabled: true
+      level: warning
+      params:
+        confidence_threshold: 0.8
+
+  availability:
+    require_ollama: false
+    fallback_when_unavailable: true
+    log_unavailability: true
+
+  profiles:
+    strict:
+      overrides:
+        detect_missing_plugins:
+          level: error
+          params:
+            confidence_threshold: 0.6
+    disabled:
+      rules: []
+```
+
+## Legacy Configuration Files
+
 ### config/perf.json
 Performance tuning configuration.
 

@@ -2,171 +2,841 @@
 
 {% block title %}Recommendation Details - TBCV{% endblock %}
 
+{% block extra_css %}
+<style>
+/* Clean, professional styling */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.page-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 8px 0;
+}
+
+.page-meta {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Subtle badge styling - no garish backgrounds */
+.badge-outline {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid;
+}
+
+.badge-outline.critical {
+    color: #dc2626;
+    border-color: #dc2626;
+}
+
+.badge-outline.high {
+    color: #ea580c;
+    border-color: #ea580c;
+}
+
+.badge-outline.medium {
+    color: #ca8a04;
+    border-color: #ca8a04;
+}
+
+.badge-outline.low {
+    color: #16a34a;
+    border-color: #16a34a;
+}
+
+/* Status dot */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+}
+
+.status-dot.pending { background: #f59e0b; }
+.status-dot.proposed { background: #f59e0b; }
+.status-dot.approved { background: #22c55e; }
+.status-dot.rejected { background: #ef4444; }
+.status-dot.applied { background: #3b82f6; }
+
+/* Content sections */
+.content-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    padding: 14px 20px;
+    border-bottom: 1px solid #e5e7eb;
+    margin: 0;
+    background: #f9fafb;
+}
+
+.section-body {
+    padding: 20px;
+}
+
+/* Key info layout */
+.info-row {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 16px;
+}
+
+.info-row:last-child {
+    margin-bottom: 0;
+}
+
+.info-item {
+    flex: 1;
+    min-width: 200px;
+}
+
+.info-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.info-value {
+    font-size: 14px;
+    color: #1f2937;
+}
+
+/* Instruction box - the main actionable content */
+.instruction-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+}
+
+.instruction-box h4 {
+    font-size: 12px;
+    font-weight: 600;
+    color: #166534;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.instruction-box p {
+    margin: 0;
+    color: #15803d;
+    line-height: 1.6;
+}
+
+.rationale-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 16px 20px;
+}
+
+.rationale-box h4 {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.rationale-box p {
+    margin: 0;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+/* Source code viewer */
+.source-viewer {
+    background: #1e1e1e;
+    border-radius: 6px;
+    overflow: hidden;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.source-header {
+    background: #2d2d2d;
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #404040;
+}
+
+.source-filename {
+    color: #e0e0e0;
+    font-size: 12px;
+}
+
+.source-content {
+    max-height: 600px;
+    overflow: auto;
+    width: 100%;
+}
+
+.source-line {
+    display: flex;
+    min-height: 20px;
+}
+
+.source-line:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.source-line.highlight {
+    background: rgba(234, 179, 8, 0.15);
+}
+
+.line-number {
+    width: 50px;
+    min-width: 50px;
+    padding: 0 12px;
+    text-align: right;
+    color: #6b7280;
+    user-select: none;
+    flex-shrink: 0;
+    border-right: 1px solid #404040;
+}
+
+.line-content {
+    flex: 1;
+    padding: 0 16px;
+    color: #d4d4d4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-width: 0;
+}
+
+/* Actions */
+.action-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+/* Sidebar items */
+.sidebar-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.sidebar-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.sidebar-value {
+    font-size: 13px;
+    color: #1f2937;
+    word-break: break-all;
+}
+
+.sidebar-value a {
+    color: #667eea;
+    text-decoration: none;
+}
+
+.sidebar-value a:hover {
+    text-decoration: underline;
+}
+
+/* Related recommendations */
+.related-item {
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.related-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.related-item:first-child {
+    padding-top: 0;
+}
+
+.related-title {
+    font-size: 13px;
+    color: #1f2937;
+    margin-bottom: 4px;
+}
+
+.related-meta {
+    font-size: 11px;
+    color: #6b7280;
+}
+
+/* Review form */
+.review-form label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+}
+
+.review-form input,
+.review-form textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    margin-bottom: 16px;
+}
+
+.review-form input:focus,
+.review-form textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Toast */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+}
+
+.toast {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    animation: slideIn 0.3s ease;
+}
+
+.toast-success { background: #d1fae5; color: #065f46; }
+.toast-error { background: #fee2e2; color: #991b1b; }
+.toast-info { background: #dbeafe; color: #1e40af; }
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Two column layout */
+.two-col {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 24px;
+}
+
+.two-col > div {
+    min-width: 0;
+}
+
+@media (max-width: 900px) {
+    .two-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+}
+
+/* Confidence bar */
+.confidence-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.confidence-bar {
+    flex: 1;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.confidence-fill {
+    height: 100%;
+    background: #667eea;
+    border-radius: 3px;
+}
+
+/* Change preview */
+.change-preview {
+    background: #fefce8;
+    border: 1px solid #fef08a;
+    border-radius: 6px;
+    padding: 16px 20px;
+}
+
+.change-preview h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #854d0e;
+    margin: 0 0 12px 0;
+}
+
+.change-preview .location {
+    font-size: 12px;
+    color: #a16207;
+    margin-bottom: 8px;
+}
+
+.change-preview .content {
+    background: white;
+    border: 1px solid #fde68a;
+    border-radius: 4px;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    color: #1f2937;
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="margin-bottom: 20px;">
-    <a href="/dashboard/recommendations" class="btn btn-secondary">← Back to Recommendations</a>
+<!-- Navigation -->
+<div style="margin-bottom: 16px;">
+    <a href="/dashboard/recommendations" style="color: #6b7280; text-decoration: none; font-size: 13px;">
+        &larr; Back to Recommendations
+    </a>
 </div>
 
-<div class="card">
-    <h2>Recommendation Details</h2>
-    
-    <div class="detail-grid">
-        <div class="detail-label">ID:</div>
-        <div class="detail-value"><code>{{ recommendation.id }}</code></div>
-        
-        <div class="detail-label">Status:</div>
-        <div class="detail-value">
-            <span class="badge badge-{{ recommendation.status }}">{{ recommendation.status }}</span>
+<!-- Page Header -->
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ recommendation.title or 'Recommendation' }}</h1>
+        <div class="page-meta">
+            <span>
+                <span class="status-dot {{ recommendation.status }}"></span>
+                {{ recommendation.status | capitalize }}
+            </span>
+            <span class="badge-outline {{ recommendation.severity or 'medium' }}">
+                {{ recommendation.severity or 'medium' }} severity
+            </span>
+            <span class="badge-outline {{ recommendation.priority or 'medium' }}">
+                {{ recommendation.priority or 'medium' }} priority
+            </span>
+            <span style="color: #6b7280; font-size: 13px;">
+                {{ "%.0f"|format((recommendation.confidence or 0) * 100) }}% confidence
+            </span>
         </div>
-        
-        <div class="detail-label">Type:</div>
-        <div class="detail-value">
-            <span class="badge badge-secondary">{{ recommendation.type }}</span>
+    </div>
+    <div class="action-bar" style="margin: 0;">
+        {% if recommendation.status == 'pending' or recommendation.status == 'proposed' %}
+        <button class="btn btn-success btn-sm" onclick="reviewRecommendation('approved')">Approve</button>
+        <button class="btn btn-danger btn-sm" onclick="reviewRecommendation('rejected')">Reject</button>
+        {% endif %}
+        {% if recommendation.can_apply %}
+        <button class="btn btn-primary btn-sm" onclick="applySingleRecommendation()">Apply Change</button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="two-col">
+    <!-- Main Content -->
+    <div>
+        <!-- Description -->
+        {% if recommendation.description %}
+        <div class="content-section">
+            <h3 class="section-title">Description</h3>
+            <div class="section-body">
+                <p style="margin: 0; color: #374151; line-height: 1.6;">{{ recommendation.description }}</p>
+            </div>
         </div>
-        
-        <div class="detail-label">Priority:</div>
-        <div class="detail-value">
-            <span class="badge badge-warning">{{ recommendation.priority }}</span>
+        {% endif %}
+
+        <!-- What to Do -->
+        {% if recommendation.instruction %}
+        <div class="content-section">
+            <h3 class="section-title">What To Do</h3>
+            <div class="section-body">
+                <div class="instruction-box">
+                    <h4>Instruction</h4>
+                    <p>{{ recommendation.instruction }}</p>
+                </div>
+                {% if recommendation.rationale %}
+                <div class="rationale-box">
+                    <h4>Why This Helps</h4>
+                    <p>{{ recommendation.rationale }}</p>
+                </div>
+                {% endif %}
+            </div>
         </div>
-        
-        <div class="detail-label">Confidence:</div>
-        <div class="detail-value">
-            <strong>{{ "%.1f"|format(recommendation.confidence * 100) }}%</strong>
+        {% endif %}
+
+        <!-- Proposed Changes -->
+        <div class="content-section">
+            <h3 class="section-title">Proposed Changes</h3>
+            <div class="section-body">
+                {% if recommendation.proposed_content and recommendation.original_content %}
+                <!-- Show diff when both exist -->
+                <div class="source-viewer" id="diffViewer">
+                    <div class="source-header">
+                        <span class="source-filename">Content Diff</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="setDiffView('original')">Original</button>
+                            <button class="btn btn-secondary btn-sm" onclick="setDiffView('proposed')">Proposed</button>
+                        </div>
+                    </div>
+                    <div class="source-content" id="diffContent">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+                {% elif recommendation.proposed_content %}
+                <!-- Show proposed content only -->
+                <div class="change-preview">
+                    <h4>Content to Add</h4>
+                    {% if recommendation.scope %}
+                    <div class="location">Location: {{ recommendation.scope }}</div>
+                    {% endif %}
+                    <div class="content">{{ recommendation.proposed_content }}</div>
+                </div>
+                {% elif recommendation.instruction %}
+                <!-- Show instruction as the change when no content is available -->
+                <div class="change-preview">
+                    <h4>Recommended Action</h4>
+                    {% if recommendation.scope %}
+                    <div class="location">Location: {{ recommendation.scope }}</div>
+                    {% endif %}
+                    <div class="content" style="font-family: inherit; white-space: normal;">{{ recommendation.instruction }}</div>
+                </div>
+                {% elif recommendation.metadata and recommendation.metadata.target %}
+                <!-- Show target from metadata -->
+                <div class="change-preview">
+                    <h4>Target Element</h4>
+                    <div class="location">Selector: {{ recommendation.metadata.target.selector }}</div>
+                    {% if recommendation.metadata.target.context %}
+                    <div class="content">{{ recommendation.metadata.target.context }}</div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <p>No specific content changes defined for this recommendation.</p>
+                    <p style="font-size: 13px;">Review the description and instruction above for guidance.</p>
+                </div>
+                {% endif %}
+            </div>
         </div>
-        
-        <div class="detail-label">Created:</div>
-        <div class="detail-value">{{ recommendation.created_at }}</div>
-        
+
+        <!-- Source File -->
+        {% if source_context and source_context.file_exists %}
+        <div class="content-section">
+            <h3 class="section-title">Source File</h3>
+            <div class="section-body" style="padding: 0;">
+                <div class="source-viewer">
+                    <div class="source-header">
+                        <span class="source-filename">{{ source_context.file_path }}</span>
+                        <span style="color: #6b7280; font-size: 12px;">{{ source_context.lines|length }} lines shown</span>
+                    </div>
+                    <div class="source-content">
+                        {% for line_num, line_content in source_context.lines %}
+                        <div class="source-line {% if source_context.target_line == line_num %}highlight{% endif %}">
+                            <span class="line-number">{{ line_num }}</span>
+                            <span class="line-content">{{ line_content }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% elif source_context and source_context.error %}
+        <div class="content-section">
+            <h3 class="section-title">Source File</h3>
+            <div class="section-body">
+                <div class="empty-state">
+                    <p>{{ source_context.error }}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Review Form -->
+        {% if recommendation.status == 'pending' or recommendation.status == 'proposed' %}
+        <div class="content-section">
+            <h3 class="section-title">Review</h3>
+            <div class="section-body">
+                <form class="review-form" id="reviewForm" onsubmit="return false;">
+                    <label for="reviewer">Reviewer</label>
+                    <input type="text" id="reviewer" name="reviewer" value="dashboard_user">
+
+                    <label for="notes">Notes (optional)</label>
+                    <textarea id="notes" name="notes" rows="3" placeholder="Add notes about your decision..."></textarea>
+
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-success" onclick="reviewRecommendation('approved')">Approve</button>
+                        <button type="button" class="btn btn-danger" onclick="reviewRecommendation('rejected')">Reject</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Review History -->
         {% if recommendation.reviewed_by %}
-        <div class="detail-label">Reviewed By:</div>
-        <div class="detail-value">{{ recommendation.reviewed_by }}</div>
-        
-        <div class="detail-label">Reviewed At:</div>
-        <div class="detail-value">{{ recommendation.reviewed_at }}</div>
+        <div class="content-section">
+            <h3 class="section-title">Review History</h3>
+            <div class="section-body">
+                <div class="info-row">
+                    <div class="info-item">
+                        <div class="info-label">Reviewed By</div>
+                        <div class="info-value">{{ recommendation.reviewed_by }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Reviewed At</div>
+                        <div class="info-value">{{ recommendation.reviewed_at }}</div>
+                    </div>
+                </div>
+                {% if recommendation.review_notes %}
+                <div style="margin-top: 12px;">
+                    <div class="info-label">Notes</div>
+                    <div class="info-value">{{ recommendation.review_notes }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
-        
-        {% if recommendation.applied_at %}
-        <div class="detail-label">Applied At:</div>
-        <div class="detail-value">{{ recommendation.applied_at }}</div>
-        
-        <div class="detail-label">Applied By:</div>
-        <div class="detail-value">{{ recommendation.applied_by }}</div>
+    </div>
+
+    <!-- Sidebar -->
+    <div>
+        <!-- Details -->
+        <div class="sidebar-card">
+            <div class="sidebar-title">Details</div>
+            <div style="margin-bottom: 12px;">
+                <div class="info-label">Type</div>
+                <div class="sidebar-value">{{ recommendation.type }}</div>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div class="info-label">Scope</div>
+                <div class="sidebar-value">{{ recommendation.scope or 'Not specified' }}</div>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div class="info-label">Confidence</div>
+                <div class="confidence-bar-container">
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: {{ (recommendation.confidence or 0) * 100 }}%"></div>
+                    </div>
+                    <span style="font-size: 13px; color: #374151;">{{ "%.0f"|format((recommendation.confidence or 0) * 100) }}%</span>
+                </div>
+            </div>
+            <div>
+                <div class="info-label">Created</div>
+                <div class="sidebar-value">{{ recommendation.created_at }}</div>
+            </div>
+        </div>
+
+        <!-- Validation -->
+        {% if validation %}
+        <div class="sidebar-card">
+            <div class="sidebar-title">Related Validation</div>
+            <div style="margin-bottom: 12px;">
+                <div class="info-label">File</div>
+                <div class="sidebar-value" style="font-size: 12px;">{{ validation.file_path }}</div>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div class="info-label">Status</div>
+                <div class="sidebar-value">
+                    <span class="badge badge-{{ validation.status }}">{{ validation.status }}</span>
+                </div>
+            </div>
+            <a href="/dashboard/validations/{{ validation.id }}" class="btn btn-secondary btn-sm" style="width: 100%; text-align: center;">
+                View Validation
+            </a>
+        </div>
         {% endif %}
-    </div>
-    
-    <div style="margin-top: 20px;">
-        <h3 style="margin-bottom: 10px;">Title</h3>
-        <p>{{ recommendation.title }}</p>
-    </div>
-    
-    <div style="margin-top: 20px;">
-        <h3 style="margin-bottom: 10px;">Description</h3>
-        <p>{{ recommendation.description }}</p>
-    </div>
-    
-    {% if recommendation.original_content %}
-    <div style="margin-top: 20px;">
-        <h3 style="margin-bottom: 10px;">Original Content</h3>
-        <pre>{{ recommendation.original_content }}</pre>
-    </div>
-    {% endif %}
-    
-    {% if recommendation.proposed_content %}
-    <div style="margin-top: 20px;">
-        <h3 style="margin-bottom: 10px;">Proposed Content</h3>
-        <pre>{{ recommendation.proposed_content }}</pre>
-    </div>
-    {% endif %}
-    
-    {% if recommendation.diff %}
-    <div style="margin-top: 20px;">
-        <h3 style="margin-bottom: 10px;">Diff</h3>
-        <pre>{{ recommendation.diff }}</pre>
-    </div>
-    {% endif %}
-    
-    {% if recommendation.review_notes %}
-    <div style="margin-top: 20px;">
-        <h3 style="margin-bottom: 10px;">Review Notes</h3>
-        <p>{{ recommendation.review_notes }}</p>
-    </div>
-    {% endif %}
-</div>
 
-<!-- Review Form -->
-{% if recommendation.status == 'pending' %}
-<div class="card">
-    <h2>Review Recommendation</h2>
-    <form method="POST" action="/dashboard/recommendations/{{ recommendation.id }}/review">
-        <div style="margin-bottom: 15px;">
-            <label for="reviewer" style="display: block; margin-bottom: 5px; font-weight: 600;">Reviewer Name:</label>
-            <input type="text" id="reviewer" name="reviewer" value="dashboard_user" 
-                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
-        </div>
-        
-        <div style="margin-bottom: 15px;">
-            <label for="notes" style="display: block; margin-bottom: 5px; font-weight: 600;">Review Notes (Optional):</label>
-            <textarea id="notes" name="notes" rows="4" 
-                      style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
-        </div>
-        
-        <div class="actions">
-            <button type="submit" name="action" value="accepted" class="btn btn-success">✓ Approve</button>
-            <button type="submit" name="action" value="rejected" class="btn btn-danger">✗ Reject</button>
-        </div>
-    </form>
-</div>
-{% endif %}
-
-<!-- Related Validation -->
-{% if validation %}
-<div class="card">
-    <h2>Related Validation</h2>
-    <div class="detail-grid">
-        <div class="detail-label">File Path:</div>
-        <div class="detail-value">{{ validation.file_path }}</div>
-        
-        <div class="detail-label">Status:</div>
-        <div class="detail-value">
-            <span class="badge badge-{{ validation.status }}">{{ validation.status }}</span>
-        </div>
-        
-        <div class="detail-label">Severity:</div>
-        <div class="detail-value">
-            <span class="badge badge-{{ validation.severity }}">{{ validation.severity }}</span>
-        </div>
-    </div>
-    <div style="margin-top: 15px;">
-        <a href="/dashboard/validations/{{ validation.id }}" class="btn btn-primary">View Full Validation</a>
-    </div>
-</div>
-{% endif %}
-
-<!-- Audit Trail -->
-{% if audit_logs %}
-<div class="card">
-    <h2>Audit Trail</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Action</th>
-                <th>Actor</th>
-                <th>Timestamp</th>
-                <th>Notes</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for log in audit_logs %}
-            <tr>
-                <td><span class="badge badge-secondary">{{ log.action }}</span></td>
-                <td>{{ log.actor or 'system' }} ({{ log.actor_type }})</td>
-                <td>{{ log.created_at }}</td>
-                <td class="truncate">{{ log.notes or '-' }}</td>
-            </tr>
+        <!-- Related Recommendations -->
+        {% if related_recommendations %}
+        <div class="sidebar-card">
+            <div class="sidebar-title">Related ({{ related_recommendations|length }})</div>
+            {% for rel in related_recommendations[:5] %}
+            <div class="related-item">
+                <div class="related-title">
+                    <a href="/dashboard/recommendations/{{ rel.id }}">{{ rel.title|truncate(40) }}</a>
+                </div>
+                <div class="related-meta">
+                    <span class="status-dot {{ rel.status }}" style="margin-right: 4px;"></span>
+                    {{ rel.status }} &middot; {{ rel.type }}
+                </div>
+            </div>
             {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% endif %}
+        </div>
+        {% endif %}
 
+        <!-- IDs -->
+        <div class="sidebar-card">
+            <div class="sidebar-title">Reference</div>
+            <div style="margin-bottom: 8px;">
+                <div class="info-label">Recommendation ID</div>
+                <div class="sidebar-value" style="font-size: 11px; font-family: monospace;">{{ recommendation.id }}</div>
+            </div>
+            <div>
+                <div class="info-label">Validation ID</div>
+                <div class="sidebar-value" style="font-size: 11px; font-family: monospace;">
+                    <a href="/dashboard/validations/{{ recommendation.validation_id }}">{{ recommendation.validation_id }}</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const recommendationId = '{{ recommendation.id }}';
+const validationId = '{{ recommendation.validation_id }}';
+const originalContent = {{ recommendation.original_content | tojson if recommendation.original_content else 'null' }};
+const proposedContent = {{ recommendation.proposed_content | tojson if recommendation.proposed_content else 'null' }};
+
+// Initialize diff view if content exists
+document.addEventListener('DOMContentLoaded', function() {
+    if (originalContent && proposedContent) {
+        setDiffView('proposed');
+    }
+});
+
+function setDiffView(view) {
+    const container = document.getElementById('diffContent');
+    if (!container) return;
+
+    const content = view === 'original' ? originalContent : proposedContent;
+    if (!content) {
+        container.innerHTML = '<div style="padding: 20px; color: #6b7280;">No content available</div>';
+        return;
+    }
+
+    const lines = content.split('\n');
+    let html = '';
+    lines.forEach((line, i) => {
+        html += `<div class="source-line">
+            <span class="line-number">${i + 1}</span>
+            <span class="line-content">${escapeHtml(line)}</span>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+async function reviewRecommendation(action) {
+    const reviewer = document.getElementById('reviewer')?.value || 'dashboard_user';
+    const notes = document.getElementById('notes')?.value || '';
+
+    try {
+        const response = await fetch(`/api/recommendations/${recommendationId}/review`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: action, reviewer: reviewer, notes: notes })
+        });
+
+        if (response.ok) {
+            showToast(`Recommendation ${action}`, 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed', 'error');
+        }
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function applySingleRecommendation() {
+    if (!confirm('Apply this recommendation?')) return;
+
+    showToast('Applying...', 'info');
+
+    try {
+        const rec = {{ recommendation | tojson }};
+        if (rec.status === 'pending' || rec.status === 'proposed') {
+            await fetch(`/api/recommendations/${recommendationId}/review`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'approved', reviewer: 'dashboard_user' })
+            });
+        }
+
+        const response = await fetch('/api/enhance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                validation_id: validationId,
+                recommendations: [recommendationId],
+                preview: false
+            })
+        });
+
+        if (response.ok) {
+            showToast('Applied successfully', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed', 'error');
+        }
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+</script>
 {% endblock %}

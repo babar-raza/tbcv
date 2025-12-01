@@ -61,13 +61,13 @@ python test_simple_ws.py
 
 **Before Fix:**
 ```
-Connecting to ws://127.0.0.1:8586/ws/test...
+Connecting to ws://127.0.0.1:8585/ws/test...
 Error: InvalidStatus: server rejected WebSocket connection: HTTP 403
 ```
 
 **After Fix:**
 ```
-Connecting to ws://127.0.0.1:8586/ws/test...
+Connecting to ws://127.0.0.1:8585/ws/test...
 Connected!
 Received: Hello from test WebSocket!
 ```
@@ -149,20 +149,20 @@ All these attempts addressed the wrong layer. The issue wasn't with uvicorn conf
 
 ```bash
 # Start server (if not already running)
-python main.py --mode api --host 127.0.0.1 --port 8586
+python main.py --mode api --host 127.0.0.1 --port 8585
 
 # Test WebSocket in another terminal
 python test_simple_ws.py
 
 # Expected output:
-# Connecting to ws://127.0.0.1:8586/ws/test...
+# Connecting to ws://127.0.0.1:8585/ws/test...
 # Connected!
 # Received: Hello from test WebSocket!
 ```
 
 ### Dashboard Test
 
-1. **Open Dashboard:** http://127.0.0.1:8586/dashboard/
+1. **Open Dashboard:** http://127.0.0.1:8585/dashboard/
 2. **Check Connection Status:** Should show **"Live" 🟢** (pulsing green indicator)
 3. **Create Validation:** Create any validation via CLI or API
 4. **Watch Activity Feed:** Should update instantly without page refresh
@@ -170,10 +170,10 @@ python test_simple_ws.py
 
 ### Workflow Progress Test
 
-1. **Open Workflows Page:** http://127.0.0.1:8586/dashboard/workflows
+1. **Open Workflows Page:** http://127.0.0.1:8585/dashboard/workflows
 2. **Create Batch Workflow:**
    ```bash
-   curl -X POST http://127.0.0.1:8586/api/validate/batch \
+   curl -X POST http://127.0.0.1:8585/api/validate/batch \
      -H "Content-Type: application/json" \
      -d '{
        "files": ["test_workflow_2.md"],
@@ -308,7 +308,7 @@ real-time features work as expected.
 
 ## Current Server Status
 
-**Server:** ✅ Running healthy on http://127.0.0.1:8586
+**Server:** ✅ Running healthy on http://127.0.0.1:8585
 **PID:** 36896
 **WebSocket Support:** ✅ Enabled and working
 **Live Updates:** ✅ Operational
@@ -316,7 +316,7 @@ real-time features work as expected.
 
 ### Health Check
 ```bash
-curl http://127.0.0.1:8586/health
+curl http://127.0.0.1:8585/health
 # {"status":"healthy","agents_registered":16,"database_connected":true}
 ```
 

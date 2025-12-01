@@ -59,9 +59,93 @@ class EnhancementResult:
 
 
 class ContentEnhancerAgent(BaseAgent):
+    """Content enhancement agent with idempotence support."""
+
+    ENHANCEMENT_MARKER_PREFIX = "<!-- TBCV:enhanced:"
+    ENHANCEMENT_MARKER_SUFFIX = " -->"
+
+    # Class-level cache for tracking enhanced content hashes (survives across calls)
+    _enhanced_content_cache: Set[str] = set()
+
     def __init__(self, agent_id: Optional[str] = None):
         self.linked_plugins: Set[str] = set()
         super().__init__(agent_id)
+
+    @classmethod
+    def clear_enhancement_cache(cls):
+        """Clear the enhancement cache (useful for testing)."""
+        cls._enhanced_content_cache.clear()
+
+    # ========= Idempotence Methods =========
+
+    def _compute_content_hash(self, content: str, detected_plugins: List[Dict],
+                              enhancement_types: List[str]) -> str:
+        """Compute deterministic hash for idempotence checking.
+
+        Args:
+            content: The content being enhanced
+            detected_plugins: List of detected plugin dictionaries
+            enhancement_types: List of enhancement types to apply
+
+        Returns:
+            A 16-character hash string
+        """
+        import hashlib
+        import json
+
+        # Sort plugins by ID for deterministic ordering
+        sorted_plugins = sorted(detected_plugins, key=lambda p: p.get("plugin_id", ""))
+        sorted_types = sorted(enhancement_types)
+
+        hash_input = {
+            "content_length": len(content),
+            "content_prefix": content[:100] if content else "",
+            "plugins": [p.get("plugin_id") for p in sorted_plugins],
+            "types": sorted_types
+        }
+
+        hash_str = json.dumps(hash_input, sort_keys=True)
+        return hashlib.sha256(hash_str.encode()).hexdigest()[:16]
+
+    def _is_already_enhanced(self, content: str, expected_hash: str = "") -> bool:
+        """Check if content has already been enhanced.
+
+        Checks for TBCV enhancement markers in the content. If expected_hash is
+        provided, checks for that specific hash. Otherwise checks for any marker.
+
+        Args:
+            content: The content to check
+            expected_hash: Optional specific hash to look for
+
+        Returns:
+            True if content contains an enhancement marker
+        """
+        import re
+
+        # If a specific hash is requested, check for that exact marker
+        if expected_hash:
+            marker = f"{self.ENHANCEMENT_MARKER_PREFIX}{expected_hash}{self.ENHANCEMENT_MARKER_SUFFIX}"
+            return marker in content
+
+        # Otherwise check for any enhancement marker pattern
+        # Pattern: <!-- TBCV:enhanced:XXXX --> where XXXX is any hash
+        pattern = re.escape(self.ENHANCEMENT_MARKER_PREFIX) + r"[a-f0-9]+" + re.escape(self.ENHANCEMENT_MARKER_SUFFIX)
+        return bool(re.search(pattern, content))
+
+    def _add_enhancement_marker(self, content: str, content_hash: str) -> str:
+        """Add enhancement marker to content if not present.
+
+        Args:
+            content: The content to mark
+            content_hash: The hash to include in the marker
+
+        Returns:
+            Content with enhancement marker appended
+        """
+        marker = f"{self.ENHANCEMENT_MARKER_PREFIX}{content_hash}{self.ENHANCEMENT_MARKER_SUFFIX}"
+        if marker in content:
+            return content
+        return f"{content}\n{marker}\n"
 
     def get_contract(self) -> AgentContract:
         return AgentContract(
@@ -111,6 +195,7 @@ class ContentEnhancerAgent(BaseAgent):
         self.register_handler("add_plugin_links", self.handle_add_plugin_links)
         self.register_handler("add_info_text", self.handle_add_info_text)
         self.register_handler("preview_enhancements", self.handle_preview_enhancements)
+        self.register_handler("enhance_with_recommendations", self.handle_enhance_with_recommendations)
 
     # ========= NEW: validation-aware enhancement =========
     @staticmethod
@@ -151,6 +236,40 @@ class ContentEnhancerAgent(BaseAgent):
             enhancements: List[Enhancement] = []
             enhanced_content = content
 
+            # ========= IDEMPOTENCE CHECK =========
+            # Compute content hash for the new enhancement marker
+            content_hash = self._compute_content_hash(content, detected_plugins, enhancement_types)
+
+            # Check if content was already enhanced:
+            # 1. Content has an enhancement marker embedded in it, OR
+            # 2. We've previously enhanced content with this exact hash (cached)
+            already_enhanced = (
+                self._is_already_enhanced(content) or
+                content_hash in self._enhanced_content_cache
+            )
+
+            if already_enhanced:
+                # Return early - content already enhanced, no changes needed
+                stats = {
+                    "original_length": len(content),
+                    "enhanced_length": len(content),
+                    "plugins_detected": len(detected_plugins),
+                    "enhancement_types": enhancement_types,
+                    "preview_only": preview_only,
+                    "already_enhanced": True,
+                    "content_hash": content_hash,
+                    "total_enhancements": 0,
+                    "unique_plugins_linked": 0,
+                    "rewrite_ratio": 0.0,
+                }
+                perf.add_context(total=0, change=0)
+                return {
+                    "enhanced_content": content,
+                    "enhancements": [],
+                    "statistics": stats,
+                    "status": "already_enhanced"
+                }
+
             # Pull validation notes first
             validation_issues = self._collect_validation_issues(file_path, severity_floor)
             heavy = any(i.get("level") == "error" for i in validation_issues)
@@ -162,6 +281,8 @@ class ContentEnhancerAgent(BaseAgent):
                 "preview_only": preview_only,
                 "validation_issues_used": len(validation_issues),
                 "strategy": "heavy" if heavy else "surgical",
+                "already_enhanced": False,
+                "content_hash": content_hash,
             }
 
             # Your original pipeline
@@ -234,8 +355,15 @@ class ContentEnhancerAgent(BaseAgent):
                 return result_dict
 
             # Otherwise return enhanced content as usual
+            # Add enhancement marker for idempotence tracking (if enhancements were made)
+            if enhancements and not preview_only:
+                enhanced_content = self._add_enhancement_marker(enhanced_content, content_hash)
+                stats["enhanced_length"] = len(enhanced_content)  # Update after adding marker
+                # Add to cache for idempotence checking on subsequent calls
+                self._enhanced_content_cache.add(content_hash)
+
             result = EnhancementResult(enhanced_content, enhancements, stats)
-            perf.add_context(total=len(enhancements), change=enhanced_length - original_length)
+            perf.add_context(total=len(enhancements), change=len(enhanced_content) - original_length)
             # Add a success status for clarity
             result_dict = result.to_dict()
             result_dict["status"] = "success"
@@ -300,6 +428,63 @@ class ContentEnhancerAgent(BaseAgent):
                     "total_enhancements": len(all_enh),
                 },
             ).to_dict()
+
+    async def handle_enhance_with_recommendations(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply approved recommendations to content.
+
+        This is the handler wrapper for the enhance_from_recommendations method.
+        Expected params:
+            - content: str - The content to enhance
+            - recommendations: List[Dict] - List of recommendation objects to apply
+            - file_path: str (optional) - File path for context
+            - recommendation_ids: List[str] (optional) - IDs of recommendations to fetch
+
+        Returns:
+            Dict with enhanced_content, applied_recommendations, skipped_recommendations,
+            diff, and statistics.
+        """
+        content = params.get("content", "")
+        file_path = params.get("file_path")
+        recommendations = params.get("recommendations", [])
+        recommendation_ids = params.get("recommendation_ids", [])
+
+        if not content:
+            return {
+                "enhanced_content": "",
+                "applied_recommendations": [],
+                "skipped_recommendations": [],
+                "diff": "",
+                "statistics": {"error": "Empty content"}
+            }
+
+        # If recommendation_ids are provided but no recommendations, fetch them
+        if recommendation_ids and not recommendations:
+            try:
+                from core.database import db_manager
+                for rec_id in recommendation_ids:
+                    rec = db_manager.get_recommendation(rec_id)
+                    if rec:
+                        recommendations.append({
+                            "id": rec.id,
+                            "instruction": rec.instruction,
+                            "scope": rec.scope,
+                            "severity": rec.severity,
+                            "confidence": rec.confidence,
+                            "original_content": getattr(rec, 'original_content', None),
+                            "proposed_content": getattr(rec, 'proposed_content', None),
+                            "found": getattr(rec, 'found', None),
+                            "expected": getattr(rec, 'expected', None),
+                        })
+            except Exception as e:
+                self.logger.warning(f"Failed to fetch recommendations: {e}")
+
+        # Call the underlying implementation
+        return await self.enhance_from_recommendations(
+            content=content,
+            recommendations=recommendations,
+            file_path=file_path
+        )
 
     # =======================================================
     # Subroutines (pure helpers)
@@ -517,10 +702,30 @@ class ContentEnhancerAgent(BaseAgent):
                 
                 # Pattern: Add field to YAML frontmatter
                 if "frontmatter" in scope.lower() and "add" in instruction.lower():
-                    # Extract field name from instruction
+                    # Extract field name from instruction using multiple patterns:
+                    # 1. "add field 'field_name'" or "add field \"field_name\""
+                    # 2. "add 'field_name: value'" - extracts just the field name before :
+                    # 3. "add 'field_name'" - extracts full value
+                    field_name = None
+                    field_value = None
+
+                    # Try pattern with "field" word first
                     field_match = re.search(r"add.*?field.*?['\"]([^'\"]+)['\"]", instruction, re.IGNORECASE)
                     if field_match:
                         field_name = field_match.group(1)
+                    else:
+                        # Try pattern: Add 'field_name: value'
+                        value_match = re.search(r"add\s+['\"]([^:]+):\s*([^'\"]*)['\"]", instruction, re.IGNORECASE)
+                        if value_match:
+                            field_name = value_match.group(1).strip()
+                            field_value = value_match.group(2).strip() if value_match.group(2) else None
+                        else:
+                            # Try simple pattern: Add 'field_name'
+                            simple_match = re.search(r"add\s+['\"]([^'\"]+)['\"]", instruction, re.IGNORECASE)
+                            if simple_match:
+                                field_name = simple_match.group(1)
+
+                    if field_name:
                         # Check if content has YAML frontmatter
                         if enhanced_content.startswith("---"):
                             parts = enhanced_content.split("---", 2)
@@ -528,8 +733,9 @@ class ContentEnhancerAgent(BaseAgent):
                                 frontmatter = parts[1]
                                 # Add field if not present
                                 if field_name not in frontmatter:
-                                    # Add at end of frontmatter
-                                    new_frontmatter = frontmatter.rstrip() + f"\n{field_name}: # TODO: Add value\n"
+                                    # Add at end of frontmatter with value if provided
+                                    value_str = field_value if field_value else "# TODO: Add value"
+                                    new_frontmatter = frontmatter.rstrip() + f"\n{field_name}: {value_str}\n"
                                     enhanced_content = f"---{new_frontmatter}---{parts[2]}"
                                     applied_change = True
                                     change_description = f"Added '{field_name}' field to frontmatter"

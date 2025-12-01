@@ -13,12 +13,13 @@ Important:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import uuid
 import hashlib
 
 from core.database import Base, db_manager, JSONField, Column, String, DateTime, Text, Index, Session
+from core.access_guard import guarded_operation
 
 
 class ValidationRecord(Base):
@@ -42,8 +43,8 @@ class ValidationRecord(Base):
     ast_hash = Column(String(64), nullable=True)
     run_id = Column(String(64), index=True, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_val_file_status', 'file_path', 'status'),
@@ -74,6 +75,7 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+@guarded_operation
 def create_validation_record(
     *,
     file_path: str,

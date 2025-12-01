@@ -45,7 +45,11 @@ data/logs/*.log
 .cache/
 data/cache/
 data/temp/
+data/validated_files/
 __pycache__/
+
+# Claude Code local settings
+.claude/settings.local.json
 
 # IDE and editor files
 .vscode/
@@ -107,6 +111,9 @@ htmlcov/
 # Test artifacts at root (should be in tests/)
 /test_*.md
 /test_*.py
+/test_*.txt
+/remaining_test_output.txt
+/final_run.txt
 !tests/
 !main.py
 !setup.py
@@ -115,3 +122,5 @@ htmlcov/
 /check_*.py
 /approve_*.py
 !scripts/
+/plans
+/reports

@@ -1,0 +1,37 @@
+# Access Guards Configuration
+# Controls access to protected modules from different callers
+
+enforcement_mode: warn  # disabled, warn, or block
+
+# Modules that are protected by access guards
+protected_modules:
+  - agents.orchestrator
+  - agents.content_validator
+  - agents.content_enhancer
+  - agents.recommendation_agent
+  - agents.truth_manager
+  - agents.validators
+  - core.validation_store
+  - core.database
+
+# Callers that are allowed to access protected modules
+allowed_callers:
+  - svc.mcp_server
+  - svc.mcp_methods
+  - tests
+
+# Callers that are explicitly blocked
+blocked_callers:
+  - api
+  - cli
+
+# Violation logging settings
+logging:
+  log_violations: true
+  log_level: WARNING
+  include_stack_trace: true
+
+# Performance monitoring
+performance:
+  track_overhead: true
+  max_overhead_ms: 1.0  # Maximum acceptable overhead in milliseconds

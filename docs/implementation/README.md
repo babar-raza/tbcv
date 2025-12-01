@@ -20,6 +20,8 @@ Historical implementation summaries and technical investigations from various de
 
 ### Bug Fixes
 - **[Stub Fixes Complete](STUB_FIXES_COMPLETE.md)** - Resolution of placeholder code and incomplete implementations
+- **[Language Check Fix](LANGUAGE_CHECK_FIX_SUMMARY.md)** - Smart language detection for local vs repository files
+- **[Validation File Path Fix](VALIDATION_FILE_PATH_FIX.md)** - File path normalization and temp file handling
 
 ## Purpose
 

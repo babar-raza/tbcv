@@ -1,0 +1,14 @@
+{
+  "critique": {
+    "description": "Evaluate the quality of a content improvement recommendation",
+    "template": "You are a quality reviewer for content improvement recommendations.\n\nRECOMMENDATION:\nInstruction: {instruction}\nScope: {scope}\nSeverity: {severity}\nRationale: {rationale}\n\nORIGINAL ISSUE:\nType: {issue_type}\nMessage: {issue_message}\n\nCONTENT CONTEXT:\nFile: {file_path}\nFamily: {family}\n\nEvaluate this recommendation on these criteria:\n1. ACTIONABLE: Can someone actually implement this? (Not vague like \"review and fix\")\n2. FIXES_ISSUE: Will following this instruction resolve the original issue?\n3. SPECIFIC: Is the scope and instruction specific enough to act on?\n4. SIDE_EFFECTS: Could implementing this break something else or cause unintended changes?\n\nRespond with JSON only:\n{\n  \"actionable\": true/false,\n  \"actionable_reason\": \"explanation\",\n  \"fixes_issue\": true/false,\n  \"fixes_issue_reason\": \"explanation\",\n  \"specific\": true/false,\n  \"specific_reason\": \"explanation\",\n  \"side_effects\": [\"list of potential issues\"],\n  \"quality_score\": 0.0-1.0,\n  \"should_discard\": true/false,\n  \"needs_refinement\": true/false,\n  \"refinement_suggestions\": \"how to improve if needed\"\n}"
+  },
+  "refine": {
+    "description": "Improve a recommendation based on critique feedback",
+    "template": "You are improving a content improvement recommendation based on quality feedback.\n\nORIGINAL RECOMMENDATION:\nInstruction: {instruction}\nScope: {scope}\nSeverity: {severity}\nRationale: {rationale}\n\nCRITIQUE FEEDBACK:\nActionable: {actionable} - {actionable_reason}\nFixes Issue: {fixes_issue} - {fixes_issue_reason}\nSpecific: {specific} - {specific_reason}\nSide Effects: {side_effects}\nSuggestions: {refinement_suggestions}\n\nORIGINAL ISSUE:\nType: {issue_type}\nMessage: {issue_message}\n\nCreate an improved recommendation that addresses the critique.\nMake the instruction more specific and actionable.\nEnsure it will actually fix the original issue.\nConsider and mitigate any side effects.\n\nRespond with JSON only:\n{\n  \"instruction\": \"improved instruction text\",\n  \"scope\": \"specific scope (e.g., line:42, section:intro, global)\",\n  \"severity\": \"critical|high|medium|low\",\n  \"rationale\": \"why this will fix the issue\",\n  \"confidence\": 0.0-1.0\n}"
+  },
+  "deduplicate": {
+    "description": "Identify semantically similar recommendations",
+    "template": "Compare these two recommendations and determine if they are semantically duplicates.\n\nRECOMMENDATION 1:\nInstruction: {instruction1}\nScope: {scope1}\n\nRECOMMENDATION 2:\nInstruction: {instruction2}\nScope: {scope2}\n\nRespond with JSON only:\n{\n  \"are_duplicates\": true/false,\n  \"similarity_score\": 0.0-1.0,\n  \"reason\": \"explanation of similarity or difference\",\n  \"prefer\": 1 or 2 (which one is better if duplicates)\n}"
+  }
+}

@@ -1,0 +1,102 @@
+# Structure Validation Configuration
+# Controls validation of document structure and organization
+
+structure:
+  enabled: true
+  profile: "default"
+
+  rules:
+    content_too_short:
+      enabled: true
+      level: warning
+      message: "Content below minimum length"
+      params:
+        min_chars: 100
+        min_words: 20
+
+    content_too_long:
+      enabled: true
+      level: info
+      message: "Content exceeds maximum length"
+      params:
+        max_chars: 50000
+        max_words: 10000
+
+    no_headings:
+      enabled: true
+      level: warning
+      message: "Document has no headings"
+
+    too_many_h1:
+      enabled: true
+      level: warning
+      message: "Document has too many H1 headings"
+      params:
+        max_h1: 3
+
+    empty_section:
+      enabled: true
+      level: warning
+      message: "Empty section detected"
+      params:
+        min_lines_between_headings: 2
+
+    consecutive_headings:
+      enabled: true
+      level: warning
+      message: "Consecutive headings without content"
+
+    long_preamble:
+      enabled: true
+      level: info
+      message: "Long content before first heading"
+      params:
+        max_preamble_chars: 200
+
+    deep_nesting:
+      enabled: true
+      level: info
+      message: "Deeply nested headings"
+      params:
+        max_depth: 4
+
+  profiles:
+    strict:
+      rules:
+        - content_too_short
+        - content_too_long
+        - no_headings
+        - too_many_h1
+        - empty_section
+        - consecutive_headings
+        - long_preamble
+        - deep_nesting
+      overrides:
+        content_too_short:
+          level: error
+          params:
+            min_chars: 200
+        no_headings:
+          level: error
+        empty_section:
+          level: error
+
+    default:
+      rules:
+        - content_too_short
+        - no_headings
+        - too_many_h1
+        - empty_section
+        - consecutive_headings
+
+    relaxed:
+      rules:
+        - content_too_short
+
+  family_overrides:
+    words:
+      profile: "strict"
+    pdf:
+      profile: "default"
+    cells:
+      profile: "default"

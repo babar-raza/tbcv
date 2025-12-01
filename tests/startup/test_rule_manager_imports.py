@@ -3,12 +3,15 @@
 Test that rule_manager imports work correctly.
 """
 
+import pytest
+
 def test_import_rule_manager_top_level():
     """Test that top-level rule_manager import works."""
     import rule_manager
     assert hasattr(rule_manager, 'RuleManager')
     assert hasattr(rule_manager, 'rule_manager')
     print(f"rule_manager OK: {rule_manager.__file__}")
+
 
 def test_import_rule_manager_from_top_level():
     """Test importing RuleManager from top-level."""

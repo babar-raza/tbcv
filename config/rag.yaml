@@ -1,0 +1,124 @@
+# RAG (Retrieval-Augmented Generation) Configuration
+# Controls semantic truth retrieval for validation
+
+rag:
+  # Master switch for RAG-based truth lookup
+  enabled: true
+
+  # Embedding configuration
+  embedding:
+    # Embedding model for Ollama
+    model: "nomic-embed-text"
+    # Ollama base URL
+    base_url: "http://localhost:11434"
+    # Batch size for embedding generation
+    batch_size: 100
+    # Dimension of embeddings (nomic-embed-text = 768)
+    dimension: 768
+
+  # Vector store configuration
+  vector_store:
+    # Storage backend: "chromadb" | "faiss" | "memory"
+    backend: "chromadb"
+    # Persistence directory for vector index
+    persist_dir: "./data/vector_store"
+    # Collection name prefix
+    collection_prefix: "tbcv_truth"
+
+  # Search configuration
+  search:
+    # Number of results to retrieve
+    top_k: 5
+    # Minimum similarity score (0.0-1.0)
+    similarity_threshold: 0.7
+    # Include metadata in results
+    include_metadata: true
+    # Maximum content length per result
+    max_content_length: 2000
+
+  # Fallback behavior
+  fallback:
+    # Fall back to exact matching if RAG fails
+    enabled: true
+    # Fall back if embedding service unavailable
+    on_embedding_failure: true
+    # Fall back if no results above threshold
+    on_no_results: true
+
+  # Indexing configuration
+  indexing:
+    # Chunk size for long documents
+    chunk_size: 500
+    # Overlap between chunks
+    chunk_overlap: 50
+    # Fields to index from truth data
+    index_fields:
+      - "text"
+      - "description"
+      - "content"
+    # Metadata fields to store
+    metadata_fields:
+      - "source"
+      - "category"
+      - "family"
+      - "version"
+
+  # Cache configuration
+  cache:
+    # Cache embedding results
+    enabled: true
+    # TTL for cached embeddings (seconds)
+    ttl_seconds: 86400  # 24 hours
+    # Maximum cached embeddings
+    max_entries: 10000
+
+  # Logging and monitoring
+  monitoring:
+    # Log retrieval queries
+    log_queries: true
+    # Log retrieval results
+    log_results: false
+    # Track retrieval metrics
+    track_metrics: true
+    # Metrics to track
+    metrics:
+      - query_latency_ms
+      - results_count
+      - similarity_scores
+      - fallback_rate
+
+# Family-specific overrides
+family_overrides:
+  words:
+    search:
+      top_k: 10  # More results for words family
+      similarity_threshold: 0.75
+
+  pdf:
+    search:
+      top_k: 3  # Fewer results for PDF
+      similarity_threshold: 0.8
+
+# Profiles for different use cases
+profiles:
+  fast:
+    search:
+      top_k: 3
+      similarity_threshold: 0.8
+    cache:
+      enabled: true
+
+  thorough:
+    search:
+      top_k: 10
+      similarity_threshold: 0.6
+    fallback:
+      on_no_results: true
+
+  offline:
+    embedding:
+      # Use pre-computed embeddings only
+      model: null
+    fallback:
+      enabled: true
+      on_embedding_failure: true

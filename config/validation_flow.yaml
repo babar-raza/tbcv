@@ -1,0 +1,277 @@
+# file: config/validation_flow.yaml
+# Tiered Validation Flow Configuration
+# Controls execution order, parallelization, and dependencies
+
+validation_flow:
+  enabled: true
+  profile: "default"
+
+  # Global flow settings
+  settings:
+    # Stop validation on critical errors
+    early_termination_on_critical: true
+    # Maximum critical errors before termination
+    max_critical_errors: 3
+    # Continue validation even if a validator fails
+    continue_on_error: true
+    # Timeout per validator (seconds)
+    validator_timeout: 60
+    # Timeout per tier (seconds)
+    tier_timeout: 180
+
+  # Tier definitions
+  # Validators in the same tier run in parallel
+  # Tiers execute sequentially (Tier 1 -> Tier 2 -> Tier 3)
+  tiers:
+    tier1:
+      name: "Quick Checks"
+      description: "Fast, rule-based validations that catch basic issues"
+      parallel: true
+      validators:
+        - yaml
+        - markdown
+        - structure
+      # Tier-level settings (override global)
+      settings:
+        timeout: 30
+
+    tier2:
+      name: "Content Analysis"
+      description: "Deeper content analysis including links and code"
+      parallel: true
+      validators:
+        - code
+        - links
+        - seo
+        - heading_sizes
+      settings:
+        timeout: 60
+
+    tier3:
+      name: "Advanced Validation"
+      description: "Advanced validations including fuzzy matching and truth checks"
+      parallel: false  # Sequential due to dependencies
+      validators:
+        - FuzzyLogic
+        - Truth
+        - llm
+      settings:
+        timeout: 120
+        # These validators may have dependencies
+        respect_dependencies: true
+
+  # Validator dependencies
+  # Format: validator_id: [list of validators that must complete first]
+  dependencies:
+    Truth:
+      - FuzzyLogic  # Truth validator uses fuzzy detection results
+    llm:
+      - Truth  # LLM uses truth data for context
+
+  # Validator definitions with defaults
+  validators:
+    yaml:
+      enabled: true
+      tier: 1
+      agent_id: "yaml_validator"
+      description: "Validate YAML frontmatter"
+      category: "standard"
+
+    markdown:
+      enabled: true
+      tier: 1
+      agent_id: "markdown_validator"
+      description: "Validate Markdown syntax"
+      category: "standard"
+
+    structure:
+      enabled: true
+      tier: 1
+      agent_id: "structure_validator"
+      description: "Validate document structure"
+      category: "standard"
+
+    code:
+      enabled: true
+      tier: 2
+      agent_id: "code_validator"
+      description: "Validate code blocks"
+      category: "standard"
+
+    links:
+      enabled: true
+      tier: 2
+      agent_id: "link_validator"
+      description: "Check link validity"
+      category: "standard"
+
+    seo:
+      enabled: true
+      tier: 2
+      agent_id: "seo_validator"
+      description: "Validate SEO-friendly heading structure"
+      category: "advanced"
+
+    heading_sizes:
+      enabled: true
+      tier: 2
+      agent_id: "seo_validator"
+      description: "Validate heading length limits"
+      category: "advanced"
+
+    FuzzyLogic:
+      enabled: true
+      tier: 3
+      agent_id: "fuzzy_detector"
+      description: "Fuzzy plugin detection"
+      category: "standard"
+
+    Truth:
+      enabled: true
+      tier: 3
+      agent_id: "truth_validator"
+      description: "Validate against truth data"
+      category: "standard"
+
+    llm:
+      enabled: false  # Disabled by default (requires Ollama)
+      tier: 3
+      agent_id: "llm_validator"
+      description: "Semantic validation via LLM"
+      category: "advanced"
+
+  # Profiles for different use cases
+  profiles:
+    strict:
+      settings:
+        early_termination_on_critical: true
+        max_critical_errors: 1
+        continue_on_error: false
+      validators:
+        yaml:
+          enabled: true
+        markdown:
+          enabled: true
+        structure:
+          enabled: true
+        code:
+          enabled: true
+        links:
+          enabled: true
+        seo:
+          enabled: true
+        heading_sizes:
+          enabled: true
+        FuzzyLogic:
+          enabled: true
+        Truth:
+          enabled: true
+        llm:
+          enabled: true
+
+    default:
+      settings:
+        early_termination_on_critical: true
+        max_critical_errors: 3
+        continue_on_error: true
+      validators:
+        yaml:
+          enabled: true
+        markdown:
+          enabled: true
+        structure:
+          enabled: true
+        code:
+          enabled: true
+        links:
+          enabled: true
+        seo:
+          enabled: true
+        heading_sizes:
+          enabled: true
+        FuzzyLogic:
+          enabled: true
+        Truth:
+          enabled: true
+        llm:
+          enabled: false
+
+    quick:
+      description: "Fast validation using only tier 1 validators"
+      settings:
+        early_termination_on_critical: false
+        continue_on_error: true
+      validators:
+        yaml:
+          enabled: true
+        markdown:
+          enabled: true
+        structure:
+          enabled: true
+        code:
+          enabled: false
+        links:
+          enabled: false
+        seo:
+          enabled: false
+        heading_sizes:
+          enabled: false
+        FuzzyLogic:
+          enabled: false
+        Truth:
+          enabled: false
+        llm:
+          enabled: false
+
+    content_only:
+      description: "Content-focused validation (no advanced)"
+      settings:
+        early_termination_on_critical: true
+        continue_on_error: true
+      validators:
+        yaml:
+          enabled: true
+        markdown:
+          enabled: true
+        structure:
+          enabled: true
+        code:
+          enabled: true
+        links:
+          enabled: true
+        seo:
+          enabled: true
+        heading_sizes:
+          enabled: true
+        FuzzyLogic:
+          enabled: false
+        Truth:
+          enabled: false
+        llm:
+          enabled: false
+
+  # Family-specific overrides
+  family_overrides:
+    words:
+      profile: "strict"
+      validators:
+        Truth:
+          enabled: true
+        llm:
+          enabled: true
+
+    pdf:
+      profile: "default"
+      validators:
+        code:
+          enabled: false  # PDF docs rarely have code
+        links:
+          enabled: false  # Links less relevant for PDF
+
+    cells:
+      profile: "default"
+      validators:
+        seo:
+          enabled: false  # SEO not relevant for spreadsheets
+        heading_sizes:
+          enabled: false

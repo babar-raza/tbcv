@@ -4,6 +4,8 @@ RecommendationAgent: Generates concrete, actionable recommendations from validat
 
 Input: Single validation + full content/context
 Output: One or more concrete recommendations with rationale and confidence
+
+Implements the Reflection pattern via RecommendationCriticAgent for quality improvement.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from datetime import datetime
 from agents.base import BaseAgent, AgentCapability, AgentContract
 from core.logging import get_logger
 from core.database import db_manager
+from core.config_loader import get_config_loader
 
 logger = get_logger(__name__)
 
@@ -31,7 +34,10 @@ class RecommendationAgent(BaseAgent):
     """
     
     def __init__(self, agent_id: str = "recommendation_agent"):
+        self._critic = None
+        self._reflection_config = None
         super().__init__(agent_id)
+        self._load_reflection_config()
         self.capabilities = [
             AgentCapability(
                 name="generate_recommendations",
@@ -67,35 +73,76 @@ class RecommendationAgent(BaseAgent):
             dependencies=[],
         )
     
+    def _load_reflection_config(self):
+        """Load reflection configuration."""
+        try:
+            config_loader = get_config_loader()
+            config = config_loader.load("reflection")
+            self._reflection_config = config.get("reflection", {}) if config else {}
+        except Exception as e:
+            logger.warning(f"Failed to load reflection config: {e}")
+            self._reflection_config = {}
+
+    def _get_critic(self):
+        """Lazy-load the recommendation critic agent."""
+        if self._critic is None and self._reflection_enabled():
+            try:
+                from agents.recommendation_critic import RecommendationCriticAgent
+                self._critic = RecommendationCriticAgent()
+                logger.debug("Initialized RecommendationCriticAgent for reflection")
+            except Exception as e:
+                logger.warning(f"Failed to initialize critic: {e}")
+        return self._critic
+
+    def _reflection_enabled(self) -> bool:
+        """Check if reflection pattern is enabled."""
+        return self._reflection_config.get("enabled", False)
+
     def _register_message_handlers(self):
         """Register MCP message handlers."""
         self.register_handler("generate_recommendations", self.handle_generate_recommendations)
+        self.register_handler("generate_recommendations_with_reflection", self.handle_generate_with_reflection)
     
     async def handle_generate_recommendations(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Handle MCP request to generate recommendations."""
         validation = params.get("validation", {})
         content = params.get("content", "")
         context = params.get("context", {})
-        
+        use_reflection = params.get("use_reflection", self._reflection_enabled())
+
         recommendations = await self.generate_recommendations(
             validation=validation,
             content=content,
             context=context
         )
-        
+
+        # Apply reflection pattern if enabled
+        reflection_stats = {}
+        if use_reflection and recommendations:
+            recommendations, reflection_stats = await self._apply_reflection(
+                recommendations, validation, context
+            )
+
         # Optionally persist
         if params.get("persist", True):
             rec_ids = await self.persist_recommendations(recommendations, context)
             return {
                 "recommendations": recommendations,
                 "persisted_ids": rec_ids,
-                "count": len(recommendations)
+                "count": len(recommendations),
+                "reflection": reflection_stats
             }
         else:
             return {
                 "recommendations": recommendations,
-                "count": len(recommendations)
+                "count": len(recommendations),
+                "reflection": reflection_stats
             }
+
+    async def handle_generate_with_reflection(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle MCP request to generate recommendations with explicit reflection."""
+        params["use_reflection"] = True
+        return await self.handle_generate_recommendations(params)
     
     async def generate_recommendations(
         self,
@@ -172,7 +219,66 @@ class RecommendationAgent(BaseAgent):
         
         logger.info(f"Generated {len(recommendations)} recommendations for validation {validation_id}")
         return recommendations
-    
+
+    async def _apply_reflection(
+        self,
+        recommendations: List[Dict[str, Any]],
+        validation: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> tuple:
+        """
+        Apply the reflection pattern to improve recommendation quality.
+
+        Args:
+            recommendations: Raw recommendations to process
+            validation: Original validation result
+            context: Additional context
+
+        Returns:
+            Tuple of (processed_recommendations, reflection_stats)
+        """
+        critic = self._get_critic()
+        if not critic:
+            logger.debug("Critic not available, skipping reflection")
+            return recommendations, {"enabled": False}
+
+        try:
+            # Build context for critic with validation info
+            critique_context = {
+                **context,
+                "issue_type": validation.get("validation_type", "unknown"),
+                "issue_message": validation.get("message", ""),
+                "validation_id": validation.get("id", "")
+            }
+
+            # Process recommendations through the full reflection pipeline
+            result = await critic.handle_process_recommendations({
+                "recommendations": recommendations,
+                "context": critique_context
+            })
+
+            processed = result.get("recommendations", recommendations)
+            stats = {
+                "enabled": True,
+                "discarded_count": result.get("discarded_count", 0),
+                "refined_count": result.get("refined_count", 0),
+                "deduplicated_count": result.get("deduplicated_count", 0),
+                "original_count": len(recommendations),
+                "final_count": len(processed)
+            }
+
+            logger.info(
+                f"Reflection complete: {stats['original_count']} -> {stats['final_count']} "
+                f"(discarded={stats['discarded_count']}, refined={stats['refined_count']}, "
+                f"deduped={stats['deduplicated_count']})"
+            )
+
+            return processed, stats
+
+        except Exception as e:
+            logger.error(f"Reflection failed: {e}", exc_info=True)
+            return recommendations, {"enabled": False, "error": str(e)}
+
     def _generate_yaml_recommendations(
         self,
         validation_id: str,

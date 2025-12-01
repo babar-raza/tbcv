@@ -278,7 +278,7 @@ Adjust worker pools, memory limits, and concurrency
 netstat -ano | findstr :8585
 
 # Try different port
-python main.py --mode api --port 8586
+python main.py --mode api --port 8585
 ```
 
 ### Database Lock Errors

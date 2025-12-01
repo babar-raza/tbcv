@@ -2,7 +2,7 @@
 
 ## Server is NOW RUNNING ✅
 
-**URL:** http://localhost:8586
+**URL:** http://localhost:8585
 **Started:** 2025-11-23 10:23:24 UTC
 **Process ID:** See `srv.log` for details
 **Log File:** `srv.log`
@@ -28,7 +28,7 @@
 
 ### 4. Port Conflict (RESOLVED ✅)
 - **Issue:** Multiple server processes on port 8585
-- **Resolution:** Switched to port 8586
+- **Resolution:** Switched to port 8585
 
 ---
 
@@ -103,37 +103,37 @@ AttributeError: 'FuzzyDetectorAgent' object has no attribute 'validate'
 ## Manual Testing Access Points
 
 ### Web Dashboard
-**URL:** http://localhost:8586/dashboard/
+**URL:** http://localhost:8585/dashboard/
 
 **Pages:**
-- Home: http://localhost:8586/dashboard/
-- Validations: http://localhost:8586/dashboard/validations
-- Workflows: http://localhost:8586/dashboard/workflows
-- Recommendations: http://localhost:8586/dashboard/recommendations
+- Home: http://localhost:8585/dashboard/
+- Validations: http://localhost:8585/dashboard/validations
+- Workflows: http://localhost:8585/dashboard/workflows
+- Recommendations: http://localhost:8585/dashboard/recommendations
 
 ### API Documentation
-**Swagger UI:** http://localhost:8586/docs
-**ReDoc:** http://localhost:8586/redoc
+**Swagger UI:** http://localhost:8585/docs
+**ReDoc:** http://localhost:8585/redoc
 
 ### Health Checks
 ```bash
 # Liveness check
-curl http://localhost:8586/health/live
+curl http://localhost:8585/health/live
 
 # Readiness check
-curl http://localhost:8586/health/ready
+curl http://localhost:8585/health/ready
 
 # Full health status
-curl http://localhost:8586/health
+curl http://localhost:8585/health
 ```
 
 ### Agent Status
 ```bash
 # List all agents
-curl http://localhost:8586/agents
+curl http://localhost:8585/agents
 
 # Agent registry
-curl http://localhost:8586/registry/agents
+curl http://localhost:8585/registry/agents
 ```
 
 ---
@@ -197,7 +197,7 @@ Get-Content data/logs/tbcv.log -Wait -Tail 50
 **Stop Server:**
 ```bash
 # Find process
-netstat -ano | findstr :8586
+netstat -ano | findstr :8585
 
 # Kill process (replace PID)
 taskkill /F /PID <pid>
@@ -205,7 +205,7 @@ taskkill /F /PID <pid>
 
 **Restart Server:**
 ```bash
-python main.py --mode api --host 127.0.0.1 --port 8586 --no-clean
+python main.py --mode api --host 127.0.0.1 --port 8585 --no-clean
 ```
 
 ---

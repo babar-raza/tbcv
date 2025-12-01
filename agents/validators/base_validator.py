@@ -1,42 +1,163 @@
 # file: agents/validators/base_validator.py
 """
 Base validator agent - foundation for all content validators.
+Includes enhanced ValidationIssue with comprehensive fields for error reporting.
 """
 
 from __future__ import annotations
 from abc import abstractmethod
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
+import uuid
 
 from agents.base import BaseAgent, AgentContract, AgentCapability
 from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Severity scoring constants
+SEVERITY_SCORES = {
+    "critical": 100,
+    "error": 75,
+    "warning": 50,
+    "info": 25
+}
+
 
 @dataclass
 class ValidationIssue:
-    """Represents a single validation issue."""
+    """
+    Represents a single validation issue with enhanced fields.
+
+    Supports comprehensive error reporting with:
+    - Identification (id, code)
+    - Severity (level, severity_score)
+    - Location (line_number, column, line_end)
+    - Classification (category, subcategory)
+    - Context (snippets before/after)
+    - Fix information (suggestion, fix_example, auto_fixable)
+    - Traceability (source, confidence, rule_id)
+    """
+    # Required fields (maintain backward compatibility)
     level: str  # "error", "warning", "info", "critical"
     category: str
     message: str
+
+    # Identification
+    id: str = ""  # Auto-generated unique ID like "YAML-001"
+    code: str = ""  # Issue code like "YAML_MISSING_FIELD"
+
+    # Severity
+    severity_score: int = 50  # 1-100 for sorting
+
+    # Location
     line_number: Optional[int] = None
     column: Optional[int] = None
+    line_end: Optional[int] = None
+
+    # Classification
+    subcategory: str = ""
+
+    # Messages
     suggestion: Optional[str] = None
-    source: str = "validator"
+
+    # Context
+    context_snippet: str = ""  # The problematic text
+    context_before: str = ""  # 2-3 lines before
+    context_after: str = ""  # 2-3 lines after
+
+    # Fix information
+    fix_example: str = ""  # Actual corrected code
     auto_fixable: bool = False
 
+    # Traceability
+    source: str = "rule_based"  # "rule_based" | "llm_semantic" | "validator"
+    confidence: float = 1.0
+    rule_id: str = ""  # Which rule triggered this
+
+    # Documentation
+    documentation_url: str = ""
+
+    def __post_init__(self):
+        """Initialize computed fields after creation."""
+        # Auto-generate ID if not provided
+        if not self.id:
+            prefix = self.category.split("_")[0].upper()[:4] if self.category else "VAL"
+            short_uuid = str(uuid.uuid4())[:8]
+            self.id = f"{prefix}-{short_uuid}"
+
+        # Auto-generate code if not provided
+        if not self.code:
+            self.code = self.category.upper().replace("-", "_") if self.category else "UNKNOWN"
+
+        # Set severity score based on level if not explicitly set
+        if self.severity_score == 50:  # Default value
+            self.severity_score = SEVERITY_SCORES.get(self.level, 50)
+
     def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
         return {
+            # Identification
+            "id": self.id,
+            "code": self.code,
+            # Severity
             "level": self.level,
-            "category": self.category,
-            "message": self.message,
+            "severity_score": self.severity_score,
+            # Location
             "line_number": self.line_number,
             "column": self.column,
+            "line_end": self.line_end,
+            # Classification
+            "category": self.category,
+            "subcategory": self.subcategory,
+            # Messages
+            "message": self.message,
             "suggestion": self.suggestion,
+            # Context
+            "context_snippet": self.context_snippet,
+            "context_before": self.context_before,
+            "context_after": self.context_after,
+            # Fix information
+            "fix_example": self.fix_example,
+            "auto_fixable": self.auto_fixable,
+            # Traceability
             "source": self.source,
-            "auto_fixable": self.auto_fixable
+            "confidence": self.confidence,
+            "rule_id": self.rule_id,
+            # Documentation
+            "documentation_url": self.documentation_url
         }
+
+    def to_compact_dict(self) -> Dict[str, Any]:
+        """Convert to compact dictionary with only non-empty fields."""
+        full = self.to_dict()
+        return {k: v for k, v in full.items() if v or v == 0 or v is False}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ValidationIssue":
+        """Create ValidationIssue from dictionary."""
+        return cls(
+            level=data.get("level", "warning"),
+            category=data.get("category", ""),
+            message=data.get("message", ""),
+            id=data.get("id", ""),
+            code=data.get("code", ""),
+            severity_score=data.get("severity_score", 50),
+            line_number=data.get("line_number"),
+            column=data.get("column"),
+            line_end=data.get("line_end"),
+            subcategory=data.get("subcategory", ""),
+            suggestion=data.get("suggestion"),
+            context_snippet=data.get("context_snippet", ""),
+            context_before=data.get("context_before", ""),
+            context_after=data.get("context_after", ""),
+            fix_example=data.get("fix_example", ""),
+            auto_fixable=data.get("auto_fixable", False),
+            source=data.get("source", "rule_based"),
+            confidence=data.get("confidence", 1.0),
+            rule_id=data.get("rule_id", ""),
+            documentation_url=data.get("documentation_url", "")
+        )
 
 
 @dataclass
@@ -54,6 +175,38 @@ class ValidationResult:
             "auto_fixable_count": self.auto_fixable_count,
             "metrics": self.metrics
         }
+
+    def get_issues_by_level(self) -> Dict[str, List[ValidationIssue]]:
+        """Group issues by severity level."""
+        result: Dict[str, List[ValidationIssue]] = {
+            "critical": [],
+            "error": [],
+            "warning": [],
+            "info": []
+        }
+        for issue in self.issues:
+            if issue.level in result:
+                result[issue.level].append(issue)
+        return result
+
+    def get_issues_by_category(self) -> Dict[str, List[ValidationIssue]]:
+        """Group issues by category."""
+        result: Dict[str, List[ValidationIssue]] = {}
+        for issue in self.issues:
+            if issue.category not in result:
+                result[issue.category] = []
+            result[issue.category].append(issue)
+        return result
+
+    def get_sorted_issues(self, by: str = "severity") -> List[ValidationIssue]:
+        """Get issues sorted by specified criteria."""
+        if by == "severity":
+            return sorted(self.issues, key=lambda i: -i.severity_score)
+        elif by == "line":
+            return sorted(self.issues, key=lambda i: i.line_number or 0)
+        elif by == "category":
+            return sorted(self.issues, key=lambda i: i.category)
+        return self.issues
 
 
 class BaseValidatorAgent(BaseAgent):
@@ -136,4 +289,34 @@ class BaseValidatorAgent(BaseAgent):
             max_runtime_s=30,
             confidence_threshold=0.5,
             side_effects=["read"]
+        )
+
+    def _create_issue(
+        self,
+        level: str,
+        category: str,
+        message: str,
+        **kwargs
+    ) -> ValidationIssue:
+        """
+        Helper method to create a ValidationIssue with defaults.
+
+        Args:
+            level: Issue level (error, warning, info, critical)
+            category: Issue category
+            message: Issue message
+            **kwargs: Additional fields
+
+        Returns:
+            ValidationIssue instance
+        """
+        # Set source to validator type by default
+        if "source" not in kwargs:
+            kwargs["source"] = "rule_based"
+
+        return ValidationIssue(
+            level=level,
+            category=category,
+            message=message,
+            **kwargs
         )

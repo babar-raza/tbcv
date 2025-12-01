@@ -484,11 +484,11 @@ class TestDashboardErrorHandling:
             assert response.status_code == 500
 
     def test_validation_detail_handles_missing_id(self, client):
-        """Test validation detail with missing ID."""
-        response = client.get("/dashboard/validations/")
+        """Test validation detail with nonexistent ID."""
+        response = client.get("/dashboard/validations/nonexistent-id-12345")
 
-        # Should return 404 or redirect
-        assert response.status_code in [404, 307, 405]
+        # Should return 404 for nonexistent validation
+        assert response.status_code == 404
 
 
 if __name__ == "__main__":

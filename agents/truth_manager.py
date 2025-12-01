@@ -16,6 +16,7 @@ Highlights:
     [OK] Uses cache_result decorator for efficient repeat lookups
     [OK] Generic JSON structure handling with safe fallbacks
     [OK] Family-agnostic truth data loading
+    [OK] RAG (Retrieval-Augmented Generation) support for semantic search
 """
 
 import json
@@ -31,6 +32,7 @@ from agents.base import BaseAgent, AgentContract, AgentCapability
 from core.logging import PerformanceLogger
 from core.cache import cache_result
 from core.rule_manager import rule_manager
+from core.config_loader import get_config_loader
 
 
 # =======================================================
@@ -156,10 +158,11 @@ class TruthDataAdapter:
             name = plugin.get("name") or plugin.get("title") or plugin.get("id", "")
             if not name:
                 return None
-                
-            # Generate ID and slug
-            plugin_id = self._generate_id(name)
-            slug = self._generate_slug(name)
+
+            # Preserve existing ID if present, otherwise generate from name
+            plugin_id = plugin.get("id") or self._generate_id(name)
+            # Preserve existing slug if present, otherwise generate from name
+            slug = plugin.get("slug") or self._generate_slug(name)
             
             # Extract or generate patterns
             patterns = self._extract_or_generate_patterns(plugin)
@@ -321,7 +324,10 @@ class TruthManagerAgent(BaseAgent):
         self.truth_directories: List[Path] = []
         self.validation_issues: List[str] = []
         self.supported_families = ["words"]  # Can be extended
+        self._rag_config = None
+        self._vector_store = None
         super().__init__(agent_id)
+        self._load_rag_config()
 
     # ---------------------------------------------------
     # Handler Registration
@@ -341,6 +347,39 @@ class TruthManagerAgent(BaseAgent):
 
         # Additional handler: check whether a set of plugins constitutes a valid combination
         self.register_handler("check_plugin_combination", self.handle_check_plugin_combination)
+
+        # RAG handlers for semantic search
+        self.register_handler("index_for_rag", self.handle_index_for_rag)
+        self.register_handler("search_with_rag", self.handle_search_with_rag)
+        self.register_handler("get_rag_status", self.handle_get_rag_status)
+
+    # ---------------------------------------------------
+    # RAG Configuration and Vector Store
+    # ---------------------------------------------------
+    def _load_rag_config(self):
+        """Load RAG configuration."""
+        try:
+            config_loader = get_config_loader()
+            config = config_loader.load("rag")
+            self._rag_config = config.get("rag", {}) if config else {}
+        except Exception as e:
+            self.logger.warning(f"Failed to load RAG config: {e}")
+            self._rag_config = {}
+
+    def _get_vector_store(self):
+        """Lazy-load the vector store."""
+        if self._vector_store is None and self._rag_enabled():
+            try:
+                from core.vector_store import get_truth_vector_store
+                self._vector_store = get_truth_vector_store()
+                self.logger.debug("Initialized vector store for RAG")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize vector store: {e}")
+        return self._vector_store
+
+    def _rag_enabled(self) -> bool:
+        """Check if RAG is enabled in configuration."""
+        return self._rag_config.get("enabled", False)
 
     # ---------------------------------------------------
     # Agent Contract (required by BaseAgent)
@@ -879,6 +918,236 @@ class TruthManagerAgent(BaseAgent):
         if sorted_ids in self.truth_index.combination_index:
             rules = [r.name for r in self.truth_index.combination_index[sorted_ids]]
         return {"valid": bool(rules), "rules": rules, "unknown_plugins": []}
+
+    # ===================================================
+    # RAG Handlers (Semantic Search)
+    # ===================================================
+
+    async def handle_index_for_rag(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Index truth data into the vector store for semantic search.
+
+        Parameters:
+            family: str - Plugin family to index (default: "words")
+            clear_existing: bool - Whether to clear existing index (default: True)
+
+        Returns:
+            {
+                "success": bool,
+                "family": str,
+                "indexed_count": int,
+                "error": str (optional)
+            }
+        """
+        family = params.get("family", "words")
+        clear_existing = params.get("clear_existing", True)
+
+        if not self._rag_enabled():
+            return {
+                "success": False,
+                "family": family,
+                "indexed_count": 0,
+                "error": "RAG is not enabled in configuration"
+            }
+
+        vector_store = self._get_vector_store()
+        if not vector_store:
+            return {
+                "success": False,
+                "family": family,
+                "indexed_count": 0,
+                "error": "Vector store not available"
+            }
+
+        # Ensure truth data is loaded
+        if not self.truth_index:
+            self._load_truth_data(family)
+
+        if not self.truth_index:
+            return {
+                "success": False,
+                "family": family,
+                "indexed_count": 0,
+                "error": "Failed to load truth data"
+            }
+
+        # Prepare truth documents for indexing
+        family_plugins = self.truth_index.by_family.get(family, [])
+        if not family_plugins:
+            return {
+                "success": True,
+                "family": family,
+                "indexed_count": 0,
+                "message": f"No plugins found for family '{family}'"
+            }
+
+        # Convert PluginInfo to indexable documents
+        documents = []
+        for plugin in family_plugins:
+            doc = {
+                "id": plugin.id,
+                "text": f"{plugin.name}: {plugin.description}",
+                "description": plugin.description,
+                "content": f"Plugin {plugin.name} ({plugin.id}) - {plugin.description}. "
+                          f"Capabilities: {', '.join(plugin.capabilities)}. "
+                          f"Type: {plugin.plugin_type}.",
+                "source": "truth_data",
+                "category": plugin.plugin_type,
+                "family": family,
+                "version": plugin.version
+            }
+            documents.append(doc)
+
+        try:
+            indexed_count = await vector_store.index_truths(
+                family=family,
+                truths=documents,
+                clear_existing=clear_existing
+            )
+            self.logger.info(f"Indexed {indexed_count} truths for RAG (family: {family})")
+            return {
+                "success": True,
+                "family": family,
+                "indexed_count": indexed_count
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to index truths for RAG: {e}")
+            return {
+                "success": False,
+                "family": family,
+                "indexed_count": 0,
+                "error": str(e)
+            }
+
+    async def handle_search_with_rag(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Perform semantic search over truth data using RAG.
+
+        Parameters:
+            query: str - Search query
+            family: str - Plugin family to search (default: "words")
+            top_k: int - Maximum results (default: 5)
+            threshold: float - Minimum similarity threshold (default: 0.7)
+
+        Returns:
+            {
+                "results": List[Dict] - Matching truth entries
+                "query": str
+                "family": str
+                "rag_enabled": bool
+                "fallback_used": bool
+            }
+        """
+        query = params.get("query", "")
+        family = params.get("family", "words")
+        top_k = params.get("top_k", 5)
+        threshold = params.get("threshold", 0.7)
+
+        if not query:
+            return {
+                "results": [],
+                "query": query,
+                "family": family,
+                "rag_enabled": self._rag_enabled(),
+                "fallback_used": False
+            }
+
+        # Try RAG search first
+        if self._rag_enabled():
+            vector_store = self._get_vector_store()
+            if vector_store:
+                try:
+                    search_results = await vector_store.search(
+                        query=query,
+                        family=family,
+                        top_k=top_k,
+                        similarity_threshold=threshold
+                    )
+
+                    if search_results:
+                        results = [
+                            {
+                                "id": r.id,
+                                "text": r.text,
+                                "score": r.score,
+                                "metadata": r.metadata
+                            }
+                            for r in search_results
+                        ]
+                        return {
+                            "results": results,
+                            "query": query,
+                            "family": family,
+                            "rag_enabled": True,
+                            "fallback_used": False
+                        }
+                except Exception as e:
+                    self.logger.warning(f"RAG search failed, falling back: {e}")
+
+        # Fallback to traditional search
+        fallback_config = self._rag_config.get("fallback", {})
+        if not fallback_config.get("enabled", True):
+            return {
+                "results": [],
+                "query": query,
+                "family": family,
+                "rag_enabled": self._rag_enabled(),
+                "fallback_used": False,
+                "error": "RAG search failed and fallback is disabled"
+            }
+
+        # Use existing search_plugins as fallback
+        search_result = await self.handle_search_plugins({
+            "query": query,
+            "family": family
+        })
+
+        return {
+            "results": search_result.get("results", []),
+            "query": query,
+            "family": family,
+            "rag_enabled": self._rag_enabled(),
+            "fallback_used": True
+        }
+
+    async def handle_get_rag_status(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Get the status of RAG indexing and search capability.
+
+        Returns:
+            {
+                "enabled": bool,
+                "indexed": bool,
+                "families": List[str],
+                "stats": Dict
+            }
+        """
+        status = {
+            "enabled": self._rag_enabled(),
+            "indexed": False,
+            "families": [],
+            "stats": {}
+        }
+
+        if not self._rag_enabled():
+            return status
+
+        vector_store = self._get_vector_store()
+        if vector_store:
+            try:
+                index_stats = vector_store.get_stats()
+                status["indexed"] = index_stats.total_documents > 0
+                status["families"] = index_stats.families
+                status["stats"] = {
+                    "total_documents": index_stats.total_documents,
+                    "last_updated": index_stats.last_updated,
+                    "embedding_dimension": index_stats.embedding_dimension
+                }
+            except Exception as e:
+                status["error"] = str(e)
+
+        return status
+
 
 # =======================================================
 # Local Smoke Test

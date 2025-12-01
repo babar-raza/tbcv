@@ -20,31 +20,63 @@ tbcv --help                    # Show help
 tbcv --verbose                 # Enable verbose logging
 tbcv --config config/custom.yaml  # Use custom config file
 tbcv --quiet                   # Minimal output
+tbcv --mcp-debug               # Enable MCP request/response debugging
 ```
+
+### MCP Integration
+
+The CLI now uses the Model Context Protocol (MCP) for all backend communication. This provides:
+
+- Standardized request/response format
+- Automatic error handling and retry logic
+- Better debugging and observability
+- Consistent behavior across CLI and API
+
+When `--mcp-debug` is enabled, you'll see detailed MCP communication logs including:
+- Request IDs and methods
+- Request/response payloads
+- Retry attempts and backoff timing
+- Error details and stack traces
 
 ## Core Commands
 
 ### validate-file
 
-Validate a single content file.
+Validate a single content file via MCP.
 
 ```bash
 tbcv validate-file <file_path> [OPTIONS]
 
 Options:
   --family, -f TEXT          Plugin family (words, cells, slides, pdf, email)
+  --types, -t TEXT           Comma-separated validator types (yaml,markdown,links,etc)
   --output, -o TEXT          Output file for results
   --format TEXT              Output format (json, text) [default: json]
 
 Examples:
+  # Basic validation
   tbcv validate-file docs/api.md --family words
+
+  # Validation with specific validators
+  tbcv validate-file content.md --types yaml,markdown,links,seo
+
+  # JSON output to file
   tbcv validate-file code.cs --family cells --output results.json
+
+  # Human-readable text format
   tbcv validate-file content.md --format text
+
+  # Debug MCP communication
+  tbcv --mcp-debug validate-file docs/api.md
+
+MCP Integration:
+  Uses MCP validate_file method with automatic retry on transient errors.
+  Returns validation_id for tracking and further operations.
 ```
 
 ### validate-directory
 
-Validate all files in a directory matching a pattern.
+Validate all files in a directory matching a pattern via MCP.
 
 ```bash
 tbcv validate-directory <directory_path> [OPTIONS]
@@ -58,9 +90,21 @@ Options:
   --recursive, -r            Search subdirectories
 
 Examples:
+  # Recursive validation with high concurrency
   tbcv validate-directory docs/ --recursive --workers 8
+
+  # Validate specific file type
   tbcv validate-directory code/ --pattern "*.cs" --family cells
+
+  # Summary output to file
   tbcv validate-directory content/ --format summary --output summary.txt
+
+  # Debug batch processing
+  tbcv --mcp-debug validate-directory docs/ --recursive
+
+MCP Integration:
+  Uses MCP validate_folder method for efficient batch processing.
+  Creates workflow for tracking progress and results.
 ```
 
 ### check-agents
@@ -80,21 +124,34 @@ Examples:
 
 ### validate
 
-Validate a file via workflow (enhanced validation).
+Validate a file via workflow (enhanced validation with tiered execution).
 
 ```bash
 tbcv validate <file_path> [OPTIONS]
 
 Options:
   --type TEXT                Validation type (basic, full, enhanced)
+  --profile TEXT             Validation profile from validation_flow.yaml
+                             (strict, default, quick, content_only)
   --confidence FLOAT         Confidence threshold (0.0-1.0) [default: 0.6]
   --output TEXT              Output format (table, json, yaml)
   --fix                      Apply automatic fixes
   --no-cache                 Skip cache lookup
+  --validators TEXT          Comma-separated list of validators to run
+                             (yaml,markdown,structure,code,links,seo,FuzzyLogic,Truth,llm)
+
+Validation Profiles:
+  strict       - All validators enabled, strict error checking, LLM enabled
+  default      - Standard validation, LLM disabled by default
+  quick        - Only Tier 1 validators (yaml, markdown, structure)
+  content_only - Content validators only, no advanced truth/LLM checks
 
 Examples:
   tbcv validate example.md --type full
   tbcv validate code.py --confidence 0.8 --output json
+  tbcv validate content.md --profile strict  # Use strict profile
+  tbcv validate docs/api.md --profile quick  # Fast validation
+  tbcv validate tutorial.md --validators yaml,markdown,links  # Specific validators
 ```
 
 ### batch
@@ -148,12 +205,30 @@ tbcv test
 
 ### status
 
-Show system status.
+Show system status via MCP.
 
 ```bash
-tbcv status
+tbcv status [OPTIONS]
 
-# Displays agent status, active workflows, and system metrics
+Options:
+  --format TEXT              Output format (table, json) [default: table]
+
+Examples:
+  # Display system status
+  tbcv status
+
+  # JSON format for monitoring
+  tbcv status --format json
+
+  # Debug system health check
+  tbcv --mcp-debug status
+
+MCP Integration:
+  Uses MCP get_system_status method to retrieve:
+  - Component health (database, cache, agents)
+  - Resource usage (memory, disk)
+  - Active workflows and validations
+  - System uptime and performance metrics
 ```
 
 ## Validation Management
@@ -630,6 +705,146 @@ The CLI provides comprehensive error handling:
 - **Validation Failures**: Detailed issue reporting
 - **Agent Unavailable**: Graceful degradation with warnings
 
+### MCP Error Codes
+
+The MCP integration uses standardized error codes:
+
+| Error Code | Type | Description | Resolution |
+|------------|------|-------------|------------|
+| -32700 | Parse Error | Invalid JSON-RPC | Check request format |
+| -32600 | Invalid Request | Missing required fields | Verify parameters |
+| -32601 | Method Not Found | Unknown MCP method | Update CLI version |
+| -32602 | Invalid Params | Wrong parameter types | Check command syntax |
+| -32603 | Internal Error | Server error | Check logs, retry |
+| -32001 | Validation Error | Validation failed | Review validation rules |
+| -32002 | Not Found | Resource not found | Verify ID exists |
+| -32003 | Permission Denied | Insufficient permissions | Check access rights |
+
+### Troubleshooting MCP Errors
+
+#### Connection Errors
+
+```bash
+# Error: Cannot connect to MCP server
+# Solution: Check if server is running
+tbcv status
+
+# Enable debug mode to see connection details
+tbcv --mcp-debug status
+```
+
+#### Validation Errors
+
+```bash
+# Error: MCPValidationError - Invalid file format
+# Example output:
+# Error: Validation failed
+# Details: File must be markdown format
+# Expected: .md extension
+# Got: .txt
+
+# Solution: Check file format and validator requirements
+tbcv validate-file docs/file.md --types yaml,markdown
+```
+
+#### Not Found Errors
+
+```bash
+# Error: MCPNotFoundError - Validation not found
+# Example output:
+# Error: Validation 'val_xyz' not found
+# Possible causes:
+# - Validation ID is incorrect
+# - Validation was deleted
+# - Database connection issue
+
+# Solution: List available validations
+tbcv validations list --limit 50
+
+# Verify validation exists
+tbcv validations show val_xyz
+```
+
+#### Internal Server Errors
+
+```bash
+# Error: MCPInternalError - Database connection failed
+# Example output:
+# Error: Internal server error
+# Message: Failed to connect to database
+# Details: Connection timeout after 30s
+
+# Solution 1: Check system health
+tbcv admin health --full
+
+# Solution 2: Enable maintenance mode and restart
+tbcv admin enable-maintenance-mode --reason "Troubleshooting"
+# ... restart services ...
+tbcv admin disable-maintenance-mode
+```
+
+#### Retry Logic
+
+The MCP client automatically retries transient errors with exponential backoff:
+
+- Attempt 1: Immediate
+- Attempt 2: 100ms delay
+- Attempt 3: 200ms delay
+- Attempt 4: 400ms delay (final)
+
+```bash
+# Example with retry debugging
+tbcv --mcp-debug validate-file docs/api.md
+
+# Output shows retry attempts:
+# [DEBUG] MCP request: method=validate_file, id=1
+# [WARNING] MCP request failed (attempt 1), retrying...
+# [DEBUG] Retrying after 0.1s
+# [DEBUG] MCP request: method=validate_file, id=1
+# [DEBUG] MCP response: method=validate_file, id=1
+```
+
+#### Common Issues and Solutions
+
+**Issue: "MCP server not responding"**
+```bash
+# Check if server process is running
+tbcv admin health
+
+# Check logs for errors
+tail -f logs/tbcv.log
+
+# Restart server if needed
+python -m api.server
+```
+
+**Issue: "Timeout waiting for validation"**
+```bash
+# Increase timeout for large files
+export TBCV_MCP_TIMEOUT=60
+tbcv validate-file large-document.md
+
+# Or use async workflow
+tbcv validate-directory docs/ --workers 4
+tbcv workflows list --state running
+```
+
+**Issue: "Cache inconsistency"**
+```bash
+# Clear cache and retry
+tbcv admin cache-clear
+tbcv validate-file docs/api.md --no-cache
+```
+
+**Issue: "Permission denied"**
+```bash
+# Check file permissions
+ls -la docs/api.md
+
+# Run with proper user context
+sudo -u tbcv tbcv validate-file docs/api.md
+```
+
 ## Performance Tuning
 
 ### Concurrent Processing
@@ -695,3 +910,248 @@ fi
 # Run CLI in container
 docker run --rm -v $(pwd):/app tbcv:latest \
   python -m tbcv.cli validate-directory /app/docs --recursive
+```
+
+## MCP Integration Details
+
+### Architecture
+
+The CLI uses MCP (Model Context Protocol) for all backend communication:
+
+```
+┌─────────────┐          ┌──────────────┐          ┌──────────────┐
+│   CLI       │          │  MCP Client  │          │  MCP Server  │
+│  Commands   │──────────│  (Sync/Async)│──────────│  (Backend)   │
+└─────────────┘  invoke  └──────────────┘  JSON-RPC └──────────────┘
+                                                           │
+                                                           ├─ Validators
+                                                           ├─ Workflows
+                                                           ├─ Cache
+                                                           └─ Database
+```
+
+### MCP Client Features
+
+**Synchronous Client** (`MCPSyncClient`):
+- Used by CLI commands
+- Blocking I/O for simple command execution
+- Automatic retry with exponential backoff
+- Thread-safe singleton instance
+
+**Asynchronous Client** (`MCPAsyncClient`):
+- Used by API endpoints
+- Non-blocking I/O for concurrent requests
+- Same interface as sync client
+- Event loop integration
+
+### Request/Response Format
+
+All MCP communication uses JSON-RPC 2.0:
+
+**Request Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "validate_file",
+  "params": {
+    "file_path": "/path/to/file.md",
+    "family": "words",
+    "validation_types": ["yaml", "markdown"]
+  },
+  "id": 1
+}
+```
+
+**Success Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "validation_id": "val_abc123",
+    "status": "completed",
+    "issues_count": 2,
+    "confidence": 0.85
+  },
+  "id": 1
+}
+```
+
+**Error Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "error": {
+    "code": -32001,
+    "message": "Validation failed",
+    "data": {
+      "details": "File format not supported",
+      "supported_formats": [".md", ".markdown"]
+    }
+  },
+  "id": 1
+}
+```
+
+### Debugging with --mcp-debug
+
+Enable detailed MCP logging:
+
+```bash
+# Basic debug output
+tbcv --mcp-debug validate-file docs/api.md
+
+# Sample output:
+# [DEBUG] MCP request: method=validate_file, id=1
+# [DEBUG]   params={'file_path': '/path/to/docs/api.md', 'family': 'words'}
+# [DEBUG] MCP response: method=validate_file, id=1, duration=1.23s
+# [DEBUG]   result={'validation_id': 'val_123', 'success': true}
+
+# Debug with verbose logging
+tbcv --verbose --mcp-debug validate-file docs/api.md
+
+# Full request/response payloads
+export TBCV_MCP_DEBUG=full
+tbcv validate-file docs/api.md
+```
+
+### Performance Optimization
+
+**Connection Pooling:**
+- MCP client uses singleton pattern
+- Connection reused across commands
+- No overhead for multiple operations
+
+**Retry Strategy:**
+```python
+# Default retry configuration
+timeout = 30  # seconds
+max_retries = 3
+backoff = [0.1, 0.2, 0.4]  # exponential
+
+# Customize via environment
+export TBCV_MCP_TIMEOUT=60
+export TBCV_MCP_MAX_RETRIES=5
+```
+
+**Batch Operations:**
+```bash
+# Use workflows for large batches
+tbcv validate-directory docs/ --workers 8
+# Creates workflow, tracks progress, handles failures
+
+# Use bulk operations when available
+tbcv validations approve val_1 val_2 val_3
+# Single MCP call, efficient batch processing
+```
+
+### Best Practices
+
+1. **Use appropriate output formats:**
+   ```bash
+   # JSON for scripting
+   tbcv validate-file doc.md --format json | jq '.validation_id'
+
+   # Text for humans
+   tbcv validate-file doc.md --format text
+
+   # Table for lists
+   tbcv validations list --format table
+   ```
+
+2. **Handle errors gracefully:**
+   ```bash
+   # Check exit codes
+   if tbcv validate-file doc.md; then
+     echo "Validation passed"
+   else
+     echo "Validation failed: $?"
+   fi
+
+   # Capture output
+   result=$(tbcv validate-file doc.md --format json)
+   validation_id=$(echo "$result" | jq -r '.validation_id')
+   ```
+
+3. **Use workflows for long operations:**
+   ```bash
+   # Start workflow
+   tbcv validate-directory docs/ --recursive > workflow.json
+   workflow_id=$(cat workflow.json | jq -r '.workflow_id')
+
+   # Monitor progress
+   watch -n 5 "tbcv workflows show $workflow_id"
+
+   # Get final report
+   tbcv workflows show $workflow_id --format json
+   ```
+
+4. **Enable caching for repeated operations:**
+   ```bash
+   # First run (slow)
+   tbcv validate-file doc.md
+
+   # Second run (fast, from cache)
+   tbcv validate-file doc.md
+
+   # Force fresh validation
+   tbcv validate-file doc.md --no-cache
+   ```
+
+5. **Use --mcp-debug for troubleshooting:**
+   ```bash
+   # Debug single command
+   tbcv --mcp-debug validate-file doc.md 2>&1 | tee debug.log
+
+   # Debug with timestamps
+   tbcv --mcp-debug validate-file doc.md 2>&1 | ts
+
+   # Debug and analyze
+   tbcv --mcp-debug validate-file doc.md 2>&1 | grep "MCP request"
+   ```
+
+### Environment Variables
+
+Configure MCP behavior via environment variables:
+
+```bash
+# MCP client configuration
+export TBCV_MCP_TIMEOUT=30        # Request timeout (seconds)
+export TBCV_MCP_MAX_RETRIES=3     # Maximum retry attempts
+export TBCV_MCP_DEBUG=true        # Enable debug logging
+
+# Server configuration
+export TBCV_MCP_SERVER_HOST=localhost
+export TBCV_MCP_SERVER_PORT=8080
+
+# Feature flags
+export TBCV_MCP_ENABLE_CACHE=true
+export TBCV_MCP_ENABLE_COMPRESSION=false
+```
+
+### Migration from Direct Agent Calls
+
+Old (direct agent calls):
+```bash
+# This approach is deprecated
+python -c "from agents.validator import validate; validate('file.md')"
+```
+
+New (via MCP):
+```bash
+# Use CLI with MCP integration
+tbcv validate-file file.md
+
+# Or use MCP client in Python
+from svc.mcp_client import get_mcp_sync_client
+client = get_mcp_sync_client()
+result = client.validate_file('file.md')
+```
+
+Benefits of MCP approach:
+- Standardized error handling
+- Automatic retry logic
+- Better logging and debugging
+- Consistent behavior across CLI and API
+- Support for async operations
+- Future-proof architecture

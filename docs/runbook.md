@@ -110,10 +110,10 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # 4. Run startup checks
-python startup_check.py
+python -c "from core.startup_checks import run_startup_checks; run_startup_checks()"
 
-# 5. Initialize database
-python -c "from core.database import db_manager; db_manager.ensure_schema_idempotent()"
+# 5. Initialize database (automatically done by startup checks)
+python -c "from core.database import db_manager; db_manager.init_database()"
 ```
 
 ### Running the System
@@ -150,6 +150,73 @@ docker build -t tbcv:latest .
 
 # Run container
 docker run -p 8000:8000 -v ./data:/app/data tbcv:latest
+```
+
+---
+
+## Startup Checks
+
+TBCV includes a comprehensive startup check system (`core/startup_checks.py`) that verifies system readiness before starting.
+
+### Running Startup Checks
+
+```bash
+# Quick startup check
+python -c "from core.startup_checks import run_startup_checks; run_startup_checks()"
+
+# Or from main entry point (checks run automatically)
+python main.py --mode api --run-checks
+```
+
+### What Gets Checked
+
+| Check | Critical | Description |
+|-------|----------|-------------|
+| Database Connectivity | Yes | Verifies SQLite database is accessible |
+| Database Schema | Yes | Verifies all required tables exist |
+| Writable Paths | Yes | Checks data, logs, reports directories |
+| Ollama Connectivity | No | Checks if Ollama LLM is reachable |
+| Ollama Models | No | Verifies required models are available |
+| Agent Smoke Test | No | Instantiates core agents to verify imports |
+
+### Startup Check Output
+
+```
+======================================================================
+STARTUP CHECKS SUMMARY
+======================================================================
+[OK] Database Connectivity
+[OK] Database Schema
+[FAIL] Ollama Connectivity [WARNING]
+  -> Ollama is not responding. LLM-based validation features will be disabled.
+[FAIL] Ollama Models [WARNING]
+  -> Missing required models: llama2, mistral. Install with: ollama pull <model>
+[OK] Writable Paths
+[OK] Agent Smoke Test
+======================================================================
+Total: 6 checks | Passed: 4 | Failed: 2
+
+[WARNING] 2 WARNING(S) - Server may not work correctly
+======================================================================
+```
+
+### Critical vs Non-Critical Failures
+
+- **Critical failures** (Database, Schema, Paths): System will not start
+- **Non-critical failures** (Ollama, Models, Agents): System starts with reduced functionality
+
+### Using in Production
+
+```python
+from core.startup_checks import run_startup_checks
+
+success, summary = run_startup_checks()
+if not success:
+    # Critical failure - don't start server
+    print(f"Cannot start: {summary['critical_failures']} critical failures")
+    sys.exit(1)
+
+# Proceed with server startup
 ```
 
 ---

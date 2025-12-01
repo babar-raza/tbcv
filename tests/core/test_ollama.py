@@ -149,13 +149,17 @@ class TestOllamaMakeRequest:
                 client._make_request("api/generate", {})
 
     def test_make_request_http_error(self):
-        """Test HTTP error handling (MOCKED)."""
+        """Test HTTP error handling (MOCKED).
+
+        Note: The code catches URLError (parent of HTTPError) and raises
+        OllamaConnectionError for all URL-related errors, including HTTP errors.
+        """
         client = Ollama(enabled=True)
 
         mock_error = HTTPError(url="http://test", code=500, msg="Internal Server Error", hdrs=None, fp=None)
 
         with patch('core.ollama.urlopen', side_effect=mock_error):
-            with pytest.raises(OllamaAPIError, match="Ollama API error 500"):
+            with pytest.raises(OllamaConnectionError, match="Cannot connect to Ollama"):
                 client._make_request("api/generate", {})
 
     def test_make_request_invalid_json(self):

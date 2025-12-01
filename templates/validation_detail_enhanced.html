@@ -7,6 +7,73 @@
     <a href="/dashboard/validations" class="btn btn-secondary">← Back to Validations</a>
 </div>
 
+<!-- Recommendations (shown first) -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2>Recommendations ({{ recommendations|length }})</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="rebuildRecommendations()">Rebuild</button>
+            {% if recommendations %}
+            <button class="btn btn-warning" onclick="enhanceSelected()">Enhance Selected</button>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if recommendations %}
+    <div style="margin-bottom: 15px;">
+        <label>
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
+            Select All
+        </label>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 40px;">
+                    <input type="checkbox" disabled>
+                </th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Target</th>
+                <th>Confidence</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rec in recommendations %}
+            <tr>
+                <td>
+                    <input type="checkbox" class="rec-checkbox" value="{{ rec.id }}"
+                           {% if rec.status == 'accepted' or rec.status == 'approved' %}checked{% endif %}>
+                </td>
+                <td class="truncate" title="{{ rec.title }}">{{ rec.title }}</td>
+                <td><span class="badge badge-secondary">{{ rec.type }}</span></td>
+                <td><span class="badge badge-{{ rec.status }}">{{ rec.status }}</span></td>
+                <td class="truncate" title="{{ rec.metadata.target.selector if rec.metadata and rec.metadata.target else 'N/A' }}">
+                    {{ rec.metadata.target.selector if rec.metadata and rec.metadata.target else 'N/A' }}
+                </td>
+                <td>{{ "%.0f"|format(rec.confidence * 100) }}%</td>
+                <td class="actions">
+                    <a href="/dashboard/recommendations/{{ rec.id }}" class="btn btn-primary btn-sm">Review</a>
+                    <button class="btn btn-secondary btn-sm" onclick="copyRecAsJSON('{{ rec.id }}')">Copy JSON</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No recommendations for this validation</p>
+        {% if validation.status != 'enhanced' %}
+        <button class="btn btn-primary" onclick="generateRecommendations()">Generate Recommendations</button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Validation Details (shown second) -->
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2>Validation Details</h2>
@@ -22,12 +89,21 @@
             </button>
             {% endif %}
             {% if validation.status == 'approved' or validation.status == 'pass' %}
-            <button class="btn btn-warning" onclick="performEnhancement()" id="enhanceBtn">
+            <button
+                class="btn btn-warning"
+                onclick="performEnhancement()"
+                id="enhanceBtn"
+                {% if not validation.can_enhance %}disabled title="{{ validation.cannot_enhance_reason }}"{% endif %}>
                 <span id="enhanceBtnText">🚀 Enhance</span>
                 <span id="enhanceBtnSpinner" style="display: none;">
                     <span class="spinner"></span> Enhancing...
                 </span>
             </button>
+            {% if not validation.can_enhance %}
+            <span style="color: #856404; font-size: 14px; display: flex; align-items: center;">
+                ⚠️ {{ validation.cannot_enhance_reason }}
+            </span>
+            {% endif %}
             {% endif %}
         </div>
     </div>
@@ -101,76 +177,14 @@
     {% endif %}
 </div>
 
-<!-- Recommendations -->
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <h2>Recommendations ({{ recommendations|length }})</h2>
-        <div style="display: flex; gap: 10px;">
-            <button class="btn btn-secondary" onclick="rebuildRecommendations()">Rebuild</button>
-            {% if recommendations %}
-            <button class="btn btn-warning" onclick="enhanceSelected()">Enhance Selected</button>
-            {% endif %}
-        </div>
-    </div>
-
-    {% if recommendations %}
-    <div style="margin-bottom: 15px;">
-        <label>
-            <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
-            Select All
-        </label>
-    </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th style="width: 40px;">
-                    <input type="checkbox" disabled>
-                </th>
-                <th>Title</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Target</th>
-                <th>Confidence</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for rec in recommendations %}
-            <tr>
-                <td>
-                    <input type="checkbox" class="rec-checkbox" value="{{ rec.id }}"
-                           {% if rec.status == 'accepted' or rec.status == 'approved' %}checked{% endif %}>
-                </td>
-                <td class="truncate" title="{{ rec.title }}">{{ rec.title }}</td>
-                <td><span class="badge badge-secondary">{{ rec.type }}</span></td>
-                <td><span class="badge badge-{{ rec.status }}">{{ rec.status }}</span></td>
-                <td class="truncate" title="{{ rec.metadata.target.selector if rec.metadata and rec.metadata.target else 'N/A' }}">
-                    {{ rec.metadata.target.selector if rec.metadata and rec.metadata.target else 'N/A' }}
-                </td>
-                <td>{{ "%.0f"|format(rec.confidence * 100) }}%</td>
-                <td class="actions">
-                    <a href="/dashboard/recommendations/{{ rec.id }}" class="btn btn-primary btn-sm">Review</a>
-                    <button class="btn btn-secondary btn-sm" onclick="copyRecAsJSON('{{ rec.id }}')">Copy JSON</button>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div class="empty-state">
-        <p>No recommendations for this validation</p>
-        <button class="btn btn-primary" onclick="generateRecommendations()">Generate Recommendations</button>
-    </div>
-    {% endif %}
-</div>
-
 <!-- Toast Notifications Container -->
 <div id="toastContainer" class="toast-container"></div>
 
 <script>
 const validationId = '{{ validation.id }}';
 const filePath = {{ validation.file_path | tojson }};
+let canEnhance = {{ 'true' if validation.can_enhance else 'false' }};
+let cannotEnhanceReason = {{ validation.cannot_enhance_reason | default("") | tojson }};
 let ws = null;
 let currentDiffStyle = 'side-by-side';
 let diffData = null;
@@ -256,11 +270,21 @@ function handleValidationUpdate(data) {
         if (data.type && data.type.includes('approved')) {
             statusBadge.textContent = 'approved';
             statusBadge.className = 'badge badge-approved';
+
+            // Update enhancement availability when validation is approved
+            canEnhance = true;
+            cannotEnhanceReason = "";
+
             updateActionButtons('approved');
             showToast('Validation approved', 'success');
         } else if (data.type && data.type.includes('rejected')) {
             statusBadge.textContent = 'rejected';
             statusBadge.className = 'badge badge-rejected';
+
+            // Disable enhancement when validation is rejected
+            canEnhance = false;
+            cannotEnhanceReason = "Validation must be approved before enhancement";
+
             updateActionButtons('rejected');
             showToast('Validation rejected', 'warning');
         } else if (data.type && data.type.includes('enhanced')) {
@@ -309,7 +333,22 @@ function updateActionButtons(status) {
         enhanceBtn.id = 'enhanceBtn';
         enhanceBtn.innerHTML = '<span id="enhanceBtnText">🚀 Enhance</span>';
         enhanceBtn.onclick = performEnhancement;
+
+        // Disable button if validation cannot be enhanced
+        if (!canEnhance) {
+            enhanceBtn.disabled = true;
+            enhanceBtn.title = cannotEnhanceReason;
+        }
+
         actionButtons.appendChild(enhanceBtn);
+
+        // Add warning message if cannot enhance
+        if (!canEnhance) {
+            const warning = document.createElement('span');
+            warning.style.cssText = 'color: #856404; font-size: 14px; display: flex; align-items: center;';
+            warning.innerHTML = `⚠️ ${cannotEnhanceReason}`;
+            actionButtons.appendChild(warning);
+        }
     } else if (status === 'pass' || status === 'fail' || status === 'warning') {
         const approveBtn = document.createElement('button');
         approveBtn.className = 'btn btn-success';
@@ -339,6 +378,30 @@ async function performAction(action) {
 
         if (result.success || response.ok) {
             showToast(result.message || `Validation ${action}d successfully`, 'success');
+
+            // Update UI immediately based on action
+            const statusBadge = document.getElementById('statusBadge');
+            if (action === 'approve') {
+                statusBadge.textContent = 'approved';
+                statusBadge.className = 'badge badge-approved';
+
+                // Enable enhancement for approved validation
+                canEnhance = true;
+                cannotEnhanceReason = "";
+
+                updateActionButtons('approved');
+            } else if (action === 'reject') {
+                statusBadge.textContent = 'rejected';
+                statusBadge.className = 'badge badge-rejected';
+
+                // Disable enhancement for rejected validation
+                canEnhance = false;
+                cannotEnhanceReason = "Validation must be approved before enhancement";
+
+                updateActionButtons('rejected');
+            }
+
+            document.getElementById('updatedAt').textContent = new Date().toISOString();
         } else {
             showToast(`Failed to ${action}: ${result.errors?.join(', ') || result.detail || 'Unknown error'}`, 'error');
         }
@@ -350,6 +413,12 @@ async function performAction(action) {
 
 // Perform enhancement - FIXED VERSION
 async function performEnhancement() {
+    // Check if enhancement is allowed
+    if (!canEnhance) {
+        showToast(cannotEnhanceReason || 'Enhancement not available for this validation', 'error');
+        return;
+    }
+
     const enhanceBtn = document.getElementById('enhanceBtn');
     const enhanceBtnText = document.getElementById('enhanceBtnText');
     const enhanceBtnSpinner = document.getElementById('enhanceBtnSpinner');

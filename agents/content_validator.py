@@ -22,11 +22,13 @@ try:
     from core.logging import PerformanceLogger
     from core.database import db_manager
     from core.rule_manager import rule_manager  # normalized import
+    from core.access_guard import guarded_operation
 except ImportError:
     from agents.base import BaseAgent, AgentContract, AgentCapability, agent_registry
     from core.logging import PerformanceLogger
     from core.database import db_manager
     from core.rule_manager import rule_manager  # normalized import
+    from core.access_guard import guarded_operation
 
 # Optional deps
 try:
@@ -157,6 +159,7 @@ class ContentValidatorAgent(BaseAgent):
     # ----------------------
     # Composite entry point
     # ----------------------
+    @guarded_operation
     async def handle_validate_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
         with PerformanceLogger(self.logger, "validate_content"):
             content = params.get("content", "")
@@ -194,7 +197,17 @@ class ContentValidatorAgent(BaseAgent):
                     elif vt in ["heading_size", "heading_sizes", "size"]:
                         result = await self._validate_heading_sizes(content)
                     elif vt in ["Truth", "truth"]:
-                        result = await self._validate_yaml_with_truths_and_rules(content, family, truth_context, rule_context)
+                        # Use TruthValidatorAgent if available, fallback to built-in
+                        from agents.base import agent_registry as ar
+                        truth_validator = ar.get_agent("truth_validator")
+                        if truth_validator:
+                            result = await truth_validator.validate(content, {
+                                "family": family,
+                                "file_path": file_path,
+                                "truth_context": truth_context
+                            })
+                        else:
+                            result = await self._validate_yaml_with_truths_and_rules(content, family, truth_context, rule_context)
                     elif vt in ["FuzzyLogic", "fuzzylogic", "fuzzy"]:
                         result = await self._validate_with_fuzzy_logic(content, family, plugin_context)
                     elif vt == "llm":
@@ -803,7 +816,10 @@ class ContentValidatorAgent(BaseAgent):
                     message=f"Unknown shortcode: {{{{< {sc} >}}}}",
                     suggestion="Verify shortcode name against available shortcodes"
                 ))
-        
+
+        # Count links in markdown format [text](url)
+        links = re.findall(r'\[.*?\]\(.*?\)', content)
+
         # Check minimum content length (from rules)
         structure_rules = self.validation_rules.get("structure", {})
         min_intro_length = structure_rules.get("min_introduction_length", 100)
@@ -838,7 +854,9 @@ class ContentValidatorAgent(BaseAgent):
                 "markdown_valid": len([i for i in issues if i.level == "error"]) == 0,
                 "headings_count": len(headings),
                 "code_blocks_count": len(code_block_delimiters) // 2,
-                "introduction_length": intro_length
+                "introduction_length": intro_length,
+                "shortcodes_count": len(shortcodes),
+                "links_count": len(links)
             }
         )
 
@@ -864,7 +882,7 @@ class ContentValidatorAgent(BaseAgent):
                     message=f"Code block is very short ({len(code.strip())} chars)",
                     suggestion="Consider adding more context or removing if it's not useful"
                 ))
-            
+
             # Check for missing language specifier
             if not lang:
                 issues.append(ValidationIssue(
@@ -872,6 +890,18 @@ class ContentValidatorAgent(BaseAgent):
                     category="missing_language_specifier",
                     message="Code block is missing language specifier",
                     suggestion="Add language after opening ```, e.g., ```python or ```java"
+                ))
+                auto_fixable += 1
+
+            # Check for hardcoded file paths
+            # Match Windows paths (C:\path\to\file) and Unix paths (/path/to/file)
+            hardcoded_paths = re.findall(r'["\']([A-Za-z]:\\\\[^"\']+|/[^"\'\s]+/[^"\']+)["\']', code)
+            for path in hardcoded_paths:
+                issues.append(ValidationIssue(
+                    level="warning",
+                    category="code_quality",
+                    message=f"Hardcoded file path detected: {path}",
+                    suggestion="Use relative paths or configuration variables instead of hardcoded absolute paths"
                 ))
                 auto_fixable += 1
         
@@ -1091,9 +1121,10 @@ class ContentValidatorAgent(BaseAgent):
         lines = content.split('\n')
         headings = []
         for i, line in enumerate(lines):
-            if line.strip().startswith('#'):
-                level = len(line) - len(line.lstrip('#'))
-                text = line.lstrip('#').strip()
+            stripped = line.strip()
+            if stripped.startswith('#'):
+                level = len(stripped) - len(stripped.lstrip('#'))
+                text = stripped.lstrip('#').strip()
                 headings.append({"level": level, "text": text, "line": i + 1})
 
         if not headings:
@@ -1237,8 +1268,8 @@ class ContentValidatorAgent(BaseAgent):
         issues: List[ValidationIssue] = []
         auto_fixable = 0
 
-        # Load heading size configuration
-        config_path = os.path.join("config", "heading_sizes.yaml")
+        # Load heading size configuration from unified seo.yaml
+        config_path = os.path.join("config", "seo.yaml")
         default_config = {
             "heading_sizes": {
                 "h1": {"min_length": 20, "max_length": 70, "recommended_min": 30, "recommended_max": 60},
@@ -1261,10 +1292,13 @@ class ContentValidatorAgent(BaseAgent):
             try:
                 with open(config_path, 'r') as f:
                     loaded_config = yaml.safe_load(f)
-                    if loaded_config and "heading_sizes" in loaded_config:
-                        size_config = loaded_config["heading_sizes"]
+                    # Look for heading_sizes in seo.yaml (unified config)
+                    if loaded_config and "seo" in loaded_config:
+                        seo_config = loaded_config["seo"]
+                        if "heading_sizes" in seo_config:
+                            size_config = seo_config["heading_sizes"]
             except Exception as e:
-                logger.warning(f"Failed to load heading sizes config: {e}, using defaults")
+                logger.warning(f"Failed to load SEO config: {e}, using defaults")
 
         severity = size_config.get("severity", default_config["heading_sizes"]["severity"])
 

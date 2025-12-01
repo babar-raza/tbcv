@@ -2,620 +2,540 @@
 
 ## Overview
 
-TBCV includes comprehensive test suites covering unit tests, integration tests, performance tests, and end-to-end workflows. Tests ensure system reliability, validate agent interactions, and measure performance characteristics.
+TBCV includes comprehensive test suites covering unit tests, integration tests, UI tests, and end-to-end workflows. Tests are written using pytest with asyncio support and use in-memory SQLite databases for isolation.
 
-## Test Structure
+**Primary Documentation**: [tests/README.md](../tests/README.md) - Complete testing guide with fixtures, markers, and examples.
 
-### Directory Layout
+## Quick Start
+
+### Run All Tests
+```bash
+pytest tests/ --ignore=tests/manual/ --ignore=tests/test_endpoints_live.py --ignore=tests/test_truth_llm_validation_real.py -v
+```
+
+### Run UI Tests (Playwright)
+```bash
+pytest tests/ui/ -v --headed
+```
+
+### Windows PowerShell
+```powershell
+python -m pytest tests/ --ignore=tests/manual/ --ignore=tests/test_endpoints_live.py -q --import-mode=importlib -p no:capture
+```
+
+See [UI Testing Guide](testing/UI_TESTING_GUIDE.md) for detailed browser testing documentation.
+
+## Test Directory Structure
+
 ```
 tests/
-├── __init__.py
-├── conftest.py                    # Pytest configuration and fixtures
-├── run_all_tests.py              # Test runner script
-├── test_cli_web_parity.py        # CLI vs API parity tests
-├── test_endpoints_live.py        # Live API endpoint tests
-├── test_endpoints_offline.py     # Offline API endpoint tests
-├── test_enhancer_consumes_validation.py  # Enhancement workflow tests
-├── test_everything.py             # Comprehensive system tests
-├── test_framework.py              # Test framework utilities
-├── test_full_stack_local.py       # Full stack local tests
-├── test_fuzzy_logic.py            # Fuzzy detection algorithm tests
-├── test_generic_validator.py      # Generic validation tests
-├── test_idempotence_and_schemas.py # Idempotency and schema tests
-├── test_performance.py            # Performance benchmark tests
-├── test_recommendations.py        # Recommendation system tests
-├── test_smoke_agents.py           # Agent smoke tests
-├── test_truth_validation.py       # Truth validation tests
-├── fixtures/                      # Test data fixtures
-│   ├── multi_plugin_content.md
-│   ├── truths_and_rules_test.md
-│   └── yaml_only_content.md
-└── reports/                       # Test reports
-    └── comprehensive_test_report.json
+├── api/                 # API endpoint tests
+│   ├── services/        # Service layer tests (live_bus.py)
+│   ├── test_dashboard*.py    # Dashboard tests (7 files)
+│   ├── test_export*.py       # Export functionality
+│   └── test_batch*.py        # Batch enhancement
+├── agents/              # Agent behavior tests
+│   ├── test_base.py          # BaseAgent tests
+│   ├── test_enhancement_agent*.py  # Enhancement agent
+│   ├── test_modular_validators.py  # Validator modules
+│   └── test_truth_manager.py       # Truth manager
+├── cli/                 # CLI command tests
+│   ├── test_admin_*.py       # Admin commands
+│   ├── test_validation_diff.py
+│   └── test_workflow_*.py    # Workflow commands
+├── core/                # Core functionality tests
+│   ├── test_database.py      # DatabaseManager
+│   ├── test_cache.py         # Caching system
+│   ├── test_config_loader.py # Configuration
+│   └── test_performance.py   # Performance tracking
+├── contracts/           # API contract tests
+├── e2e/                 # End-to-end workflows
+├── ui/                  # Playwright browser tests (65 tests)
+│   ├── pages/           # Page Object Models
+│   ├── test_navigation.py
+│   ├── test_validations_flow.py
+│   └── test_recommendations_flow.py
+└── manual/              # Interactive testing (excluded from CI)
 ```
 
-## Running Tests
+## Test Categories
 
-### All Tests
+| Category | Location | Tests | Purpose |
+|----------|----------|-------|---------|
+| API Tests | `tests/api/` | ~50+ | Endpoint and dashboard tests |
+| Agent Tests | `tests/agents/` | ~30+ | Agent behavior and validation |
+| Core Tests | `tests/core/` | ~25+ | Database, config, utilities |
+| CLI Tests | `tests/cli/` | ~15+ | Command-line interface |
+| UI Tests | `tests/ui/` | 65 | Playwright browser tests |
+| E2E Tests | `tests/e2e/` | ~10+ | End-to-end workflows |
+| Contract Tests | `tests/contracts/` | ~20+ | API response schemas |
+
+## Test Markers
+
 ```bash
-# Run complete test suite
-pytest tests/
+pytest tests/ -m unit          # Unit tests only
+pytest tests/ -m integration   # Integration tests
+pytest tests/ -m smoke         # Quick health checks (~30 sec)
+pytest tests/ -m ui            # Browser UI tests
+pytest tests/ -m websocket     # WebSocket functionality
+pytest tests/ -m "not slow"    # Exclude slow tests
+```
 
-# With coverage report
-pytest tests/ --cov=tbcv --cov-report=html --cov-report=term
+## Key Fixtures
 
-# Run specific test file
-pytest tests/test_smoke_agents.py -v
+From `tests/conftest.py`:
 
-# Run specific test
-pytest tests/test_fuzzy_logic.py::test_fuzzy_detection -v
+| Fixture | Scope | Purpose |
+|---------|-------|---------|
+| `db_manager` | function | In-memory SQLite database |
+| `db_session` | function | Direct database session |
+| `api_client` | function | FastAPI TestClient (sync) |
+| `async_api_client` | function | HTTPX AsyncClient |
+| `sample_validation` | function | Pre-created validation |
+| `sample_workflow` | function | Pre-created workflow |
+| `mock_ollama` | function | Mocked LLM responses |
+
+## Running Tests by Category
+
+```bash
+# API tests
+pytest tests/api/ -v
+
+# Agent tests with mocked Ollama
+pytest tests/agents/ -v
+
+# Dashboard-specific tests
+pytest tests/api/test_dashboard*.py -v
+
+# UI tests with visible browser
+pytest tests/ui/ -v --headed
+
+# E2E workflows
+pytest tests/e2e/ -v
+
+# Contract tests
+pytest tests/contracts/ -v
+```
+
+## Coverage
+
+```bash
+# Generate HTML coverage report
+pytest tests/ --cov=. --cov-report=html
+
+# Terminal report with missing lines
+pytest tests/ --cov=. --cov-report=term-missing
+
+# Coverage for specific module
+pytest tests/core/ --cov=core --cov-report=term-missing
+```
+
+## Tests Excluded from CI
+
+These tests require external dependencies or manual interaction:
+
+- `tests/manual/` - Interactive testing scripts
+- `tests/test_endpoints_live.py` - Requires live server
+- `tests/test_truth_llm_validation_real.py` - Requires Ollama
+
+## Writing New Tests
+
+Example test structure:
+
+```python
+import pytest
+from unittest.mock import Mock, patch
+
+class TestMyFeature:
+    """Tests for MyFeature functionality."""
+
+    @pytest.fixture
+    def feature_instance(self, db_manager):
+        """Create feature instance with dependencies."""
+        return MyFeature(db=db_manager)
+
+    def test_basic_functionality(self, feature_instance):
+        """Test basic operation."""
+        result = feature_instance.do_something()
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_async_operation(self, feature_instance):
+        """Test async functionality."""
+        result = await feature_instance.async_do_something()
+        assert result is not None
+
+    @pytest.mark.slow
+    def test_expensive_operation(self, feature_instance):
+        """Test that takes a long time."""
+        # ...
+```
+
+## MCP Testing
+
+### Overview
+
+TBCV's MCP (Model Context Protocol) implementation provides a JSON-RPC interface for external tools to interact with validation operations. The testing infrastructure ensures reliability of server-client communication, error handling, and integration with core components.
+
+### Architecture
+
+```
+┌─────────────────────┐
+│   MCP Test Suite   │
+└─────────┬───────────┘
+          │
+    ┌─────┴─────┐
+    │           │
+┌───▼───┐   ┌──▼────┐
+│Server │   │Client │
+│ Tests │   │ Tests │
+└───┬───┘   └──┬────┘
+    │          │
+    └────┬─────┘
+         │
+    ┌────▼────┐
+    │Database │
+    │  Tests  │
+    └─────────┘
 ```
 
 ### Test Categories
 
-#### Unit Tests
-```bash
-# Agent-specific tests
-pytest tests/test_smoke_agents.py
-pytest tests/test_fuzzy_logic.py
-pytest tests/test_truth_validation.py
+| Category | Files | Coverage |
+|----------|-------|----------|
+| Server Architecture | `test_mcp_server_architecture.py` | JSON-RPC protocol, method registry, routing |
+| Client Wrappers | `test_mcp_client.py` | Sync/async clients, retry logic, error handling |
+| Integration | Future: `tests/integration/` | End-to-end MCP workflows |
 
-# Core component tests
-pytest tests/test_framework.py
-pytest tests/test_idempotence_and_schemas.py
-```
+### Available Test Fixtures
 
-#### Integration Tests
-```bash
-# API endpoint tests
-pytest tests/test_endpoints_live.py
-pytest tests/test_endpoints_offline.py
+From `tests/svc/conftest.py`:
 
-# CLI tests
-pytest tests/test_cli_web_parity.py
-
-# Workflow tests
-pytest tests/test_full_stack_local.py
-pytest tests/test_enhancer_consumes_validation.py
-```
-
-#### Performance Tests
-```bash
-# Performance benchmarks
-pytest tests/test_performance.py --benchmark
-
-# Memory profiling
-pytest tests/test_performance.py --memory
-
-# Load testing
-pytest tests/test_performance.py --load
-```
-
-#### End-to-End Tests
-```bash
-# Full system tests
-pytest tests/test_everything.py
-
-# Recommendation workflow
-pytest tests/test_recommendations.py
-
-# Generic validation
-pytest tests/test_generic_validator.py
-```
-
-### Custom Test Runner
-```bash
-# Use the custom test runner
-python tests/run_all_tests.py
-
-# With options
-python tests/run_all_tests.py --verbose --coverage --performance
-```
-
-## Test Configuration
-
-### pytest.ini
-```ini
-[tool:pytest.ini_options]
-testpaths = tests
-python_files = test_*.py
-python_classes = Test*
-python_functions = test_*
-addopts =
-    --strict-markers
-    --strict-config
-    --verbose
-    --cov=tbcv
-    --cov-report=term-missing
-    --cov-report=html
-    --cov-fail-under=95
-markers =
-    slow: marks tests as slow (deselect with '-m "not slow"')
-    integration: marks tests as integration tests
-    performance: marks tests as performance tests
-asyncio_mode = auto
-```
-
-### Coverage Configuration
-```ini
-[tool.coverage.run]
-source = tbcv
-omit =
-    */tests/*
-    */test_*.py
-    */__pycache__/*
-    */conftest.py
-
-[tool.coverage.report]
-exclude_lines =
-    pragma: no cover
-    def __repr__
-    if self.debug:
-    if settings.DEBUG
-    raise AssertionError
-    raise NotImplementedError
-    if 0:
-    if __name__ == .__main__.:
-    class .*\\bProtocol\\):
-    @(abc\\.)?abstractmethod
-```
-
-## Test Fixtures
-
-### conftest.py
 ```python
-import pytest
-import asyncio
-from pathlib import Path
-from core.database import db_manager
-from agents.base import agent_registry
+# Database
+temp_db                    # Isolated SQLite database
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+# Server & Clients
+mcp_server                 # MCPServer instance
+mcp_sync_client            # Synchronous client (MCPSyncClient)
+mcp_async_client           # Asynchronous client (MCPAsyncClient)
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_database():
-    """Initialize test database."""
-    db_manager.init_database()
-    yield
-    # Cleanup after tests
+# Test Data
+test_markdown_file         # Single markdown file
+test_markdown_files        # Multiple markdown files (batch testing)
+test_validation_record     # Pre-created validation record
+sample_validation_data     # Sample validation dictionary
+sample_recommendation_data # Sample recommendation dictionary
 
-@pytest.fixture(scope="function")
-async def initialized_agents():
-    """Initialize agents for testing."""
-    from core.config import get_settings
-    settings = get_settings()
-
-    # Register test agents
-    yield
-    # Cleanup agents
-
-@pytest.fixture
-def sample_markdown():
-    """Sample markdown content for testing."""
-    return """
-# Sample Document
-
-This is a test document with some content.
-
-```csharp
-// Sample code
-Document doc = new Document();
-doc.Save("output.pdf");
-```
-"""
-
-@pytest.fixture
-def sample_truth_data():
-    """Sample truth data for testing."""
-    return {
-        "plugin_name": "Aspose.Words",
-        "patterns": ["Document.Save", "Document.Load"],
-        "family": "words"
-    }
+# Environment
+clean_env                  # Clean test environment
 ```
 
-## Writing Tests
+### Writing MCP Tests
 
-### Unit Test Example
+#### Example 1: Synchronous Client Test
+
 ```python
-import pytest
-from agents.fuzzy_detector import FuzzyDetectorAgent
+def test_validate_folder(mcp_sync_client, test_markdown_file):
+    """Test folder validation via sync client."""
+    folder_path = str(test_markdown_file.parent)
 
-class TestFuzzyDetector:
-    def test_exact_match(self):
-        """Test exact pattern matching."""
-        agent = FuzzyDetectorAgent("test_detector")
-        content = "Document.Save(filename)"
-        patterns = ["Document.Save"]
+    result = mcp_sync_client.validate_folder(folder_path, recursive=False)
 
-        result = agent.detect_plugins(content, patterns)
-
-        assert len(result) == 1
-        assert result[0]["pattern"] == "Document.Save"
-        assert result[0]["confidence"] > 0.9
-
-    def test_fuzzy_match(self):
-        """Test fuzzy pattern matching."""
-        agent = FuzzyDetectorAgent("test_detector")
-        content = "doc.Save(file)"  # Slight variation
-        patterns = ["Document.Save"]
-
-        result = agent.detect_plugins(content, patterns)
-
-        assert len(result) == 1
-        assert result[0]["confidence"] > 0.7  # Fuzzy match confidence
-
-    @pytest.mark.asyncio
-    async def test_async_detection(self):
-        """Test asynchronous plugin detection."""
-        agent = FuzzyDetectorAgent("test_detector")
-        content = "Document doc = new Document(); doc.Save();"
-
-        result = await agent.process_request("detect_plugins", {
-            "content": content,
-            "patterns": ["Document.Save"]
-        })
-
-        assert result["success"] is True
-        assert len(result["detections"]) > 0
+    assert result["success"] is True
+    assert result["results"]["files_processed"] > 0
+    assert "validations" in result["results"]
 ```
 
-### Integration Test Example
+#### Example 2: Asynchronous Client Test
+
 ```python
-import pytest
-from fastapi.testclient import TestClient
-from tbcv.api.server import app
+@pytest.mark.asyncio
+async def test_approve_validations(mcp_async_client, test_validation_record):
+    """Test validation approval via async client."""
+    validation_ids = [test_validation_record]
 
-class TestAPIEndpoints:
-    def setup_method(self):
-        """Setup test client."""
-        self.client = TestClient(app)
+    result = await mcp_async_client.approve(validation_ids)
 
-    def test_health_check(self):
-        """Test health check endpoint."""
-        response = self.client.get("/health/live")
-        assert response.status_code == 200
-
-        data = response.json()
-        assert data["status"] == "alive"
-        assert "timestamp" in data
-
-    def test_validation_endpoint(self):
-        """Test content validation endpoint."""
-        payload = {
-            "content": "# Test Document\n\nSome content.",
-            "file_path": "test.md",
-            "family": "words"
-        }
-
-        response = self.client.post("/api/validate", json=payload)
-        assert response.status_code == 200
-
-        data = response.json()
-        assert "validation_result" in data
-        assert data["validation_result"]["content_validation"]["confidence"] >= 0
-
-    @pytest.mark.asyncio
-    async def test_workflow_creation(self):
-        """Test workflow creation and monitoring."""
-        payload = {
-            "directory_path": "./tests/fixtures",
-            "file_pattern": "*.md",
-            "max_workers": 2,
-            "family": "words"
-        }
-
-        response = self.client.post("/workflows/validate-directory", json=payload)
-        assert response.status_code == 200
-
-        data = response.json()
-        workflow_id = data["workflow_id"]
-
-        # Check workflow status
-        status_response = self.client.get(f"/workflows/{workflow_id}")
-        assert status_response.status_code == 200
-
-        status_data = status_response.json()
-        assert status_data["state"] in ["pending", "running", "completed"]
+    assert result["success"] is True
+    assert result["approved_count"] == len(validation_ids)
 ```
 
-### Performance Test Example
+#### Example 3: Server Method Test
+
 ```python
-import pytest
-import time
-from agents.content_validator import ContentValidatorAgent
-
-class TestPerformance:
-    @pytest.mark.benchmark
-    def test_validation_performance(self, benchmark, sample_markdown):
-        """Benchmark content validation performance."""
-        agent = ContentValidatorAgent("perf_test")
-
-        def validate():
-            return agent.validate_content(sample_markdown, "test.md")
-
-        result = benchmark(validate)
-
-        # Assert performance requirements
-        assert result.stats.mean < 1.0  # Less than 1 second average
-        assert result.stats.max < 5.0   # Less than 5 seconds max
-
-    @pytest.mark.memory
-    def test_memory_usage(self, sample_markdown):
-        """Test memory usage during validation."""
-        import psutil
-        import os
-
-        process = psutil.Process(os.getpid())
-        initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-
-        agent = ContentValidatorAgent("memory_test")
-        agent.validate_content(sample_markdown, "test.md")
-
-        final_memory = process.memory_info().rss / 1024 / 1024  # MB
-        memory_increase = final_memory - initial_memory
-
-        # Assert memory usage is reasonable
-        assert memory_increase < 50  # Less than 50MB increase
-
-    @pytest.mark.load
-    def test_concurrent_validations(self):
-        """Test concurrent validation handling."""
-        import asyncio
-        import aiohttp
-
-        async def validate_concurrent():
-            async with aiohttp.ClientSession() as session:
-                tasks = []
-                for i in range(10):
-                    payload = {
-                        "content": f"# Document {i}\n\nContent {i}",
-                        "file_path": f"test{i}.md"
-                    }
-                    tasks.append(session.post(
-                        "http://localhost:8080/api/validate",
-                        json=payload
-                    ))
-
-                responses = await asyncio.gather(*tasks)
-                return [r.status for r in responses]
-
-        statuses = asyncio.run(validate_concurrent())
-        assert all(status == 200 for status in statuses)
-```
-
-## Test Data Management
-
-### Fixtures Directory
-```
-tests/fixtures/
-├── multi_plugin_content.md     # Content with multiple plugins
-├── truths_and_rules_test.md   # Truth data validation content
-├── yaml_only_content.md       # YAML-only test content
-└── large_document.md          # Large document for performance testing
-```
-
-### Generating Test Data
-```python
-def generate_test_content(num_plugins=5, content_length=1000):
-    """Generate test content with specified characteristics."""
-    plugins = [
-        "Document.Save", "Document.Load", "Workbook.Save",
-        "Presentation.Save", "PdfDocument.Save"
-    ]
-
-    content = "# Test Document\n\n"
-
-    # Add plugin usage
-    for i in range(num_plugins):
-        plugin = plugins[i % len(plugins)]
-        content += f"```csharp\n// Using {plugin}\nvar doc = new Document();\ndoc.{plugin.split('.')[1]}();\n```\n\n"
-
-    # Pad content to desired length
-    while len(content) < content_length:
-        content += "This is additional content to reach desired length.\n"
-
-    return content
-```
-
-## Continuous Integration
-
-### GitHub Actions Example
-```yaml
-name: Tests
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.8, 3.9, "3.10", "3.11", "3.12"]
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -e .[dev]
-
-      - name: Run tests
-        run: |
-          pytest tests/ --cov=tbcv --cov-report=xml
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-```
-
-### Pre-commit Hooks
-```yaml
-# .pre-commit-config.yaml
-repos:
-  - repo: local
-    hooks:
-      - id: pytest
-        name: Run tests
-        entry: pytest tests/ -x
-        language: system
-        pass_filenames: false
-        always_run: true
-
-  - repo: local
-    hooks:
-      - id: mypy
-        name: Type checking
-        entry: mypy tbcv/
-        language: system
-        pass_filenames: false
-
-  - repo: local
-    hooks:
-      - id: black
-        name: Code formatting
-        entry: black tbcv/ tests/
-        language: system
-        pass_filenames: false
-```
-
-## Test Reporting
-
-### Coverage Reports
-```bash
-# HTML coverage report
-pytest tests/ --cov=tbcv --cov-report=html
-open htmlcov/index.html
-
-# Terminal coverage
-pytest tests/ --cov=tbcv --cov-report=term-missing
-
-# XML for CI
-pytest tests/ --cov=tbcv --cov-report=xml
-```
-
-### Performance Reports
-```bash
-# Benchmark report
-pytest tests/test_performance.py --benchmark --benchmark-json=benchmark.json
-
-# Memory profiling
-pytest tests/test_performance.py --memory --memory-report
-```
-
-### Custom Reports
-```python
-# tests/generate_report.py
-import json
-import pytest
-from pathlib import Path
-
-def generate_comprehensive_report(results):
-    """Generate comprehensive test report."""
-    report = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "summary": {
-            "total_tests": results["summary"]["num_tests"],
-            "passed": results["summary"]["passed"],
-            "failed": results["summary"]["failed"],
-            "skipped": results["summary"]["skipped"],
-            "duration": results["summary"]["duration"]
-        },
-        "coverage": results.get("coverage", {}),
-        "performance": results.get("performance", {}),
-        "details": results["tests"]
+def test_json_rpc_compliance(mcp_server):
+    """Test JSON-RPC 2.0 protocol compliance."""
+    request = {
+        "jsonrpc": "2.0",
+        "method": "validate_folder",
+        "params": {"folder_path": "/test"},
+        "id": 1
     }
 
-    Path("tests/reports").mkdir(exist_ok=True)
-    with open("tests/reports/comprehensive_test_report.json", "w") as f:
-        json.dump(report, f, indent=2)
+    response = mcp_server.handle_request(request)
 
-    return report
+    assert response["jsonrpc"] == "2.0"
+    assert response["id"] == 1
+    assert "result" in response or "error" in response
 ```
 
-## Debugging Tests
+#### Example 4: Error Handling Test
 
-### Verbose Output
-```bash
-# Detailed test output
-pytest tests/test_fuzzy_logic.py -v -s
-
-# Debug specific test
-pytest tests/test_fuzzy_logic.py::TestFuzzyDetector::test_exact_match -v -s --pdb
-```
-
-### Logging in Tests
 ```python
-import logging
+def test_method_not_found(mcp_sync_client):
+    """Test error handling for nonexistent method."""
+    from svc.mcp_exceptions import MCPMethodNotFoundError
 
-def test_with_logging(caplog):
-    """Test with log capture."""
-    caplog.set_level(logging.DEBUG)
+    with pytest.raises(MCPMethodNotFoundError) as exc_info:
+        mcp_sync_client._call_method("invalid_method", {})
 
-    # Test code that logs
-    agent = FuzzyDetectorAgent("test")
-    agent.detect_plugins("content", ["pattern"])
-
-    # Assert logs
-    assert "Detected plugin" in caplog.text
-    assert caplog.records[0].levelname == "INFO"
+    assert exc_info.value.code == -32601
+    assert "not found" in str(exc_info.value).lower()
 ```
 
-### Mocking External Services
+#### Example 5: Full Workflow Test
+
 ```python
-import pytest
-from unittest.mock import patch, MagicMock
+@pytest.mark.asyncio
+async def test_validation_workflow(mcp_async_client, test_markdown_file):
+    """Test complete validation → approval → enhancement workflow."""
+    folder = str(test_markdown_file.parent)
 
-def test_with_mocked_ollama():
-    """Test LLM validator with mocked Ollama."""
-    with patch('core.ollama.OllamaClient') as mock_client:
-        mock_client.return_value.generate.return_value = "Mocked response"
+    # Step 1: Validate
+    val_result = await mcp_async_client.validate_folder(folder)
+    assert val_result["success"]
 
-        agent = LLMValidatorAgent("test")
-        result = agent.validate_with_llm("test content")
+    # Step 2: Extract validation IDs
+    val_ids = [v["id"] for v in val_result["results"]["validations"]]
 
-        assert result["response"] == "Mocked response"
-        mock_client.return_value.generate.assert_called_once()
+    # Step 3: Approve
+    approve_result = await mcp_async_client.approve(val_ids)
+    assert approve_result["approved_count"] == len(val_ids)
+
+    # Step 4: Enhance
+    enhance_result = await mcp_async_client.enhance(val_ids)
+    assert enhance_result["success"]
 ```
 
-## Test Maintenance
+### Running MCP Tests
 
-### Keeping Tests Current
 ```bash
-# Update test snapshots
-pytest tests/ --snapshot-update
+# All MCP tests
+pytest tests/svc/ -v
 
-# Regenerate fixtures
-python tests/generate_fixtures.py
+# Specific test file
+pytest tests/svc/test_mcp_client.py -v
 
-# Update expected results
-pytest tests/ --update-expected
+# Specific test class
+pytest tests/svc/test_mcp_server_architecture.py::TestJSONRPCUtilities -v
+
+# Only sync client tests
+pytest tests/svc/ -k "sync" -v
+
+# Only async client tests
+pytest tests/svc/ -k "async" -v
+
+# With coverage
+pytest tests/svc/ --cov=svc --cov-report=html
 ```
 
-### Test Organization
-- **Unit tests**: Test individual functions/classes
-- **Integration tests**: Test component interactions
-- **System tests**: Test end-to-end workflows
-- **Performance tests**: Benchmark and profile
-- **Regression tests**: Prevent bug reintroduction
+### Best Practices
 
-### Test Naming Conventions
-- `test_function_name`: Unit test for function
-- `test_class_method`: Unit test for class method
-- `test_integration_feature`: Integration test
-- `test_performance_scenario`: Performance test
-- `test_regression_issue_123`: Regression test
+#### 1. Always Use Fixtures for Database Isolation
 
-This comprehensive testing guide ensures TBCV maintains high quality and reliability through systematic testing practices.
+```python
+# ✅ Correct - uses temp_db for isolation
+def test_with_database(temp_db, mcp_sync_client):
+    result = mcp_sync_client.validate_folder("/path")
+    # Database is isolated and cleaned up automatically
+
+# ❌ Incorrect - missing temp_db may cause database locks
+def test_without_database(mcp_sync_client):
+    result = mcp_sync_client.validate_folder("/path")
+    # May fail with "database is locked" error
+```
+
+#### 2. Mark Async Tests Properly
+
+```python
+# ✅ Correct - properly marked as async
+@pytest.mark.asyncio
+async def test_async_operation(mcp_async_client):
+    result = await mcp_async_client.validate_folder("/path")
+    assert result["success"]
+
+# ❌ Incorrect - missing @pytest.mark.asyncio
+async def test_async_operation(mcp_async_client):
+    # Test will not run properly
+    result = await mcp_async_client.validate_folder("/path")
+```
+
+#### 3. Follow JSON-RPC 2.0 Specification
+
+```python
+# ✅ Correct - valid JSON-RPC 2.0 request
+request = {
+    "jsonrpc": "2.0",      # Required: version
+    "method": "approve",    # Required: method name
+    "params": {"ids": []},  # Optional: parameters
+    "id": 1                 # Required: request ID
+}
+
+# ❌ Incorrect - missing required fields
+request = {
+    "method": "approve",
+    "params": {"ids": []}
+}  # Missing jsonrpc version and id
+```
+
+#### 4. Test Error Cases
+
+```python
+def test_error_handling(mcp_sync_client):
+    """Test error handling for various failure scenarios."""
+    from svc.mcp_exceptions import MCPInvalidParamsError
+
+    # Test invalid parameters
+    with pytest.raises(MCPInvalidParamsError):
+        mcp_sync_client.approve([])  # Empty list
+
+    # Test method not found
+    with pytest.raises(MCPMethodNotFoundError):
+        mcp_sync_client._call_method("nonexistent", {})
+
+    # Test internal errors
+    # (Mock internal failures as needed)
+```
+
+#### 5. Use Proper Fixture Dependencies
+
+```python
+# ✅ Correct - proper dependency chain
+def test_with_dependencies(temp_db, mcp_server, mcp_sync_client):
+    # temp_db → mcp_server → mcp_sync_client
+    # All fixtures properly initialized in order
+    pass
+
+# ❌ Incorrect - skipping intermediate dependencies
+def test_without_dependencies(mcp_sync_client):
+    # May fail if temp_db not initialized
+    pass
+```
+
+### Troubleshooting
+
+#### Database Locked Error
+
+**Problem**: Tests fail with "database is locked" error.
+
+**Solution**: Ensure `temp_db` fixture is included in test parameters.
+
+```python
+# Fix by adding temp_db fixture
+def test_example(temp_db, mcp_sync_client):
+    # Now database is properly isolated
+    pass
+```
+
+#### Async Test Not Running
+
+**Problem**: Async test appears to be skipped or fails immediately.
+
+**Solution**: Add `@pytest.mark.asyncio` decorator.
+
+```python
+@pytest.mark.asyncio
+async def test_async_feature(mcp_async_client):
+    result = await mcp_async_client.validate_folder("/path")
+    assert result["success"]
+```
+
+#### JSON-RPC Validation Failed
+
+**Problem**: Request fails with "Invalid JSON-RPC" error.
+
+**Solution**: Ensure request includes all required fields: `jsonrpc`, `method`, and `id`.
+
+```python
+request = {
+    "jsonrpc": "2.0",
+    "method": "validate_folder",
+    "params": {"folder_path": "/test"},
+    "id": 1
+}
+```
+
+#### Fixture Dependency Error
+
+**Problem**: Fixture initialization fails.
+
+**Solution**: Check fixture dependency order. `temp_db` must come before `mcp_server`, which must come before clients.
+
+```python
+# Correct order
+def test_example(temp_db, mcp_server, mcp_sync_client):
+    pass
+```
+
+### Common Test Patterns
+
+#### Pattern: Batch Validation
+
+```python
+def test_batch_validation(mcp_sync_client, test_markdown_files):
+    """Test validating multiple files."""
+    folder = str(test_markdown_files[0].parent)
+
+    result = mcp_sync_client.validate_folder(folder, recursive=False)
+
+    assert result["results"]["files_processed"] == len(test_markdown_files)
+```
+
+#### Pattern: Error Recovery
+
+```python
+@pytest.mark.asyncio
+async def test_retry_on_transient_failure(mcp_async_client):
+    """Test retry logic on transient failures."""
+    # Client configured with max_retries=2
+    # Will automatically retry on network errors
+    result = await mcp_async_client.validate_folder("/path")
+    assert result is not None
+```
+
+#### Pattern: Mocking External Dependencies
+
+```python
+def test_with_mocked_ollama(mcp_sync_client, monkeypatch):
+    """Test enhancement with mocked LLM."""
+    def mock_enhance(*args, **kwargs):
+        return {"success": True, "enhanced_count": 1}
+
+    monkeypatch.setattr("svc.mcp_server.enhance_validations", mock_enhance)
+
+    result = mcp_sync_client.enhance(["val-123"])
+    assert result["success"]
+```
+
+### Test Coverage Goals
+
+- **Server Methods**: 100% coverage of all JSON-RPC methods
+- **Client Wrappers**: 90%+ coverage including error paths
+- **Integration**: End-to-end workflows validated
+- **Error Handling**: All error codes tested
+
+### Reference Files
+
+- **Server Tests**: `tests/svc/test_mcp_server_architecture.py`
+- **Client Tests**: `tests/svc/test_mcp_client.py`
+- **Fixtures**: `tests/svc/conftest.py`
+- **Implementation**: `svc/mcp_server.py`, `svc/mcp_client.py`, `svc/mcp_methods.py`
+
+## Additional Resources
+
+- [tests/README.md](../tests/README.md) - **Complete testing documentation with MCP section**
+- [testing/UI_TESTING_GUIDE.md](testing/UI_TESTING_GUIDE.md) - Playwright UI testing
+- [mcp_integration.md](mcp_integration.md) - MCP server integration guide
+- [pytest.ini](../pytest.ini) - pytest configuration
+- [tests/conftest.py](../tests/conftest.py) - Shared fixtures

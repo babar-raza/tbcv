@@ -1,0 +1,105 @@
+# Code Block Validation Configuration
+# Controls validation of code blocks and inline code
+
+code:
+  enabled: true
+  profile: "default"
+
+  rules:
+    no_language_specified:
+      enabled: true
+      level: warning
+      message: "Code block has no language specified"
+
+    empty_code_block:
+      enabled: true
+      level: warning
+      message: "Empty code block detected"
+
+    code_block_too_long:
+      enabled: true
+      level: info
+      message: "Code block exceeds maximum lines"
+      params:
+        max_lines: 100
+
+    inline_code_too_long:
+      enabled: true
+      level: info
+      message: "Inline code exceeds maximum characters"
+      params:
+        max_chars: 50
+
+    hardcoded_path:
+      enabled: true
+      level: warning
+      message: "Hardcoded path detected in code"
+      params:
+        patterns:
+          - "C:\\"
+          - "/home/"
+          - "/Users/"
+          - "/var/www/"
+
+    placeholder_comment:
+      enabled: true
+      level: info
+      message: "Placeholder comment detected"
+      params:
+        patterns:
+          - "TODO"
+          - "FIXME"
+          - "XXX"
+          - "HACK"
+
+    sensitive_data:
+      enabled: true
+      level: warning
+      message: "Potential sensitive data in code"
+      params:
+        patterns:
+          - "password"
+          - "api_key"
+          - "secret"
+          - "token"
+
+  profiles:
+    strict:
+      rules:
+        - no_language_specified
+        - empty_code_block
+        - code_block_too_long
+        - inline_code_too_long
+        - hardcoded_path
+        - placeholder_comment
+        - sensitive_data
+      overrides:
+        no_language_specified:
+          level: error
+        hardcoded_path:
+          level: error
+        sensitive_data:
+          level: error
+
+    default:
+      rules:
+        - no_language_specified
+        - empty_code_block
+        - code_block_too_long
+        - hardcoded_path
+
+    relaxed:
+      rules:
+        - empty_code_block
+
+  family_overrides:
+    words:
+      profile: "strict"
+      rules:
+        code_block_too_long:
+          params:
+            max_lines: 50
+    pdf:
+      profile: "default"
+    cells:
+      profile: "default"

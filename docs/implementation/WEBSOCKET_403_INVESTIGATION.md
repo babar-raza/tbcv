@@ -27,7 +27,7 @@ ALL WebSocket connections to the FastAPI server return HTTP 403 Forbidden, even 
 **Result:** Still 403
 
 ### 3. ✗ Started uvicorn from command line
-**Command:** `python -m uvicorn api.server:app --host 127.0.0.1 --port 8586 --ws websockets`
+**Command:** `python -m uvicorn api.server:app --host 127.0.0.1 --port 8585 --ws websockets`
 **Result:** Still 403
 
 ### 4. ✗ Moved CORS middleware after WebSocket routes
@@ -68,7 +68,7 @@ async def test_websocket(websocket: WebSocket):
 
 ```
 INFO:     Started server process [113908]
-INFO:     Uvicorn running on http://127.0.0.1:8586
+INFO:     Uvicorn running on http://127.0.0.1:8585
 INFO:     127.0.0.1:XXXXX - "WebSocket /ws/test" 403
 INFO:     connection rejected (403 Forbidden)
 INFO:     connection closed
@@ -88,7 +88,7 @@ import asyncio
 import websockets
 
 async def test():
-    uri = "ws://127.0.0.1:8586/ws/test"
+    uri = "ws://127.0.0.1:8585/ws/test"
     print(f"Connecting to {uri}...")
     try:
         async with websockets.connect(uri) as websocket:
@@ -103,7 +103,7 @@ asyncio.run(test())
 
 **Output:**
 ```
-Connecting to ws://127.0.0.1:8586/ws/test...
+Connecting to ws://127.0.0.1:8585/ws/test...
 Error: InvalidStatus: server rejected WebSocket connection: HTTP 403
 ```
 
@@ -306,7 +306,7 @@ FROM python:3.12-slim
 
 ```bash
 # Start server
-python main.py --mode api --host 127.0.0.1 --port 8586
+python main.py --mode api --host 127.0.0.1 --port 8585
 
 # Test WebSocket in another terminal
 python test_simple_ws.py
@@ -315,7 +315,7 @@ python test_simple_ws.py
 # Error: InvalidStatus: server rejected WebSocket connection: HTTP 403
 
 # Desired output (after fix):
-# Connecting to ws://127.0.0.1:8586/ws/test...
+# Connecting to ws://127.0.0.1:8585/ws/test...
 # Connected!
 # Received: Hello from test WebSocket!
 ```
@@ -323,7 +323,7 @@ python test_simple_ws.py
 ### Test After Implementing Fix
 
 1. **Start server** (with fix applied)
-2. **Open browser** to http://127.0.0.1:8586/dashboard/
+2. **Open browser** to http://127.0.0.1:8585/dashboard/
 3. **Check connection status** - Should show "Live" 🟢 instead of "Disconnected" 🔴
 4. **Create workflow** - Progress should update in real-time
 5. **Check browser console** - WebSocket connection should succeed
@@ -365,5 +365,5 @@ The WebSocket 403 error is a fundamental environment incompatibility issue, like
 ---
 
 **Generated:** 2025-11-23
-**Server:** Running on http://127.0.0.1:8586 (PID: 113908)
+**Server:** Running on http://127.0.0.1:8585 (PID: 113908)
 **Status:** WebSocket functionality BLOCKED, REST API fully operational
