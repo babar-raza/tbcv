@@ -566,6 +566,35 @@ class AgentRegistry:
                     )
         return responses
 
+    def list_validators(self) -> List[Dict[str, Any]]:
+        """
+        Get list of available validators.
+
+        Returns:
+            List of validator information dictionaries
+        """
+        validators = []
+        for agent_id, agent in self.agents.items():
+            contract = self.contracts.get(agent_id)
+            if contract and hasattr(contract, 'validator_type'):
+                validators.append({
+                    "id": agent_id,
+                    "type": getattr(contract, 'validator_type', 'unknown'),
+                    "name": getattr(contract, 'name', agent_id),
+                    "description": getattr(contract, 'description', ''),
+                    "status": agent.status.value if hasattr(agent.status, 'value') else str(agent.status)
+                })
+            else:
+                # Include all agents as potential validators
+                validators.append({
+                    "id": agent_id,
+                    "type": "generic",
+                    "name": agent_id,
+                    "description": f"Agent {agent_id}",
+                    "status": agent.status.value if hasattr(agent.status, 'value') else str(agent.status)
+                })
+        return validators
+
 
 # Global registry shared process-wide
 agent_registry = AgentRegistry()

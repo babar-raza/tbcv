@@ -1718,6 +1718,93 @@ class DatabaseManager:
 
             return results
 
+    # ------------------- Statistics & Query Methods -------------------
+
+    def count_recommendations(self) -> int:
+        """
+        Count total number of recommendations.
+
+        Returns:
+            Total count of recommendations
+        """
+        with self.get_session() as session:
+            return session.query(Recommendation).count()
+
+    def count_workflows(self) -> int:
+        """
+        Count total number of workflows.
+
+        Returns:
+            Total count of workflows
+        """
+        with self.get_session() as session:
+            return session.query(Workflow).count()
+
+    def get_validations_by_status(self) -> Dict[str, int]:
+        """
+        Get count of validations grouped by status.
+
+        Returns:
+            Dictionary mapping status to count
+        """
+        with self.get_session() as session:
+            from sqlalchemy import func
+            results = session.query(
+                ValidationResult.status,
+                func.count(ValidationResult.id)
+            ).group_by(ValidationResult.status).all()
+
+            return {
+                status.value if hasattr(status, 'value') else str(status): count
+                for status, count in results
+            }
+
+    def get_workflows_by_status(self) -> Dict[str, int]:
+        """
+        Get count of workflows grouped by state.
+
+        Returns:
+            Dictionary mapping state to count
+        """
+        with self.get_session() as session:
+            from sqlalchemy import func
+            results = session.query(
+                Workflow.state,
+                func.count(Workflow.id)
+            ).group_by(Workflow.state).all()
+
+            return {
+                state.value if hasattr(state, 'value') else str(state): count
+                for state, count in results
+            }
+
+    def get_recommendations(self, validation_id: str) -> List[Recommendation]:
+        """
+        Get all recommendations for a validation.
+
+        Args:
+            validation_id: Validation ID
+
+        Returns:
+            List of Recommendation objects
+        """
+        return self.list_recommendations(validation_id=validation_id, limit=999999)
+
+    def get_workflow_validations(self, workflow_id: str) -> List[ValidationResult]:
+        """
+        Get all validations for a workflow.
+
+        Args:
+            workflow_id: Workflow ID
+
+        Returns:
+            List of ValidationResult objects
+        """
+        with self.get_session() as session:
+            return session.query(ValidationResult).filter(
+                ValidationResult.workflow_id == workflow_id
+            ).order_by(ValidationResult.created_at.desc()).all()
+
     # ------------------- System Reset/Cleanup Methods -------------------
 
     def delete_all_validations(self, confirm: bool = False) -> int:

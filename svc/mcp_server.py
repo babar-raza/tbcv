@@ -50,8 +50,10 @@ class MCPServer:
             ValidationMethods,
             ApprovalMethods,
             EnhancementMethods,
-            AdminMethods
+            AdminMethods,
+            QueryMethods
         )
+        from svc.mcp_methods.workflow_methods import WorkflowMethods
 
         # Initialize method handler instances
         validation_handler = ValidationMethods(
@@ -74,6 +76,16 @@ class MCPServer:
             self.rule_manager,
             self.agent_registry
         )
+        workflow_handler = WorkflowMethods(
+            self.db_manager,
+            self.rule_manager,
+            self.agent_registry
+        )
+        query_handler = QueryMethods(
+            self.db_manager,
+            self.rule_manager,
+            self.agent_registry
+        )
 
         # Register validation methods
         self.registry.register("validate_folder", validation_handler.validate_folder)
@@ -88,6 +100,8 @@ class MCPServer:
         # Register approval methods
         self.registry.register("approve", approval_handler.approve)
         self.registry.register("reject", approval_handler.reject)
+        self.registry.register("bulk_approve", approval_handler.bulk_approve)
+        self.registry.register("bulk_reject", approval_handler.bulk_reject)
 
         # Register enhancement methods
         self.registry.register("enhance", enhancement_handler.enhance)
@@ -103,6 +117,28 @@ class MCPServer:
         self.registry.register("enable_maintenance_mode", admin_handler.enable_maintenance_mode)
         self.registry.register("disable_maintenance_mode", admin_handler.disable_maintenance_mode)
         self.registry.register("create_checkpoint", admin_handler.create_checkpoint)
+
+        # Register workflow methods
+        self.registry.register("create_workflow", workflow_handler.create_workflow)
+        self.registry.register("get_workflow", workflow_handler.get_workflow)
+        self.registry.register("list_workflows", workflow_handler.list_workflows)
+        self.registry.register("control_workflow", workflow_handler.control_workflow)
+        self.registry.register("get_workflow_report", workflow_handler.get_workflow_report)
+        self.registry.register("get_workflow_summary", workflow_handler.get_workflow_summary)
+        self.registry.register("delete_workflow", workflow_handler.delete_workflow)
+        self.registry.register("bulk_delete_workflows", workflow_handler.bulk_delete_workflows)
+
+        # Register query methods
+        self.registry.register("get_stats", query_handler.get_stats)
+        self.registry.register("get_audit_log", query_handler.get_audit_log)
+        self.registry.register("get_performance_report", query_handler.get_performance_report)
+        self.registry.register("get_health_report", query_handler.get_health_report)
+        self.registry.register("get_validation_history", query_handler.get_validation_history)
+        self.registry.register("get_available_validators", query_handler.get_available_validators)
+        self.registry.register("export_validation", query_handler.export_validation)
+        self.registry.register("export_recommendations", query_handler.export_recommendations)
+        self.registry.register("export_workflow", query_handler.export_workflow)
+
     def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """
         Handle JSON-RPC request using registry pattern.

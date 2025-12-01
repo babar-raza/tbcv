@@ -371,12 +371,24 @@ Re-run validation on the same file with the same settings.
 
 ### 9. `approve`
 
-Approve validation records by their IDs.
+Approve one or more validation records. Supports both single ID (string) and multiple IDs (array).
 
 **Parameters:**
-- `ids` (array, required): List of validation IDs to approve
+- `ids` (string or array, required): Single validation ID or list of IDs to approve
 
-**Request:**
+**Request Example (Single ID):**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "approve",
+  "params": {
+    "ids": "val-123"
+  },
+  "id": 1
+}
+```
+
+**Request Example (Multiple IDs):**
 ```json
 {
   "jsonrpc": "2.0",
@@ -395,26 +407,47 @@ Approve validation records by their IDs.
   "result": {
     "success": true,
     "approved_count": 3,
+    "failed_count": 0,
     "errors": []
   },
   "id": 2
 }
 ```
 
-### 3. `reject`
+**Errors:**
+- Returns partial success with error details if some IDs are not found
+- `failed_count` indicates number of IDs that could not be approved
+- `errors` array contains specific error messages for failed IDs
 
-Reject validation records by their IDs.
+### 10. `reject`
+
+Reject one or more validation records with optional reason. Supports both single ID (string) and multiple IDs (array).
 
 **Parameters:**
-- `ids` (array, required): List of validation IDs to reject
+- `ids` (string or array, required): Single validation ID or list of IDs to reject
+- `reason` (string, optional): Rejection reason (appended to validation notes)
 
-**Request:**
+**Request Example (Single):**
 ```json
 {
   "jsonrpc": "2.0",
   "method": "reject",
   "params": {
-    "ids": ["val-101", "val-102"]
+    "ids": "val-101",
+    "reason": "Content needs revision"
+  },
+  "id": 1
+}
+```
+
+**Request Example (Multiple):**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "reject",
+  "params": {
+    "ids": ["val-101", "val-102"],
+    "reason": "Batch rejection for quality review"
   },
   "id": 3
 }
@@ -427,11 +460,107 @@ Reject validation records by their IDs.
   "result": {
     "success": true,
     "rejected_count": 2,
+    "failed_count": 0,
     "errors": []
   },
   "id": 3
 }
 ```
+
+### 11. `bulk_approve`
+
+Efficiently approve large batches of validation records. Optimized for bulk operations with configurable batch processing and performance tracking.
+
+**Parameters:**
+- `ids` (array, required): List of validation IDs to approve
+- `batch_size` (integer, optional): Processing batch size for transaction management (default: 100)
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "bulk_approve",
+  "params": {
+    "ids": ["val-1", "val-2", "val-3", "...val-150"],
+    "batch_size": 50
+  },
+  "id": 4
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "total": 150,
+    "approved_count": 148,
+    "failed_count": 2,
+    "errors": [
+      "Validation val-x not found",
+      "Validation val-y not found"
+    ],
+    "processing_time_ms": 42.5
+  },
+  "id": 4
+}
+```
+
+**Performance:**
+- Optimized for batches up to 1000 validations
+- Processes in configurable batch sizes to avoid transaction timeouts
+- Target performance: <100ms for 100 validations
+- Returns processing time for performance monitoring
+
+**Use Cases:**
+- Approving all validations in a workflow
+- Batch approval after manual review
+- Automated approval of passing validations
+
+### 12. `bulk_reject`
+
+Efficiently reject large batches of validation records with optional reason. Optimized for bulk operations.
+
+**Parameters:**
+- `ids` (array, required): List of validation IDs to reject
+- `reason` (string, optional): Rejection reason applied to all validations
+- `batch_size` (integer, optional): Processing batch size (default: 100)
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "bulk_reject",
+  "params": {
+    "ids": ["val-1", "val-2", "val-3", "...val-100"],
+    "reason": "Outdated content - requires update",
+    "batch_size": 50
+  },
+  "id": 5
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "total": 100,
+    "rejected_count": 100,
+    "failed_count": 0,
+    "errors": [],
+    "processing_time_ms": 38.2
+  },
+  "id": 5
+}
+```
+
+**Performance:**
+- Same optimizations as `bulk_approve`
+- Efficiently appends reason to validation notes
+- Target performance: <100ms for 100 validations
 
 ### 4. `enhance`
 
@@ -1051,6 +1180,74 @@ if validation_ids:
     print(f"Enhanced {enhance_response['result']['enhanced_count']} files")
 ```
 
+### Example 4: Bulk Approval Workflow
+
+```python
+from svc.mcp_client import MCPSyncClient
+
+client = MCPSyncClient()
+
+# Step 1: Validate folder
+result = client.validate_folder("./content")
+print(f"Validated {result['results']['files_processed']} files")
+
+# Step 2: Get all validation IDs
+validations = client.list_validations(limit=1000, status="pending")
+validation_ids = [v["id"] for v in validations["validations"]]
+
+print(f"Found {len(validation_ids)} pending validations")
+
+# Step 3: Bulk approve efficiently
+if len(validation_ids) > 10:
+    # Use bulk_approve for better performance with large batches
+    bulk_result = client.bulk_approve(
+        validation_ids,
+        batch_size=100  # Process in batches of 100
+    )
+    print(f"Bulk approved {bulk_result['approved_count']}/{bulk_result['total']} validations")
+    print(f"Processing time: {bulk_result['processing_time_ms']:.2f}ms")
+
+    if bulk_result['errors']:
+        print(f"Errors: {bulk_result['errors']}")
+else:
+    # Use regular approve for small batches
+    result = client.approve(validation_ids)
+    print(f"Approved {result['approved_count']} validations")
+```
+
+### Example 5: Bulk Rejection with Reason
+
+```python
+from svc.mcp_client import MCPSyncClient
+
+client = MCPSyncClient()
+
+# Get validations that failed specific checks
+validations = client.list_validations(limit=1000)
+failed_seo_ids = [
+    v["id"] for v in validations["validations"]
+    if "seo" in str(v.get("validation_results", {}))
+]
+
+if failed_seo_ids:
+    # Bulk reject with reason
+    result = client.bulk_reject(
+        failed_seo_ids,
+        reason="Failed SEO validation - requires meta description and keywords",
+        batch_size=50
+    )
+
+    print(f"Rejected {result['rejected_count']} validations")
+    print(f"Processing time: {result['processing_time_ms']:.2f}ms")
+
+    # Check if within performance target
+    if result['rejected_count'] == 100:
+        if result['processing_time_ms'] < 100:
+            print("Performance target met: <100ms for 100 validations")
+        else:
+            print(f"Performance warning: {result['processing_time_ms']:.2f}ms for 100 validations")
+```
+
 ## Configuration
 
 The MCP server uses TBCV's standard configuration:
@@ -1140,6 +1337,921 @@ ollama pull llama2:7b
 ```bash
 # Initialize database if needed
 python -c "from core.database import DatabaseManager; DatabaseManager().init_database()"
+```
+
+## Workflow Methods
+
+The MCP server supports comprehensive workflow management for orchestrating complex validation and enhancement operations.
+
+### 15. `create_workflow`
+
+Create and start a new workflow for background execution.
+
+**Parameters:**
+- `workflow_type` (string, required): Type of workflow (`validate_directory`, `batch_enhance`, `full_audit`, `recommendation_batch`)
+- `params` (object, required): Workflow-specific parameters
+- `name` (string, optional): Workflow name for display
+- `description` (string, optional): Workflow description
+
+**Workflow Types:**
+- `validate_directory`: Validate all files in a directory
+- `batch_enhance`: Enhance multiple validations
+- `full_audit`: Complete validation and enhancement audit
+- `recommendation_batch`: Process batch of recommendations
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "create_workflow",
+  "params": {
+    "workflow_type": "validate_directory",
+    "params": {
+      "directory_path": "/content",
+      "recursive": true
+    },
+    "name": "Validate Content Directory",
+    "description": "Full validation of content directory"
+  },
+  "id": 15
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "workflow_id": "wf-abc123",
+    "workflow_type": "validate_directory",
+    "status": "running",
+    "created_at": "2025-12-01T12:00:00Z"
+  },
+  "id": 15
+}
+```
+
+**Errors:**
+- `ValueError`: Invalid workflow type or parameters
+
+### 16. `get_workflow`
+
+Retrieve complete workflow details by ID.
+
+**Parameters:**
+- `workflow_id` (string, required): ID of workflow to retrieve
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_workflow",
+  "params": {
+    "workflow_id": "wf-abc123"
+  },
+  "id": 16
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "workflow": {
+      "id": "wf-abc123",
+      "workflow_type": "validate_directory",
+      "name": "Validate Content Directory",
+      "description": "Full validation of content directory",
+      "status": "running",
+      "params": {
+        "directory_path": "/content",
+        "recursive": true
+      },
+      "progress": 45,
+      "error_message": null,
+      "created_at": "2025-12-01T12:00:00Z",
+      "started_at": "2025-12-01T12:00:01Z",
+      "completed_at": null,
+      "updated_at": "2025-12-01T12:00:30Z",
+      "total_steps": 100,
+      "current_step": 45
+    }
+  },
+  "id": 16
+}
+```
+
+**Errors:**
+- `ValueError`: Workflow not found
+
+### 17. `list_workflows`
+
+List workflows with filtering and pagination.
+
+**Parameters:**
+- `limit` (integer, optional): Maximum results (default: 100)
+- `offset` (integer, optional): Results to skip (default: 0)
+- `status` (string, optional): Filter by status (pending/running/paused/completed/failed/cancelled)
+- `workflow_type` (string, optional): Filter by workflow type
+- `created_after` (string, optional): Filter by creation date (ISO 8601)
+- `created_before` (string, optional): Filter by creation date (ISO 8601)
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "list_workflows",
+  "params": {
+    "limit": 50,
+    "offset": 0,
+    "status": "running",
+    "workflow_type": "validate_directory"
+  },
+  "id": 17
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "workflows": [
+      {
+        "id": "wf-1",
+        "workflow_type": "validate_directory",
+        "status": "running",
+        "progress": 45,
+        "created_at": "2025-12-01T12:00:00Z"
+      },
+      {
+        "id": "wf-2",
+        "workflow_type": "batch_enhance",
+        "status": "running",
+        "progress": 75,
+        "created_at": "2025-12-01T11:30:00Z"
+      }
+    ],
+    "total": 2,
+    "limit": 50,
+    "offset": 0
+  },
+  "id": 17
+}
+```
+
+### 18. `control_workflow`
+
+Control workflow execution (pause/resume/cancel).
+
+**Parameters:**
+- `workflow_id` (string, required): ID of workflow to control
+- `action` (string, required): Control action (`pause`, `resume`, or `cancel`)
+
+**Request (Pause):**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "control_workflow",
+  "params": {
+    "workflow_id": "wf-abc123",
+    "action": "pause"
+  },
+  "id": 18
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "workflow_id": "wf-abc123",
+    "action": "pause",
+    "new_status": "paused"
+  },
+  "id": 18
+}
+```
+
+**Actions:**
+- `pause`: Pause a running workflow (can be resumed)
+- `resume`: Resume a paused workflow
+- `cancel`: Cancel workflow and mark as cancelled (cannot be resumed)
+
+**Errors:**
+- `ValueError`: Invalid action or workflow cannot be controlled in current state
+
+### 19. `get_workflow_report`
+
+Generate detailed workflow report with metrics and statistics.
+
+**Parameters:**
+- `workflow_id` (string, required): ID of workflow
+- `include_details` (boolean, optional): Include detailed metrics (default: true)
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_workflow_report",
+  "params": {
+    "workflow_id": "wf-abc123",
+    "include_details": true
+  },
+  "id": 19
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "workflow_id": "wf-abc123",
+    "report": {
+      "workflow_id": "wf-abc123",
+      "workflow_type": "validate_directory",
+      "state": "completed",
+      "created_at": "2025-12-01T12:00:00Z",
+      "completed_at": "2025-12-01T12:05:00Z",
+      "total_steps": 100,
+      "current_step": 100,
+      "progress_percent": 100,
+      "error_message": null,
+      "metrics": {
+        "duration_seconds": 300.5,
+        "files_processed": 100,
+        "files_total": 100,
+        "errors_count": 0
+      },
+      "metadata": {
+        "name": "Validate Content Directory",
+        "description": "Full validation of content directory"
+      }
+    }
+  },
+  "id": 19
+}
+```
+
+### 20. `get_workflow_summary`
+
+Get workflow summary for dashboards (lightweight version of report).
+
+**Parameters:**
+- `workflow_id` (string, required): ID of workflow
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_workflow_summary",
+  "params": {
+    "workflow_id": "wf-abc123"
+  },
+  "id": 20
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "workflow_id": "wf-abc123",
+    "status": "running",
+    "progress_percent": 45,
+    "files_processed": 45,
+    "files_total": 100,
+    "errors_count": 0,
+    "duration_seconds": 120.5,
+    "eta_seconds": 147.2
+  },
+  "id": 20
+}
+```
+
+**Fields:**
+- `progress_percent`: Progress percentage (0-100)
+- `files_processed`: Number of items processed
+- `files_total`: Total number of items
+- `errors_count`: Number of errors encountered
+- `duration_seconds`: Time elapsed since workflow started
+- `eta_seconds`: Estimated time remaining (only for running workflows)
+
+### 21. `delete_workflow`
+
+Delete a workflow record from the database.
+
+**Parameters:**
+- `workflow_id` (string, required): ID of workflow to delete
+- `force` (boolean, optional): Allow deleting running workflows (default: false)
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "delete_workflow",
+  "params": {
+    "workflow_id": "wf-abc123",
+    "force": false
+  },
+  "id": 21
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "workflow_id": "wf-abc123"
+  },
+  "id": 21
+}
+```
+
+**Errors:**
+- `ValueError`: Cannot delete running workflow without force=true
+
+### 22. `bulk_delete_workflows`
+
+Bulk delete workflows with filtering options.
+
+**Parameters:**
+- `workflow_ids` (array, optional): Specific workflow IDs to delete
+- `status` (string, optional): Delete all workflows with this status
+- `workflow_type` (string, optional): Delete all workflows of this type
+- `created_before` (string, optional): Delete workflows created before this date (ISO 8601)
+- `force` (boolean, optional): Allow deleting running workflows (default: false)
+
+**Request (Delete by Status):**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "bulk_delete_workflows",
+  "params": {
+    "status": "completed",
+    "created_before": "2025-11-01T00:00:00Z",
+    "force": false
+  },
+  "id": 22
+}
+```
+
+**Request (Delete Specific IDs):**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "bulk_delete_workflows",
+  "params": {
+    "workflow_ids": ["wf-1", "wf-2", "wf-3"],
+    "force": true
+  },
+  "id": 23
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "deleted_count": 15,
+    "errors": [
+      {
+        "workflow_id": "wf-999",
+        "error": "Workflow not found"
+      }
+    ]
+  },
+  "id": 22
+}
+```
+
+### Example: Complete Workflow Lifecycle
+
+```python
+from svc.mcp_client import get_mcp_sync_client
+import time
+
+client = get_mcp_sync_client()
+
+# Step 1: Create workflow
+create_result = client.create_workflow(
+    workflow_type="validate_directory",
+    workflow_params={
+        "directory_path": "/content",
+        "recursive": True
+    },
+    name="Monthly Content Audit"
+)
+workflow_id = create_result["workflow_id"]
+print(f"Created workflow: {workflow_id}")
+
+# Step 2: Monitor progress
+while True:
+    summary = client.get_workflow_summary(workflow_id)
+    print(f"Progress: {summary['progress_percent']}% "
+          f"({summary['files_processed']}/{summary['files_total']})")
+
+    if summary["status"] in ["completed", "failed", "cancelled"]:
+        break
+
+    time.sleep(5)
+
+# Step 3: Get detailed report
+report = client.get_workflow_report(workflow_id, include_details=True)
+print(f"Workflow completed in {report['report']['metrics']['duration_seconds']}s")
+print(f"Processed {report['report']['metrics']['files_processed']} files")
+
+# Step 4: Clean up
+client.delete_workflow(workflow_id)
+```
+
+### Example: Workflow Control
+
+```python
+from svc.mcp_client import get_mcp_sync_client
+
+client = get_mcp_sync_client()
+
+# Create long-running workflow
+result = client.create_workflow(
+    workflow_type="full_audit",
+    workflow_params={"directory_path": "/large-content-dir", "recursive": True}
+)
+workflow_id = result["workflow_id"]
+
+# Pause for maintenance window
+client.control_workflow(workflow_id, "pause")
+print("Workflow paused for maintenance")
+
+# ... perform maintenance ...
+
+# Resume workflow
+client.control_workflow(workflow_id, "resume")
+print("Workflow resumed")
+
+# Or cancel if needed
+# client.control_workflow(workflow_id, "cancel")
+```
+
+## Query & Analytics Methods
+
+### `get_stats`
+
+Get comprehensive system statistics.
+
+**Parameters:** None
+
+**Request:**
+```json
+{"jsonrpc": "2.0", "method": "get_stats", "params": {}, "id": 24}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "validations_total": 1250,
+    "validations_by_status": {
+      "pass": 800,
+      "fail": 200,
+      "warning": 200,
+      "approved": 50
+    },
+    "recommendations_total": 3500,
+    "workflows_total": 45,
+    "workflows_by_status": {
+      "pending": 5,
+      "running": 2,
+      "completed": 35,
+      "failed": 3
+    },
+    "cache_stats": {
+      "total_items": 150,
+      "total_size_bytes": 2048576,
+      "hit_rate": 0.85
+    },
+    "agents_count": 12
+  },
+  "id": 24
+}
+```
+
+### `get_audit_log`
+
+Get audit log entries with filtering and pagination.
+
+**Parameters:**
+- `limit` (integer, optional): Maximum entries to return (default: 100)
+- `offset` (integer, optional): Pagination offset (default: 0)
+- `operation` (string, optional): Filter by operation name
+- `user` (string, optional): Filter by user
+- `status` (string, optional): Filter by status (success/failure)
+- `start_date` (string, optional): Filter by start date (ISO 8601)
+- `end_date` (string, optional): Filter by end date (ISO 8601)
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_audit_log",
+  "params": {
+    "limit": 50,
+    "offset": 0,
+    "operation": "validate_file",
+    "status": "success"
+  },
+  "id": 25
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "logs": [
+      {
+        "timestamp": "2025-12-01T14:30:00Z",
+        "operation": "validate_file",
+        "user": "system",
+        "status": "success",
+        "details": {"file_path": "/test.md"}
+      }
+    ],
+    "total": 125
+  },
+  "id": 25
+}
+```
+
+### `get_performance_report`
+
+Get performance metrics for operations.
+
+**Parameters:**
+- `time_range` (string, optional): Time range - "1h", "24h", "7d", "30d" (default: "24h")
+- `operation` (string, optional): Filter by specific operation
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_performance_report",
+  "params": {
+    "time_range": "24h"
+  },
+  "id": 26
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "time_range": "24h",
+    "total_operations": 5420,
+    "failed_operations": 12,
+    "success_rate": 0.9978,
+    "operations": {
+      "validate_file": {
+        "count": 3200,
+        "avg_duration_ms": 45.2,
+        "min_duration_ms": 12.1,
+        "max_duration_ms": 234.5,
+        "p50_duration_ms": 42.0,
+        "p95_duration_ms": 89.3,
+        "p99_duration_ms": 156.8
+      }
+    }
+  },
+  "id": 26
+}
+```
+
+### `get_health_report`
+
+Get detailed system health report with recommendations.
+
+**Parameters:** None
+
+**Request:**
+```json
+{"jsonrpc": "2.0", "method": "get_health_report", "params": {}, "id": 27}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "overall_health": "healthy",
+    "components": {
+      "database": {"status": "healthy", "details": {}},
+      "cache": {"status": "healthy", "details": {}},
+      "agents": {"status": "healthy", "details": {}}
+    },
+    "recent_errors": [],
+    "performance_summary": {
+      "time_range": "1h",
+      "total_operations": 450,
+      "failed_operations": 2,
+      "success_rate": 0.9956
+    },
+    "recommendations": []
+  },
+  "id": 27
+}
+```
+
+### `get_validation_history`
+
+Get validation history for a specific file.
+
+**Parameters:**
+- `file_path` (string, required): Path to file
+- `limit` (integer, optional): Maximum history entries (default: 50)
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_validation_history",
+  "params": {
+    "file_path": "/content/guide.md",
+    "limit": 20
+  },
+  "id": 28
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "file_path": "/content/guide.md",
+    "validations": [
+      {
+        "id": "val-123",
+        "status": "pass",
+        "severity": "info",
+        "created_at": "2025-12-01T14:00:00Z",
+        "validation_results": {}
+      }
+    ],
+    "total": 15
+  },
+  "id": 28
+}
+```
+
+### `get_available_validators`
+
+Get list of available validators.
+
+**Parameters:**
+- `validator_type` (string, optional): Filter by validator type
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_available_validators",
+  "params": {},
+  "id": 29
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "validators": [
+      {
+        "id": "markdown_validator",
+        "type": "markdown",
+        "name": "Markdown Validator",
+        "description": "Validates markdown syntax and structure",
+        "status": "active"
+      }
+    ],
+    "total": 12
+  },
+  "id": 29
+}
+```
+
+### `export_validation`
+
+Export validation results to JSON.
+
+**Parameters:**
+- `validation_id` (string, required): ID of validation to export
+- `include_recommendations` (boolean, optional): Include recommendations (default: false)
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "export_validation",
+  "params": {
+    "validation_id": "val-123",
+    "include_recommendations": true
+  },
+  "id": 30
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "export_data": "{\"schema_version\":\"1.0\",\"exported_at\":\"2025-12-01T14:30:00Z\",\"data\":{...}}",
+    "metadata": {
+      "exported_at": "2025-12-01T14:30:00Z",
+      "schema_version": "1.0",
+      "filters": {"validation_id": "val-123"}
+    }
+  },
+  "id": 30
+}
+```
+
+### `export_recommendations`
+
+Export recommendations to JSON.
+
+**Parameters:**
+- `validation_id` (string, required): ID of validation
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "export_recommendations",
+  "params": {
+    "validation_id": "val-123"
+  },
+  "id": 31
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "export_data": "{\"schema_version\":\"1.0\",\"exported_at\":\"2025-12-01T14:30:00Z\",\"data\":{...}}",
+    "metadata": {
+      "exported_at": "2025-12-01T14:30:00Z",
+      "schema_version": "1.0",
+      "filters": {"validation_id": "val-123"}
+    }
+  },
+  "id": 31
+}
+```
+
+### `export_workflow`
+
+Export workflow report to JSON.
+
+**Parameters:**
+- `workflow_id` (string, required): ID of workflow to export
+- `include_validations` (boolean, optional): Include validations (default: false)
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "export_workflow",
+  "params": {
+    "workflow_id": "wf-456",
+    "include_validations": true
+  },
+  "id": 32
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "export_data": "{\"schema_version\":\"1.0\",\"exported_at\":\"2025-12-01T14:30:00Z\",\"data\":{...}}",
+    "metadata": {
+      "exported_at": "2025-12-01T14:30:00Z",
+      "schema_version": "1.0",
+      "filters": {"workflow_id": "wf-456"}
+    }
+  },
+  "id": 32
+}
+```
+
+### Example: Query and Export Workflow
+
+```python
+from svc.mcp_client import get_mcp_sync_client
+import json
+
+client = get_mcp_sync_client()
+
+# Get system statistics
+stats = client.get_stats()
+print(f"Total validations: {stats['validations_total']}")
+print(f"Total recommendations: {stats['recommendations_total']}")
+
+# Check system health
+health = client.get_health_report()
+print(f"System status: {health['overall_health']}")
+for recommendation in health['recommendations']:
+    print(f"  - {recommendation}")
+
+# Get performance metrics
+perf = client.get_performance_report(time_range="24h")
+print(f"Operations in last 24h: {perf['total_operations']}")
+print(f"Success rate: {perf['success_rate']:.2%}")
+
+# Export validation with recommendations
+validation_id = "val-123"
+export_result = client.export_validation(
+    validation_id=validation_id,
+    include_recommendations=True
+)
+
+# Save export to file
+export_data = json.loads(export_result["export_data"])
+with open(f"validation_{validation_id}.json", "w") as f:
+    json.dump(export_data, f, indent=2)
+
+print(f"Exported validation {validation_id} with schema version {export_data['schema_version']}")
+```
+
+### Example: Audit and Performance Analysis
+
+```python
+from svc.mcp_client import get_mcp_sync_client
+from datetime import datetime, timedelta
+
+client = get_mcp_sync_client()
+
+# Get audit logs for the last hour
+end_date = datetime.now().isoformat()
+start_date = (datetime.now() - timedelta(hours=1)).isoformat()
+
+audit_logs = client.get_audit_log(
+    limit=100,
+    start_date=start_date,
+    end_date=end_date,
+    status="failure"
+)
+
+print(f"Found {audit_logs['total']} failed operations in the last hour:")
+for log in audit_logs['logs']:
+    print(f"  - {log['timestamp']}: {log['operation']} - {log['details']}")
+
+# Get performance metrics for specific operation
+perf_report = client.get_performance_report(
+    time_range="24h",
+    operation="validate_file"
+)
+
+if "validate_file" in perf_report["operations"]:
+    metrics = perf_report["operations"]["validate_file"]
+    print(f"\nValidate file performance:")
+    print(f"  Count: {metrics['count']}")
+    print(f"  Average: {metrics['avg_duration_ms']:.2f}ms")
+    print(f"  P95: {metrics['p95_duration_ms']:.2f}ms")
+    print(f"  P99: {metrics['p99_duration_ms']:.2f}ms")
+
+# Get validation history for trending
+history = client.get_validation_history(
+    file_path="/important/guide.md",
+    limit=50
+)
+
+print(f"\nValidation history for guide.md:")
+print(f"  Total validations: {history['total']}")
+for validation in history['validations'][:5]:  # Show last 5
+    print(f"  - {validation['created_at']}: {validation['status']}")
 ```
 
 ## Related Documentation

@@ -13,6 +13,7 @@ from .validation_methods import ValidationMethods
 from .approval_methods import ApprovalMethods
 from .enhancement_methods import EnhancementMethods
 from .admin_methods import AdminMethods
+from .query_methods import QueryMethods
 
 __all__ = [
     "BaseMCPMethod",
@@ -27,4 +28,5 @@ __all__ = [
     "ApprovalMethods",
     "EnhancementMethods",
     "AdminMethods",
+    "QueryMethods",
 ]

@@ -2,7 +2,7 @@
 
 import time
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from svc.mcp_server import create_mcp_client
 from svc.mcp_exceptions import (
     MCPError,
@@ -288,35 +288,108 @@ class MCPSyncClient:
     # Approval Methods
     # ========================================================================
 
-    def approve(self, ids: List[str]) -> Dict[str, Any]:
+    def approve(self, validation_ids: Union[str, List[str]]) -> Dict[str, Any]:
         """
-        Approve validation records.
+        Approve validation(s).
 
         Args:
-            ids: List of validation IDs to approve
+            validation_ids: Single ID or list of IDs to approve
 
         Returns:
-            Results with approved_count and errors list
+            Approval results with counts and errors
 
         Raises:
             MCPError: If approval fails
         """
+        # Normalize to list for API
+        if isinstance(validation_ids, str):
+            ids = [validation_ids]
+        else:
+            ids = validation_ids
+
         return self._call("approve", {"ids": ids})
 
-    def reject(self, ids: List[str]) -> Dict[str, Any]:
+    def reject(
+        self,
+        validation_ids: Union[str, List[str]],
+        reason: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
-        Reject validation records.
+        Reject validation(s).
 
         Args:
-            ids: List of validation IDs to reject
+            validation_ids: Single ID or list of IDs to reject
+            reason: Optional rejection reason
 
         Returns:
-            Results with rejected_count and errors list
+            Rejection results with counts and errors
 
         Raises:
             MCPError: If rejection fails
         """
-        return self._call("reject", {"ids": ids})
+        # Normalize to list for API
+        if isinstance(validation_ids, str):
+            ids = [validation_ids]
+        else:
+            ids = validation_ids
+
+        params = {"ids": ids}
+        if reason is not None:
+            params["reason"] = reason
+
+        return self._call("reject", params)
+
+    def bulk_approve(
+        self,
+        validation_ids: List[str],
+        batch_size: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Bulk approve multiple validations efficiently.
+
+        Args:
+            validation_ids: List of validation IDs
+            batch_size: Processing batch size (default 100)
+
+        Returns:
+            Bulk approval results with timing
+
+        Raises:
+            MCPError: If bulk approval fails
+        """
+        return self._call("bulk_approve", {
+            "ids": validation_ids,
+            "batch_size": batch_size
+        })
+
+    def bulk_reject(
+        self,
+        validation_ids: List[str],
+        reason: Optional[str] = None,
+        batch_size: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Bulk reject multiple validations efficiently.
+
+        Args:
+            validation_ids: List of validation IDs
+            reason: Optional rejection reason
+            batch_size: Processing batch size (default 100)
+
+        Returns:
+            Bulk rejection results with timing
+
+        Raises:
+            MCPError: If bulk rejection fails
+        """
+        params = {
+            "ids": validation_ids,
+            "batch_size": batch_size
+        }
+        if reason is not None:
+            params["reason"] = reason
+
+        return self._call("bulk_reject", params)
 
     # ========================================================================
     # Enhancement Methods
@@ -490,6 +563,404 @@ class MCPSyncClient:
         return self._call("create_checkpoint", {
             "name": name,
             "metadata": metadata
+        })
+
+    # ========================================================================
+    # Workflow Methods
+    # ========================================================================
+
+    def create_workflow(
+        self,
+        workflow_type: str,
+        workflow_params: Dict[str, Any],
+        name: Optional[str] = None,
+        description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a new workflow.
+
+        Args:
+            workflow_type: Type of workflow (validate_directory, batch_enhance, etc.)
+            workflow_params: Workflow-specific parameters
+            name: Optional workflow name
+            description: Optional workflow description
+
+        Returns:
+            Results with workflow_id and status
+
+        Raises:
+            MCPError: If workflow creation fails
+        """
+        return self._call("create_workflow", {
+            "workflow_type": workflow_type,
+            "params": workflow_params,
+            "name": name,
+            "description": description
+        })
+
+    def get_workflow(self, workflow_id: str) -> Dict[str, Any]:
+        """
+        Get workflow by ID.
+
+        Args:
+            workflow_id: ID of workflow to retrieve
+
+        Returns:
+            Workflow details dictionary
+
+        Raises:
+            MCPError: If workflow not found
+        """
+        return self._call("get_workflow", {
+            "workflow_id": workflow_id
+        })
+
+    def list_workflows(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        status: Optional[str] = None,
+        workflow_type: Optional[str] = None,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        List workflows with filters.
+
+        Args:
+            limit: Maximum number of results
+            offset: Number of results to skip
+            status: Filter by status (optional)
+            workflow_type: Filter by type (optional)
+            created_after: Filter by creation date (ISO 8601)
+            created_before: Filter by creation date (ISO 8601)
+
+        Returns:
+            Dictionary with workflows list and total count
+
+        Raises:
+            MCPError: If listing fails
+        """
+        return self._call("list_workflows", {
+            "limit": limit,
+            "offset": offset,
+            "status": status,
+            "workflow_type": workflow_type,
+            "created_after": created_after,
+            "created_before": created_before
+        })
+
+    def control_workflow(
+        self,
+        workflow_id: str,
+        action: str
+    ) -> Dict[str, Any]:
+        """
+        Control workflow execution (pause/resume/cancel).
+
+        Args:
+            workflow_id: ID of workflow to control
+            action: Action to perform (pause, resume, or cancel)
+
+        Returns:
+            Results with new status
+
+        Raises:
+            MCPError: If control action fails
+        """
+        return self._call("control_workflow", {
+            "workflow_id": workflow_id,
+            "action": action
+        })
+
+    def get_workflow_report(
+        self,
+        workflow_id: str,
+        include_details: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Get detailed workflow report.
+
+        Args:
+            workflow_id: ID of workflow
+            include_details: Whether to include detailed metrics
+
+        Returns:
+            Detailed report dictionary
+
+        Raises:
+            MCPError: If report generation fails
+        """
+        return self._call("get_workflow_report", {
+            "workflow_id": workflow_id,
+            "include_details": include_details
+        })
+
+    def get_workflow_summary(self, workflow_id: str) -> Dict[str, Any]:
+        """
+        Get workflow summary for dashboards.
+
+        Args:
+            workflow_id: ID of workflow
+
+        Returns:
+            Summary dictionary with progress metrics
+
+        Raises:
+            MCPError: If summary generation fails
+        """
+        return self._call("get_workflow_summary", {
+            "workflow_id": workflow_id
+        })
+
+    def delete_workflow(
+        self,
+        workflow_id: str,
+        force: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Delete a workflow.
+
+        Args:
+            workflow_id: ID of workflow to delete
+            force: Allow deleting running workflows
+
+        Returns:
+            Success status
+
+        Raises:
+            MCPError: If deletion fails
+        """
+        return self._call("delete_workflow", {
+            "workflow_id": workflow_id,
+            "force": force
+        })
+
+    def bulk_delete_workflows(
+        self,
+        workflow_ids: Optional[List[str]] = None,
+        status: Optional[str] = None,
+        workflow_type: Optional[str] = None,
+        created_before: Optional[str] = None,
+        force: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Bulk delete workflows.
+
+        Args:
+            workflow_ids: Specific workflow IDs to delete
+            status: Delete by status
+            workflow_type: Delete by type
+            created_before: Delete workflows created before date (ISO 8601)
+            force: Allow deleting running workflows
+
+        Returns:
+            Results with deleted_count and errors list
+
+        Raises:
+            MCPError: If bulk deletion fails
+        """
+        return self._call("bulk_delete_workflows", {
+            "workflow_ids": workflow_ids,
+            "status": status,
+            "workflow_type": workflow_type,
+            "created_before": created_before,
+            "force": force
+        })
+
+    # ========================================================================
+    # Query & Statistics Methods
+    # ========================================================================
+
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Get system statistics.
+
+        Returns:
+            Statistics dictionary with counts and metrics
+
+        Raises:
+            MCPError: If stats retrieval fails
+        """
+        return self._call("get_stats", {})
+
+    def get_audit_log(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        operation: Optional[str] = None,
+        user: Optional[str] = None,
+        status: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get audit log entries.
+
+        Args:
+            limit: Maximum number of entries to return
+            offset: Offset for pagination
+            operation: Filter by operation name
+            user: Filter by user
+            status: Filter by status
+            start_date: Filter by start date (ISO format)
+            end_date: Filter by end date (ISO format)
+
+        Returns:
+            Audit log dictionary with logs and total count
+
+        Raises:
+            MCPError: If audit log retrieval fails
+        """
+        return self._call("get_audit_log", {
+            "limit": limit,
+            "offset": offset,
+            "operation": operation,
+            "user": user,
+            "status": status,
+            "start_date": start_date,
+            "end_date": end_date
+        })
+
+    def get_performance_report(
+        self,
+        time_range: str = "24h",
+        operation: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get performance metrics report.
+
+        Args:
+            time_range: Time range (1h, 24h, 7d, 30d)
+            operation: Filter by operation name
+
+        Returns:
+            Performance report dictionary
+
+        Raises:
+            MCPError: If report generation fails
+        """
+        return self._call("get_performance_report", {
+            "time_range": time_range,
+            "operation": operation
+        })
+
+    def get_health_report(self) -> Dict[str, Any]:
+        """
+        Get detailed health report.
+
+        Returns:
+            Health report with status and recommendations
+
+        Raises:
+            MCPError: If health check fails
+        """
+        return self._call("get_health_report", {})
+
+    def get_validation_history(
+        self,
+        file_path: str,
+        limit: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Get validation history for a file.
+
+        Args:
+            file_path: Path to file
+            limit: Maximum number of history entries
+
+        Returns:
+            Validation history dictionary
+
+        Raises:
+            MCPError: If history retrieval fails
+        """
+        return self._call("get_validation_history", {
+            "file_path": file_path,
+            "limit": limit
+        })
+
+    def get_available_validators(
+        self,
+        validator_type: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get list of available validators.
+
+        Args:
+            validator_type: Filter by validator type
+
+        Returns:
+            Validators dictionary with list and total count
+
+        Raises:
+            MCPError: If validator discovery fails
+        """
+        return self._call("get_available_validators", {
+            "validator_type": validator_type
+        })
+
+    def export_validation(
+        self,
+        validation_id: str,
+        include_recommendations: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Export validation to JSON.
+
+        Args:
+            validation_id: ID of validation to export
+            include_recommendations: Include recommendations in export
+
+        Returns:
+            Export result with JSON data and metadata
+
+        Raises:
+            MCPError: If export fails
+        """
+        return self._call("export_validation", {
+            "validation_id": validation_id,
+            "include_recommendations": include_recommendations
+        })
+
+    def export_recommendations(self, validation_id: str) -> Dict[str, Any]:
+        """
+        Export recommendations to JSON.
+
+        Args:
+            validation_id: ID of validation
+
+        Returns:
+            Export result with JSON data and metadata
+
+        Raises:
+            MCPError: If export fails
+        """
+        return self._call("export_recommendations", {
+            "validation_id": validation_id
+        })
+
+    def export_workflow(
+        self,
+        workflow_id: str,
+        include_validations: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Export workflow report to JSON.
+
+        Args:
+            workflow_id: ID of workflow to export
+            include_validations: Include validations in export
+
+        Returns:
+            Export result with JSON data and metadata
+
+        Raises:
+            MCPError: If export fails
+        """
+        return self._call("export_workflow", {
+            "workflow_id": workflow_id,
+            "include_validations": include_validations
         })
 
 
@@ -773,35 +1244,108 @@ class MCPAsyncClient:
     # Approval Methods
     # ========================================================================
 
-    async def approve(self, ids: List[str]) -> Dict[str, Any]:
+    async def approve(self, validation_ids: Union[str, List[str]]) -> Dict[str, Any]:
         """
-        Approve validation records asynchronously.
+        Approve validation(s) asynchronously.
 
         Args:
-            ids: List of validation IDs to approve
+            validation_ids: Single ID or list of IDs to approve
 
         Returns:
-            Results with approved_count and errors list
+            Approval results with counts and errors
 
         Raises:
             MCPError: If approval fails
         """
+        # Normalize to list for API
+        if isinstance(validation_ids, str):
+            ids = [validation_ids]
+        else:
+            ids = validation_ids
+
         return await self._call("approve", {"ids": ids})
 
-    async def reject(self, ids: List[str]) -> Dict[str, Any]:
+    async def reject(
+        self,
+        validation_ids: Union[str, List[str]],
+        reason: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
-        Reject validation records asynchronously.
+        Reject validation(s) asynchronously.
 
         Args:
-            ids: List of validation IDs to reject
+            validation_ids: Single ID or list of IDs to reject
+            reason: Optional rejection reason
 
         Returns:
-            Results with rejected_count and errors list
+            Rejection results with counts and errors
 
         Raises:
             MCPError: If rejection fails
         """
-        return await self._call("reject", {"ids": ids})
+        # Normalize to list for API
+        if isinstance(validation_ids, str):
+            ids = [validation_ids]
+        else:
+            ids = validation_ids
+
+        params = {"ids": ids}
+        if reason is not None:
+            params["reason"] = reason
+
+        return await self._call("reject", params)
+
+    async def bulk_approve(
+        self,
+        validation_ids: List[str],
+        batch_size: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Bulk approve multiple validations efficiently asynchronously.
+
+        Args:
+            validation_ids: List of validation IDs
+            batch_size: Processing batch size (default 100)
+
+        Returns:
+            Bulk approval results with timing
+
+        Raises:
+            MCPError: If bulk approval fails
+        """
+        return await self._call("bulk_approve", {
+            "ids": validation_ids,
+            "batch_size": batch_size
+        })
+
+    async def bulk_reject(
+        self,
+        validation_ids: List[str],
+        reason: Optional[str] = None,
+        batch_size: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Bulk reject multiple validations efficiently asynchronously.
+
+        Args:
+            validation_ids: List of validation IDs
+            reason: Optional rejection reason
+            batch_size: Processing batch size (default 100)
+
+        Returns:
+            Bulk rejection results with timing
+
+        Raises:
+            MCPError: If bulk rejection fails
+        """
+        params = {
+            "ids": validation_ids,
+            "batch_size": batch_size
+        }
+        if reason is not None:
+            params["reason"] = reason
+
+        return await self._call("bulk_reject", params)
 
     # ========================================================================
     # Enhancement Methods
@@ -878,6 +1422,198 @@ class MCPAsyncClient:
         return await self._call("create_checkpoint", {
             "name": name,
             "metadata": metadata
+        })
+
+    # ========================================================================
+    # Workflow Methods
+    # ========================================================================
+
+    async def create_workflow(
+        self,
+        workflow_type: str,
+        workflow_params: Dict[str, Any],
+        name: Optional[str] = None,
+        description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a new workflow asynchronously."""
+        return await self._call("create_workflow", {
+            "workflow_type": workflow_type,
+            "params": workflow_params,
+            "name": name,
+            "description": description
+        })
+
+    async def get_workflow(self, workflow_id: str) -> Dict[str, Any]:
+        """Get workflow by ID asynchronously."""
+        return await self._call("get_workflow", {
+            "workflow_id": workflow_id
+        })
+
+    async def list_workflows(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        status: Optional[str] = None,
+        workflow_type: Optional[str] = None,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """List workflows with filters asynchronously."""
+        return await self._call("list_workflows", {
+            "limit": limit,
+            "offset": offset,
+            "status": status,
+            "workflow_type": workflow_type,
+            "created_after": created_after,
+            "created_before": created_before
+        })
+
+    async def control_workflow(
+        self,
+        workflow_id: str,
+        action: str
+    ) -> Dict[str, Any]:
+        """Control workflow execution asynchronously."""
+        return await self._call("control_workflow", {
+            "workflow_id": workflow_id,
+            "action": action
+        })
+
+    async def get_workflow_report(
+        self,
+        workflow_id: str,
+        include_details: bool = True
+    ) -> Dict[str, Any]:
+        """Get detailed workflow report asynchronously."""
+        return await self._call("get_workflow_report", {
+            "workflow_id": workflow_id,
+            "include_details": include_details
+        })
+
+    async def get_workflow_summary(self, workflow_id: str) -> Dict[str, Any]:
+        """Get workflow summary asynchronously."""
+        return await self._call("get_workflow_summary", {
+            "workflow_id": workflow_id
+        })
+
+    async def delete_workflow(
+        self,
+        workflow_id: str,
+        force: bool = False
+    ) -> Dict[str, Any]:
+        """Delete a workflow asynchronously."""
+        return await self._call("delete_workflow", {
+            "workflow_id": workflow_id,
+            "force": force
+        })
+
+    async def bulk_delete_workflows(
+        self,
+        workflow_ids: Optional[List[str]] = None,
+        status: Optional[str] = None,
+        workflow_type: Optional[str] = None,
+        created_before: Optional[str] = None,
+        force: bool = False
+    ) -> Dict[str, Any]:
+        """Bulk delete workflows asynchronously."""
+        return await self._call("bulk_delete_workflows", {
+            "workflow_ids": workflow_ids,
+            "status": status,
+            "workflow_type": workflow_type,
+            "created_before": created_before,
+            "force": force
+        })
+
+    # ========================================================================
+    # Query & Statistics Methods
+    # ========================================================================
+
+    async def get_stats(self) -> Dict[str, Any]:
+        """Get system statistics asynchronously."""
+        return await self._call("get_stats", {})
+
+    async def get_audit_log(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        operation: Optional[str] = None,
+        user: Optional[str] = None,
+        status: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get audit log entries asynchronously."""
+        return await self._call("get_audit_log", {
+            "limit": limit,
+            "offset": offset,
+            "operation": operation,
+            "user": user,
+            "status": status,
+            "start_date": start_date,
+            "end_date": end_date
+        })
+
+    async def get_performance_report(
+        self,
+        time_range: str = "24h",
+        operation: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get performance metrics report asynchronously."""
+        return await self._call("get_performance_report", {
+            "time_range": time_range,
+            "operation": operation
+        })
+
+    async def get_health_report(self) -> Dict[str, Any]:
+        """Get detailed health report asynchronously."""
+        return await self._call("get_health_report", {})
+
+    async def get_validation_history(
+        self,
+        file_path: str,
+        limit: int = 50
+    ) -> Dict[str, Any]:
+        """Get validation history for a file asynchronously."""
+        return await self._call("get_validation_history", {
+            "file_path": file_path,
+            "limit": limit
+        })
+
+    async def get_available_validators(
+        self,
+        validator_type: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get list of available validators asynchronously."""
+        return await self._call("get_available_validators", {
+            "validator_type": validator_type
+        })
+
+    async def export_validation(
+        self,
+        validation_id: str,
+        include_recommendations: bool = False
+    ) -> Dict[str, Any]:
+        """Export validation to JSON asynchronously."""
+        return await self._call("export_validation", {
+            "validation_id": validation_id,
+            "include_recommendations": include_recommendations
+        })
+
+    async def export_recommendations(self, validation_id: str) -> Dict[str, Any]:
+        """Export recommendations to JSON asynchronously."""
+        return await self._call("export_recommendations", {
+            "validation_id": validation_id
+        })
+
+    async def export_workflow(
+        self,
+        workflow_id: str,
+        include_validations: bool = False
+    ) -> Dict[str, Any]:
+        """Export workflow report to JSON asynchronously."""
+        return await self._call("export_workflow", {
+            "workflow_id": workflow_id,
+            "include_validations": include_validations
         })
 
 
