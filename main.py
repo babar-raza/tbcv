@@ -77,19 +77,26 @@ def _purge_bytecode(project_root: Path) -> Tuple[int, int]:
 
     return dirs_removed, files_removed
 
-def _validate_schemas() -> bool:
+def _validate_schemas(truth_dir: str = None, rules_dir: str = None) -> bool:
     """
     Validate JSON schemas for truth tables at startup.
     Returns True if all schemas are valid, False otherwise.
+
+    Args:
+        truth_dir: Optional custom directory for truth files. Defaults to ./truth/
+        rules_dir: Optional custom directory for rule files. Defaults to ./rules/
     """
     try:
         import json
         from pathlib import Path
-        
-        # Find truth table files
+
+        # Find truth table files - use custom dirs if provided, else defaults
         project_root = Path(__file__).parent
-        truth_files = list(project_root.glob("truth/*.json"))
-        rule_files = list(project_root.glob("rules/*.json"))
+        truth_path = Path(truth_dir) if truth_dir else project_root / "truth"
+        rules_path = Path(rules_dir) if rules_dir else project_root / "rules"
+
+        truth_files = list(truth_path.glob("*.json")) if truth_path.exists() else []
+        rule_files = list(rules_path.glob("*.json")) if rules_path.exists() else []
         
         print(f"Validating {len(truth_files)} truth files and {len(rule_files)} rule files...")
         
