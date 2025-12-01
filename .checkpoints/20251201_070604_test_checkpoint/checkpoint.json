@@ -1,0 +1,25 @@
+{
+  "id": "20251201_070604_test_checkpoint",
+  "name": "test_checkpoint",
+  "created_at": "2025-12-01T07:06:04.613401+00:00",
+  "metadata": {},
+  "database_backed_up": true,
+  "cache_stats": {
+    "l1": {
+      "enabled": true,
+      "size": 0,
+      "max_size": 1000,
+      "hits": 0,
+      "misses": 0,
+      "hit_rate": 0.0,
+      "ttl_seconds": 3600
+    },
+    "l2": {
+      "enabled": true,
+      "total_entries": 0,
+      "total_size_bytes": 0,
+      "total_size_mb": 0.0,
+      "database_path": "./data/cache/tbcv_cache.db"
+    }
+  }
+}
