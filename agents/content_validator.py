@@ -22,11 +22,13 @@ try:
     from core.logging import PerformanceLogger
     from core.database import db_manager
     from core.rule_manager import rule_manager  # normalized import
+    from core.access_guard import guarded_operation
 except ImportError:
     from agents.base import BaseAgent, AgentContract, AgentCapability, agent_registry
     from core.logging import PerformanceLogger
     from core.database import db_manager
     from core.rule_manager import rule_manager  # normalized import
+    from core.access_guard import guarded_operation
 
 # Optional deps
 try:
@@ -157,6 +159,7 @@ class ContentValidatorAgent(BaseAgent):
     # ----------------------
     # Composite entry point
     # ----------------------
+    @guarded_operation
     async def handle_validate_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
         with PerformanceLogger(self.logger, "validate_content"):
             content = params.get("content", "")

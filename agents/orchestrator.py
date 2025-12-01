@@ -28,6 +28,7 @@ from agents.base import BaseAgent, AgentContract, AgentCapability, agent_registr
 from core.logging import PerformanceLogger, get_logger
 from core.language_utils import is_english_content, validate_english_content_batch, log_language_rejection
 from agents.validators.router import ValidatorRouter
+from core.access_guard import guarded_operation
 
 logger = get_logger(__name__)
 
@@ -216,6 +217,7 @@ class OrchestratorAgent(BaseAgent):
             checkpoints=[]
         )
 
+    @guarded_operation
     async def handle_validate_file(self, params: Dict[str, Any]) -> Dict[str, Any]:
         with PerformanceLogger(self.logger, "validate_file"):
             file_path = params.get("file_path")
@@ -249,6 +251,7 @@ class OrchestratorAgent(BaseAgent):
                 self.logger.exception("File validation failed")
                 return {"status": "error", "message": str(e), "file_path": file_path}
 
+    @guarded_operation
     async def handle_validate_directory(self, params: Dict[str, Any]) -> Dict[str, Any]:
         with PerformanceLogger(self.logger, "validate_directory"):
             # Accept both 'directory_path' and 'directory' for compatibility

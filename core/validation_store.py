@@ -19,6 +19,7 @@ import uuid
 import hashlib
 
 from core.database import Base, db_manager, JSONField, Column, String, DateTime, Text, Index, Session
+from core.access_guard import guarded_operation
 
 
 class ValidationRecord(Base):
@@ -74,6 +75,7 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+@guarded_operation
 def create_validation_record(
     *,
     file_path: str,
