@@ -63,60 +63,22 @@
             
             <div id="singleValidationFields" style="display: none;">
                 <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Select File:</label>
-                    <input type="file" id="singleFile" class="form-control" accept=".md,.txt,.html,.json,.yaml,.yml">
-                    <div style="font-size: 12px; color: #666; margin-top: 5px;">Supported: .md, .txt, .html, .json, .yaml, .yml</div>
-                </div>
-                
-                <div id="fileInfo" style="display: none; margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
-                    <div style="font-size: 13px;"><strong>File:</strong> <span id="fileName"></span></div>
-                    <div style="font-size: 13px;"><strong>Size:</strong> <span id="fileSize"></span></div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">File Path:</label>
+                    <input type="text" id="singleFilePath" class="form-control" placeholder="C:\path\to\file.md or /path/to/file.md">
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Enter the full path to the file on this machine<br>
+                        Supported: .md, .txt, .html, .json, .yaml, .yml
+                    </div>
                 </div>
             </div>
             
             <div id="batchValidationFields" style="display: none;">
                 <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Batch Mode:</label>
-                    <select id="batchMode" class="form-control" onchange="updateBatchMode()">
-                        <option value="upload">Upload Files (from your computer)</option>
-                        <option value="server">Server Paths (files on server)</option>
-                    </select>
-                </div>
-
-                <div id="batchUploadFields" style="display: block;">
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Select Files:</label>
-                        <input type="file" id="batchFileInput" class="form-control" accept=".md,.txt,.html,.json,.yaml,.yml" multiple style="display: none;">
-                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('batchFileInput').click()" style="width: 100%; margin-bottom: 10px;">
-                            Browse Files...
-                        </button>
-
-                        <div id="dropZone" style="border: 2px dashed #ddd; border-radius: 8px; padding: 40px 20px; text-align: center; background: #f9f9f9; cursor: pointer; transition: all 0.3s;">
-                            <div style="font-size: 48px; margin-bottom: 10px;">📁</div>
-                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">Drop files here</div>
-                            <div style="font-size: 13px; color: #666;">or click "Browse Files" button above</div>
-                            <div style="font-size: 12px; color: #999; margin-top: 10px;">Supported: .md, .txt, .html, .json, .yaml, .yml</div>
-                        </div>
-
-                        <div id="selectedFilesList" style="margin-top: 15px; display: none;">
-                            <div style="font-weight: 600; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                                <span>Selected Files (<span id="selectedFilesCount">0</span>)</span>
-                                <button type="button" class="btn btn-danger btn-sm" onclick="clearSelectedFiles()">Clear All</button>
-                            </div>
-                            <div id="filesListContainer" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: white;">
-                            </div>
-                            <div style="margin-top: 10px; font-size: 13px; color: #666;">
-                                <strong>Total Size:</strong> <span id="totalFileSize">0 B</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="batchServerFields" style="display: none;">
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">File Paths (one per line):</label>
-                        <textarea id="batchFilePaths" class="form-control" rows="6" placeholder="/path/to/file1.md&#10;/path/to/file2.md"></textarea>
-                        <div style="font-size: 12px; color: #666; margin-top: 5px;">Enter full file paths from your server filesystem</div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">File Paths (one per line):</label>
+                    <textarea id="batchFilePaths" class="form-control" rows="8" placeholder="C:\path\to\file1.md&#10;C:\path\to\file2.md&#10;&#10;Or use wildcards:&#10;C:\docs\*.md"></textarea>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Enter full file paths from this machine (one per line)<br>
+                        Supports wildcards: *.md, **/*.md, etc.
                     </div>
                 </div>
             </div>
@@ -214,9 +176,11 @@
                             Reject
                         </button>
                         {% endif %}
+                        {% if validation.status != 'enhanced' %}
                         <button class="btn btn-info btn-sm" onclick="generateRecommendations('{{ validation.id }}')">
                             Generate Recommendations
                         </button>
+                        {% endif %}
                         {% if validation.status == 'approved' %}
                         <button class="btn btn-warning btn-sm" onclick="singleAction('enhance', '{{ validation.id }}')">
                             Enhance
@@ -253,143 +217,6 @@
 <script>
 let activeValidationRuns = new Map();
 let validationPollIntervals = new Map();
-let selectedFile = null;
-let selectedBatchFiles = [];
-
-// Handle file selection
-document.addEventListener('DOMContentLoaded', function() {
-    const fileInput = document.getElementById('singleFile');
-    if (fileInput) {
-        fileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                selectedFile = file;
-                document.getElementById('fileName').textContent = file.name;
-                document.getElementById('fileSize').textContent = formatFileSize(file.size);
-                document.getElementById('fileInfo').style.display = 'block';
-            } else {
-                selectedFile = null;
-                document.getElementById('fileInfo').style.display = 'none';
-            }
-        });
-    }
-
-    // Handle batch file input
-    const batchFileInput = document.getElementById('batchFileInput');
-    if (batchFileInput) {
-        batchFileInput.addEventListener('change', function(e) {
-            handleBatchFilesSelection(Array.from(e.target.files));
-        });
-    }
-
-    // Setup drag and drop
-    const dropZone = document.getElementById('dropZone');
-    if (dropZone) {
-        dropZone.addEventListener('click', function() {
-            document.getElementById('batchFileInput').click();
-        });
-
-        dropZone.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '#667eea';
-            this.style.background = '#f0f0ff';
-        });
-
-        dropZone.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '#ddd';
-            this.style.background = '#f9f9f9';
-        });
-
-        dropZone.addEventListener('drop', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '#ddd';
-            this.style.background = '#f9f9f9';
-
-            const files = Array.from(e.dataTransfer.files);
-            handleBatchFilesSelection(files);
-        });
-    }
-});
-
-function updateBatchMode() {
-    const mode = document.getElementById('batchMode').value;
-    document.getElementById('batchUploadFields').style.display = mode === 'upload' ? 'block' : 'none';
-    document.getElementById('batchServerFields').style.display = mode === 'server' ? 'block' : 'none';
-}
-
-function handleBatchFilesSelection(files) {
-    const validExtensions = ['.md', '.txt', '.html', '.json', '.yaml', '.yml'];
-
-    files.forEach(file => {
-        const ext = '.' + file.name.split('.').pop().toLowerCase();
-        if (validExtensions.includes(ext)) {
-            // Check if file already exists
-            const exists = selectedBatchFiles.some(f => f.name === file.name && f.size === file.size);
-            if (!exists) {
-                selectedBatchFiles.push(file);
-            }
-        } else {
-            showValidationMessage(`Skipped ${file.name}: Unsupported file type`, 'warning');
-        }
-    });
-
-    updateBatchFilesList();
-}
-
-function updateBatchFilesList() {
-    const listContainer = document.getElementById('filesListContainer');
-    const selectedFilesList = document.getElementById('selectedFilesList');
-    const countSpan = document.getElementById('selectedFilesCount');
-    const totalSizeSpan = document.getElementById('totalFileSize');
-
-    if (selectedBatchFiles.length === 0) {
-        selectedFilesList.style.display = 'none';
-        return;
-    }
-
-    selectedFilesList.style.display = 'block';
-    countSpan.textContent = selectedBatchFiles.length;
-
-    let totalSize = selectedBatchFiles.reduce((sum, file) => sum + file.size, 0);
-    totalSizeSpan.textContent = formatFileSize(totalSize);
-
-    listContainer.innerHTML = '';
-    selectedBatchFiles.forEach((file, index) => {
-        const fileItem = document.createElement('div');
-        fileItem.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 13px;';
-
-        fileItem.innerHTML = `
-            <div style="flex: 1; overflow: hidden;">
-                <div style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.name}</div>
-                <div style="color: #666; font-size: 12px;">${formatFileSize(file.size)}</div>
-            </div>
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeBatchFile(${index})" style="margin-left: 10px;">Remove</button>
-        `;
-
-        listContainer.appendChild(fileItem);
-    });
-}
-
-function removeBatchFile(index) {
-    selectedBatchFiles.splice(index, 1);
-    updateBatchFilesList();
-}
-
-function clearSelectedFiles() {
-    selectedBatchFiles = [];
-    updateBatchFilesList();
-    document.getElementById('batchFileInput').value = '';
-}
-
-function formatFileSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-}
 
 function openRunValidationModal() {
     document.getElementById('runValidationModal').style.display = 'flex';
@@ -402,9 +229,6 @@ function closeRunValidationModal() {
     document.getElementById('batchValidationFields').style.display = 'none';
     document.getElementById('validationCommonFields').style.display = 'none';
     document.getElementById('maxWorkersField').style.display = 'none';
-    document.getElementById('fileInfo').style.display = 'none';
-    selectedFile = null;
-    clearSelectedFiles();
 }
 
 function updateValidationForm() {
@@ -417,85 +241,52 @@ function updateValidationForm() {
 
 document.getElementById('runValidationForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    
+
     const submitBtn = document.getElementById('submitValidationBtn');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Starting...';
-    
+
     try {
         const mode = document.getElementById('validationMode').value;
         const validationTypes = Array.from(document.querySelectorAll('.validation-type:checked')).map(cb => cb.value);
-        
+
         let endpoint, payload, runId;
-        
+
         if (mode === 'single') {
-            if (!selectedFile) {
-                alert('Please select a file to validate');
+            const filePath = document.getElementById('singleFilePath').value.trim();
+
+            if (!filePath) {
+                alert('Please enter a file path');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Start Validation';
                 return;
             }
-            
-            // Read file content
-            const content = await readFileContent(selectedFile);
-            
-            endpoint = '/api/validate';
+
+            endpoint = '/api/validate/file';
             payload = {
-                content: content,
-                file_path: selectedFile.name,
+                file_path: filePath,
                 family: document.getElementById('validationFamily').value,
                 validation_types: validationTypes
             };
             runId = `single-${Date.now()}`;
         } else if (mode === 'batch') {
-            endpoint = '/api/validate/batch';
-            const batchMode = document.getElementById('batchMode').value;
+            const filesText = document.getElementById('batchFilePaths').value;
+            const files = filesText.split('\n').map(f => f.trim()).filter(f => f);
 
-            if (batchMode === 'upload') {
-                // Handle client-side file upload
-                if (selectedBatchFiles.length === 0) {
-                    alert('Please select at least one file to upload');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Start Validation';
-                    return;
-                }
-
-                // Read all files and create payload with file contents
-                submitBtn.textContent = 'Reading files...';
-                const fileContents = await Promise.all(
-                    selectedBatchFiles.map(async (file) => ({
-                        file_path: file.name,
-                        content: await readFileContent(file)
-                    }))
-                );
-
-                payload = {
-                    files: fileContents.map(f => f.file_path),  // For workflow tracking
-                    file_contents: fileContents,  // Array of {file_path, content}
-                    family: document.getElementById('validationFamily').value,
-                    validation_types: validationTypes,
-                    max_workers: parseInt(document.getElementById('validationMaxWorkers').value),
-                    upload_mode: true  // Flag to indicate client-side upload
-                };
-            } else {
-                // Handle server-side file paths
-                const filesText = document.getElementById('batchFilePaths').value;
-                const files = filesText.split('\n').map(f => f.trim()).filter(f => f);
-
-                if (files.length === 0) {
-                    alert('Please enter at least one file path');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Start Validation';
-                    return;
-                }
-
-                payload = {
-                    files: files,
-                    family: document.getElementById('validationFamily').value,
-                    validation_types: validationTypes,
-                    max_workers: parseInt(document.getElementById('validationMaxWorkers').value)
-                };
+            if (files.length === 0) {
+                alert('Please enter at least one file path');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Start Validation';
+                return;
             }
+
+            endpoint = '/api/validate/batch';
+            payload = {
+                files: files,
+                family: document.getElementById('validationFamily').value,
+                validation_types: validationTypes,
+                max_workers: parseInt(document.getElementById('validationMaxWorkers').value)
+            };
             runId = null;
         } else {
             alert('Please select a validation mode');
@@ -561,15 +352,6 @@ document.getElementById('runValidationForm').addEventListener('submit', async fu
         submitBtn.textContent = 'Start Validation';
     }
 });
-
-function readFileContent(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = (e) => reject(new Error('Failed to read file'));
-        reader.readAsText(file);
-    });
-}
 
 function updateActiveValidationsDisplay() {
     const section = document.getElementById('activeValidationsSection');
@@ -934,11 +716,11 @@ document.addEventListener('DOMContentLoaded', function() {
         checkboxes.forEach(cb => cb.checked = this.checked);
         updateBulkActionButtons();
     });
-    
+
     document.querySelectorAll('.validation-checkbox').forEach(cb => {
         cb.addEventListener('change', updateBulkActionButtons);
     });
-    
+
     document.getElementById('liveRefresh').addEventListener('change', function() {
         liveRefreshEnabled = this.checked;
         if (liveRefreshEnabled) {
@@ -948,12 +730,29 @@ document.addEventListener('DOMContentLoaded', function() {
             ws = null;
         }
     });
-    
+
     if (liveRefreshEnabled) {
         initWebSocket();
     }
-    
+
     updateBulkActionButtons();
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const modal = document.getElementById('runValidationModal');
+            if (modal && modal.style.display !== 'none') {
+                closeRunValidationModal();
+            }
+        }
+    });
+
+    // Close modal on backdrop click
+    document.getElementById('runValidationModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeRunValidationModal();
+        }
+    });
 });
 </script>
 

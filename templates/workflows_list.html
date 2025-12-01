@@ -47,99 +47,29 @@
             
             <div id="directoryFields" style="display: none;">
                 <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Directory Mode:</label>
-                    <select id="directoryMode" class="form-control" onchange="updateDirectoryMode()">
-                        <option value="upload">Upload Directory (from your computer)</option>
-                        <option value="server">Server Path (directory on server)</option>
-                    </select>
-                </div>
-
-                <div id="directoryUploadFields" style="display: block;">
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Select Directory:</label>
-                        <input type="file" id="directoryInput" class="form-control" webkitdirectory directory multiple style="display: none;">
-                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('directoryInput').click()" style="width: 100%; margin-bottom: 10px;">
-                            Browse Directory...
-                        </button>
-
-                        <div id="dirDropZone" style="border: 2px dashed #ddd; border-radius: 8px; padding: 40px 20px; text-align: center; background: #f9f9f9; cursor: pointer; transition: all 0.3s;">
-                            <div style="font-size: 48px; margin-bottom: 10px;">📂</div>
-                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">Select or drop a directory</div>
-                            <div style="font-size: 13px; color: #666;">or click "Browse Directory" button above</div>
-                            <div style="font-size: 12px; color: #999; margin-top: 10px;">Supported: .md, .txt, .html, .json, .yaml, .yml</div>
-                        </div>
-
-                        <div id="directoryFilesList" style="margin-top: 15px; display: none;">
-                            <div style="font-weight: 600; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                                <span>Directory: <span id="directoryName"></span></span>
-                                <button type="button" class="btn btn-danger btn-sm" onclick="clearDirectorySelection()">Clear</button>
-                            </div>
-                            <div style="padding: 10px; background: #f5f5f5; border-radius: 4px; margin-bottom: 10px;">
-                                <div style="font-size: 13px; margin-bottom: 5px;"><strong>Total Files:</strong> <span id="directoryFileCount">0</span></div>
-                                <div style="font-size: 13px;"><strong>Total Size:</strong> <span id="directoryTotalSize">0 B</span></div>
-                            </div>
-                            <div id="directoryFilesContainer" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: white;">
-                            </div>
-                        </div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Directory Path:</label>
+                    <input type="text" id="directoryPath" class="form-control" placeholder="C:\path\to\directory or /path/to/directory">
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Enter the full path to a directory on this machine
                     </div>
                 </div>
 
-                <div id="directoryServerFields" style="display: none;">
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Directory Path:</label>
-                        <input type="text" id="directoryPath" class="form-control" placeholder="/path/to/directory">
-                    </div>
-
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">File Pattern:</label>
-                        <input type="text" id="filePattern" class="form-control" value="*.md">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">File Pattern:</label>
+                    <input type="text" id="filePattern" class="form-control" value="*.md" placeholder="*.md, **/*.md, etc.">
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Glob pattern to match files (e.g., *.md, **/*.txt)
                     </div>
                 </div>
             </div>
 
             <div id="batchFields" style="display: none;">
                 <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Batch Mode:</label>
-                    <select id="batchModeWorkflow" class="form-control" onchange="updateBatchModeWorkflow()">
-                        <option value="upload">Upload Files (from your computer)</option>
-                        <option value="server">Server Paths (files on server)</option>
-                    </select>
-                </div>
-
-                <div id="batchUploadFieldsWorkflow" style="display: block;">
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Select Files:</label>
-                        <input type="file" id="batchFileInputWorkflow" class="form-control" accept=".md,.txt,.html,.json,.yaml,.yml" multiple style="display: none;">
-                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('batchFileInputWorkflow').click()" style="width: 100%; margin-bottom: 10px;">
-                            Browse Files...
-                        </button>
-
-                        <div id="batchDropZoneWorkflow" style="border: 2px dashed #ddd; border-radius: 8px; padding: 40px 20px; text-align: center; background: #f9f9f9; cursor: pointer; transition: all 0.3s;">
-                            <div style="font-size: 48px; margin-bottom: 10px;">📁</div>
-                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">Drop files here</div>
-                            <div style="font-size: 13px; color: #666;">or click "Browse Files" button above</div>
-                            <div style="font-size: 12px; color: #999; margin-top: 10px;">Supported: .md, .txt, .html, .json, .yaml, .yml</div>
-                        </div>
-
-                        <div id="selectedFilesListWorkflow" style="margin-top: 15px; display: none;">
-                            <div style="font-weight: 600; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                                <span>Selected Files (<span id="selectedFilesCountWorkflow">0</span>)</span>
-                                <button type="button" class="btn btn-danger btn-sm" onclick="clearWorkflowBatchFiles()">Clear All</button>
-                            </div>
-                            <div id="filesListContainerWorkflow" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: white;">
-                            </div>
-                            <div style="margin-top: 10px; font-size: 13px; color: #666;">
-                                <strong>Total Size:</strong> <span id="totalFileSizeWorkflow">0 B</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="batchServerFieldsWorkflow" style="display: none;">
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">File Paths (one per line):</label>
-                        <textarea id="filePaths" class="form-control" rows="6" placeholder="/path/to/file1.md&#10;/path/to/file2.md"></textarea>
-                        <div style="font-size: 12px; color: #666; margin-top: 5px;">Enter full file paths from your server filesystem</div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">File Paths (one per line):</label>
+                    <textarea id="batchFilePathsWorkflow" class="form-control" rows="8" placeholder="C:\path\to\file1.md&#10;C:\path\to\file2.md&#10;&#10;Or use wildcards:&#10;C:\docs\*.md"></textarea>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Enter full file paths from this machine (one per line)<br>
+                        Supports wildcards: *.md, **/*.md, etc.
                     </div>
                 </div>
             </div>
@@ -232,8 +162,6 @@
 <script>
 let activeRuns = new Map();
 let pollIntervals = new Map();
-let selectedDirectoryFiles = [];
-let selectedWorkflowBatchFiles = [];
 
 function openRunWorkflowModal() {
     document.getElementById('runWorkflowModal').style.display = 'flex';
@@ -245,243 +173,6 @@ function closeRunWorkflowModal() {
     document.getElementById('directoryFields').style.display = 'none';
     document.getElementById('batchFields').style.display = 'none';
     document.getElementById('commonFields').style.display = 'none';
-    clearDirectorySelection();
-    clearWorkflowBatchFiles();
-}
-
-// Directory handling
-document.addEventListener('DOMContentLoaded', function() {
-    const directoryInput = document.getElementById('directoryInput');
-    if (directoryInput) {
-        directoryInput.addEventListener('change', function(e) {
-            handleDirectorySelection(Array.from(e.target.files));
-        });
-    }
-
-    const dirDropZone = document.getElementById('dirDropZone');
-    if (dirDropZone) {
-        dirDropZone.addEventListener('click', function() {
-            document.getElementById('directoryInput').click();
-        });
-
-        dirDropZone.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '#667eea';
-            this.style.background = '#f0f0ff';
-        });
-
-        dirDropZone.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '#ddd';
-            this.style.background = '#f9f9f9';
-        });
-
-        dirDropZone.addEventListener('drop', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '#ddd';
-            this.style.background = '#f9f9f9';
-
-            const files = Array.from(e.dataTransfer.files);
-            handleDirectorySelection(files);
-        });
-    }
-
-    // Batch file handling for workflows
-    const batchFileInputWorkflow = document.getElementById('batchFileInputWorkflow');
-    if (batchFileInputWorkflow) {
-        batchFileInputWorkflow.addEventListener('change', function(e) {
-            handleWorkflowBatchFilesSelection(Array.from(e.target.files));
-        });
-    }
-
-    const batchDropZoneWorkflow = document.getElementById('batchDropZoneWorkflow');
-    if (batchDropZoneWorkflow) {
-        batchDropZoneWorkflow.addEventListener('click', function() {
-            document.getElementById('batchFileInputWorkflow').click();
-        });
-
-        batchDropZoneWorkflow.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '#667eea';
-            this.style.background = '#f0f0ff';
-        });
-
-        batchDropZoneWorkflow.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '#ddd';
-            this.style.background = '#f9f9f9';
-        });
-
-        batchDropZoneWorkflow.addEventListener('drop', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '#ddd';
-            this.style.background = '#f9f9f9';
-
-            const files = Array.from(e.dataTransfer.files);
-            handleWorkflowBatchFilesSelection(files);
-        });
-    }
-});
-
-function updateDirectoryMode() {
-    const mode = document.getElementById('directoryMode').value;
-    document.getElementById('directoryUploadFields').style.display = mode === 'upload' ? 'block' : 'none';
-    document.getElementById('directoryServerFields').style.display = mode === 'server' ? 'block' : 'none';
-}
-
-function updateBatchModeWorkflow() {
-    const mode = document.getElementById('batchModeWorkflow').value;
-    document.getElementById('batchUploadFieldsWorkflow').style.display = mode === 'upload' ? 'block' : 'none';
-    document.getElementById('batchServerFieldsWorkflow').style.display = mode === 'server' ? 'block' : 'none';
-}
-
-function handleDirectorySelection(files) {
-    const validExtensions = ['.md', '.txt', '.html', '.json', '.yaml', '.yml'];
-
-    selectedDirectoryFiles = files.filter(file => {
-        const ext = '.' + file.name.split('.').pop().toLowerCase();
-        return validExtensions.includes(ext);
-    });
-
-    if (selectedDirectoryFiles.length === 0) {
-        showMessage('No valid files found in the selected directory', 'warning');
-        return;
-    }
-
-    // Extract directory name from first file's path
-    const firstFile = files[0];
-    const pathParts = firstFile.webkitRelativePath ? firstFile.webkitRelativePath.split('/') : [firstFile.name];
-    const dirName = pathParts.length > 1 ? pathParts[0] : 'Selected Directory';
-
-    updateDirectoryFilesList(dirName);
-}
-
-function updateDirectoryFilesList(dirName) {
-    const listContainer = document.getElementById('directoryFilesContainer');
-    const directoryFilesList = document.getElementById('directoryFilesList');
-    const directoryNameSpan = document.getElementById('directoryName');
-    const fileCountSpan = document.getElementById('directoryFileCount');
-    const totalSizeSpan = document.getElementById('directoryTotalSize');
-
-    if (selectedDirectoryFiles.length === 0) {
-        directoryFilesList.style.display = 'none';
-        return;
-    }
-
-    directoryFilesList.style.display = 'block';
-    directoryNameSpan.textContent = dirName;
-    fileCountSpan.textContent = selectedDirectoryFiles.length;
-
-    let totalSize = selectedDirectoryFiles.reduce((sum, file) => sum + file.size, 0);
-    totalSizeSpan.textContent = formatFileSize(totalSize);
-
-    listContainer.innerHTML = '';
-    selectedDirectoryFiles.forEach((file) => {
-        const fileItem = document.createElement('div');
-        fileItem.style.cssText = 'padding: 6px; border-bottom: 1px solid #eee; font-size: 13px;';
-
-        const relativePath = file.webkitRelativePath || file.name;
-        fileItem.innerHTML = `
-            <div style="display: flex; justify-content: space-between;">
-                <div style="flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${relativePath}</div>
-                <div style="color: #666; font-size: 12px; margin-left: 10px;">${formatFileSize(file.size)}</div>
-            </div>
-        `;
-
-        listContainer.appendChild(fileItem);
-    });
-}
-
-function clearDirectorySelection() {
-    selectedDirectoryFiles = [];
-    document.getElementById('directoryFilesList').style.display = 'none';
-    const dirInput = document.getElementById('directoryInput');
-    if (dirInput) dirInput.value = '';
-}
-
-function handleWorkflowBatchFilesSelection(files) {
-    const validExtensions = ['.md', '.txt', '.html', '.json', '.yaml', '.yml'];
-
-    files.forEach(file => {
-        const ext = '.' + file.name.split('.').pop().toLowerCase();
-        if (validExtensions.includes(ext)) {
-            const exists = selectedWorkflowBatchFiles.some(f => f.name === file.name && f.size === file.size);
-            if (!exists) {
-                selectedWorkflowBatchFiles.push(file);
-            }
-        } else {
-            showMessage(`Skipped ${file.name}: Unsupported file type`, 'warning');
-        }
-    });
-
-    updateWorkflowBatchFilesList();
-}
-
-function updateWorkflowBatchFilesList() {
-    const listContainer = document.getElementById('filesListContainerWorkflow');
-    const selectedFilesList = document.getElementById('selectedFilesListWorkflow');
-    const countSpan = document.getElementById('selectedFilesCountWorkflow');
-    const totalSizeSpan = document.getElementById('totalFileSizeWorkflow');
-
-    if (selectedWorkflowBatchFiles.length === 0) {
-        selectedFilesList.style.display = 'none';
-        return;
-    }
-
-    selectedFilesList.style.display = 'block';
-    countSpan.textContent = selectedWorkflowBatchFiles.length;
-
-    let totalSize = selectedWorkflowBatchFiles.reduce((sum, file) => sum + file.size, 0);
-    totalSizeSpan.textContent = formatFileSize(totalSize);
-
-    listContainer.innerHTML = '';
-    selectedWorkflowBatchFiles.forEach((file, index) => {
-        const fileItem = document.createElement('div');
-        fileItem.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 13px;';
-
-        fileItem.innerHTML = `
-            <div style="flex: 1; overflow: hidden;">
-                <div style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.name}</div>
-                <div style="color: #666; font-size: 12px;">${formatFileSize(file.size)}</div>
-            </div>
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeWorkflowBatchFile(${index})" style="margin-left: 10px;">Remove</button>
-        `;
-
-        listContainer.appendChild(fileItem);
-    });
-}
-
-function removeWorkflowBatchFile(index) {
-    selectedWorkflowBatchFiles.splice(index, 1);
-    updateWorkflowBatchFilesList();
-}
-
-function clearWorkflowBatchFiles() {
-    selectedWorkflowBatchFiles = [];
-    updateWorkflowBatchFilesList();
-    const batchInput = document.getElementById('batchFileInputWorkflow');
-    if (batchInput) batchInput.value = '';
-}
-
-function formatFileSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-}
-
-function readFileContent(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = (e) => reject(new Error('Failed to read file'));
-        reader.readAsText(file);
-    });
 }
 
 function updateWorkflowForm() {
@@ -493,104 +184,51 @@ function updateWorkflowForm() {
 
 document.getElementById('runWorkflowForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    
+
     const submitBtn = document.getElementById('submitWorkflowBtn');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Starting...';
-    
+
     try {
         const workflowType = document.getElementById('workflowType').value;
         let endpoint, payload;
 
         if (workflowType === 'directory') {
-            const directoryMode = document.getElementById('directoryMode').value;
+            const directoryPath = document.getElementById('directoryPath').value.trim();
 
-            if (directoryMode === 'upload') {
-                // Handle client-side directory upload
-                if (selectedDirectoryFiles.length === 0) {
-                    alert('Please select a directory to upload');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Start Workflow';
-                    return;
-                }
-
-                submitBtn.textContent = 'Reading files...';
-                const fileContents = await Promise.all(
-                    selectedDirectoryFiles.map(async (file) => ({
-                        file_path: file.webkitRelativePath || file.name,
-                        content: await readFileContent(file)
-                    }))
-                );
-
-                endpoint = '/api/validate/batch';
-                payload = {
-                    files: fileContents.map(f => f.file_path),
-                    file_contents: fileContents,
-                    family: document.getElementById('family').value,
-                    validation_types: ['yaml', 'markdown', 'code', 'links', 'structure', 'Truth', 'FuzzyLogic'],
-                    max_workers: parseInt(document.getElementById('maxWorkers').value),
-                    upload_mode: true
-                };
-            } else {
-                // Handle server-side directory path
-                endpoint = '/workflows/validate-directory';
-                payload = {
-                    directory_path: document.getElementById('directoryPath').value,
-                    file_pattern: document.getElementById('filePattern').value,
-                    family: document.getElementById('family').value,
-                    max_workers: parseInt(document.getElementById('maxWorkers').value),
-                    workflow_type: 'validate_directory'
-                };
+            if (!directoryPath) {
+                alert('Please enter a directory path');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Start Workflow';
+                return;
             }
+
+            endpoint = '/workflows/validate-directory';
+            payload = {
+                directory_path: directoryPath,
+                file_pattern: document.getElementById('filePattern').value,
+                family: document.getElementById('family').value,
+                max_workers: parseInt(document.getElementById('maxWorkers').value),
+                workflow_type: 'validate_directory'
+            };
         } else if (workflowType === 'batch') {
-            const batchMode = document.getElementById('batchModeWorkflow').value;
+            const filesText = document.getElementById('batchFilePathsWorkflow').value;
+            const files = filesText.split('\n').map(f => f.trim()).filter(f => f);
 
-            if (batchMode === 'upload') {
-                // Handle client-side file upload
-                if (selectedWorkflowBatchFiles.length === 0) {
-                    alert('Please select at least one file to upload');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Start Workflow';
-                    return;
-                }
-
-                submitBtn.textContent = 'Reading files...';
-                const fileContents = await Promise.all(
-                    selectedWorkflowBatchFiles.map(async (file) => ({
-                        file_path: file.name,
-                        content: await readFileContent(file)
-                    }))
-                );
-
-                endpoint = '/api/validate/batch';
-                payload = {
-                    files: fileContents.map(f => f.file_path),
-                    file_contents: fileContents,
-                    family: document.getElementById('family').value,
-                    validation_types: ['yaml', 'markdown', 'code', 'links', 'structure', 'Truth', 'FuzzyLogic'],
-                    max_workers: parseInt(document.getElementById('maxWorkers').value),
-                    upload_mode: true
-                };
-            } else {
-                // Handle server-side file paths
-                endpoint = '/api/validate/batch';
-                const filesText = document.getElementById('filePaths').value;
-                const files = filesText.split('\n').map(f => f.trim()).filter(f => f);
-
-                if (files.length === 0) {
-                    alert('Please enter at least one file path');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Start Workflow';
-                    return;
-                }
-
-                payload = {
-                    files: files,
-                    family: document.getElementById('family').value,
-                    validation_types: ['yaml', 'markdown', 'code', 'links', 'structure', 'Truth', 'FuzzyLogic'],
-                    max_workers: parseInt(document.getElementById('maxWorkers').value)
-                };
+            if (files.length === 0) {
+                alert('Please enter at least one file path');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Start Workflow';
+                return;
             }
+
+            endpoint = '/api/validate/batch';
+            payload = {
+                files: files,
+                family: document.getElementById('family').value,
+                validation_types: ['yaml', 'markdown', 'code', 'links', 'structure', 'Truth', 'FuzzyLogic'],
+                max_workers: parseInt(document.getElementById('maxWorkers').value)
+            };
         } else {
             alert('Please select a workflow type');
             submitBtn.disabled = false;
@@ -805,23 +443,23 @@ function updateBulkActions() {
 async function bulkDelete() {
     const checkboxes = document.querySelectorAll('.workflow-checkbox:checked');
     const selectedIds = Array.from(checkboxes).map(cb => cb.value);
-    
+
     if (selectedIds.length === 0) {
         alert('Please select at least one workflow');
         return;
     }
-    
+
     if (!confirm(`Delete ${selectedIds.length} workflow(s)? This action cannot be undone.`)) {
         return;
     }
-    
+
     try {
         const response = await fetch('/api/workflows/bulk-delete', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(selectedIds)
         });
-        
+
         if (response.ok) {
             const result = await response.json();
             alert(`Successfully deleted ${result.deleted_count} workflow(s)`);
@@ -835,6 +473,29 @@ async function bulkDelete() {
         alert(`Error: ${error.message}`);
     }
 }
+
+// Initialize modal event handlers
+document.addEventListener('DOMContentLoaded', function() {
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const modal = document.getElementById('runWorkflowModal');
+            if (modal && modal.style.display !== 'none') {
+                closeRunWorkflowModal();
+            }
+        }
+    });
+
+    // Close modal on backdrop click
+    const modal = document.getElementById('runWorkflowModal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeRunWorkflowModal();
+            }
+        });
+    }
+});
 </script>
 
 <style>

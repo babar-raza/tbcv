@@ -7,10 +7,77 @@
     <a href="/dashboard/validations" class="btn btn-secondary">← Back to Validations</a>
 </div>
 
+<!-- Recommendations (shown first) -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2>Recommendations ({{ recommendations|length }})</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="rebuildRecommendations()">Rebuild</button>
+            {% if recommendations %}
+            <button class="btn btn-warning" onclick="enhanceSelected()">Enhance Selected</button>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if recommendations %}
+    <div style="margin-bottom: 15px;">
+        <label>
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
+            Select All
+        </label>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 40px;">
+                    <input type="checkbox" disabled>
+                </th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Target</th>
+                <th>Confidence</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rec in recommendations %}
+            <tr>
+                <td>
+                    <input type="checkbox" class="rec-checkbox" value="{{ rec.id }}"
+                           {% if rec.status == 'accepted' %}checked{% endif %}>
+                </td>
+                <td class="truncate" title="{{ rec.title }}">{{ rec.title }}</td>
+                <td><span class="badge badge-secondary">{{ rec.type }}</span></td>
+                <td><span class="badge badge-{{ rec.status }}">{{ rec.status }}</span></td>
+                <td class="truncate" title="{{ rec.metadata.target.selector if rec.metadata and rec.metadata.target else 'N/A' }}">
+                    {{ rec.metadata.target.selector if rec.metadata and rec.metadata.target else 'N/A' }}
+                </td>
+                <td>{{ "%.0f"|format(rec.confidence * 100) }}%</td>
+                <td class="actions">
+                    <a href="/dashboard/recommendations/{{ rec.id }}" class="btn btn-primary btn-sm">Review</a>
+                    <button class="btn btn-secondary btn-sm" onclick="copyRecAsJSON('{{ rec.id }}')">Copy JSON</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No recommendations for this validation</p>
+        {% if validation.status != 'enhanced' %}
+        <button class="btn btn-primary" onclick="generateRecommendations()">Generate Recommendations</button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Validation Details (shown second) -->
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2>Validation Details</h2>
-        
+
         <!-- Action Buttons -->
         <div id="actionButtons" style="display: flex; gap: 10px;">
             {% if validation.status not in ['approved', 'rejected', 'enhanced'] %}
@@ -28,39 +95,39 @@
             {% endif %}
         </div>
     </div>
-    
+
     <div class="detail-grid">
         <div class="detail-label">ID:</div>
         <div class="detail-value"><code>{{ validation.id }}</code></div>
-        
+
         <div class="detail-label">File Path:</div>
         <div class="detail-value">{{ validation.file_path }}</div>
-        
+
         <div class="detail-label">Status:</div>
         <div class="detail-value">
             <span id="statusBadge" class="badge badge-{{ validation.status }}">{{ validation.status }}</span>
         </div>
-        
+
         <div class="detail-label">Severity:</div>
         <div class="detail-value">
             <span class="badge badge-{{ validation.severity }}">{{ validation.severity }}</span>
         </div>
-        
+
         <div class="detail-label">Created:</div>
         <div class="detail-value">{{ validation.created_at }}</div>
-        
+
         <div class="detail-label">Updated:</div>
         <div class="detail-value" id="updatedAt">{{ validation.updated_at }}</div>
     </div>
-    
+
     {% if validation.notes %}
     <div style="margin-top: 20px;">
         <h3 style="margin-bottom: 10px;">Notes</h3>
         <p id="validationNotes">{{ validation.notes }}</p>
     </div>
     {% endif %}
-    
-        
+
+
     <!-- Enhancement Comparison for Enhanced Validations -->
     {% if validation.status == 'enhanced' %}
     <div style="margin-top: 20px;" id="enhancementSection">
@@ -131,75 +198,112 @@
         </div>
     </div>
     {% endif %}
-    
+
     {% if validation.validation_results %}
     <div style="margin-top: 20px;">
         <h3 style="margin-bottom: 10px;">Validation Results</h3>
-        <pre>{{ validation.validation_results | tojson(indent=2) }}</pre>
-    </div>
-    {% endif %}
-</div>
 
-<!-- Recommendations -->
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <h2>Recommendations ({{ recommendations|length }})</h2>
-        <div style="display: flex; gap: 10px;">
-            <button class="btn btn-secondary" onclick="rebuildRecommendations()">Rebuild</button>
-            {% if recommendations %}
-            <button class="btn btn-warning" onclick="enhanceSelected()">Enhance Selected</button>
+        <!-- Error Summary Card -->
+        {% if validation.validation_results.error_summary %}
+        {% set summary = validation.validation_results.error_summary %}
+        <div class="error-summary-card" style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; text-align: center;">
+                <div>
+                    <div style="font-size: 12px; color: #666; text-transform: uppercase;">Total Issues</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #333;">{{ summary.total }}</div>
+                </div>
+                {% if summary.by_level.critical %}
+                <div>
+                    <div style="font-size: 12px; color: #666; text-transform: uppercase;">Critical</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #dc3545;">{{ summary.by_level.critical }}</div>
+                </div>
+                {% endif %}
+                {% if summary.by_level.error %}
+                <div>
+                    <div style="font-size: 12px; color: #666; text-transform: uppercase;">Errors</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #e74c3c;">{{ summary.by_level.error }}</div>
+                </div>
+                {% endif %}
+                {% if summary.by_level.warning %}
+                <div>
+                    <div style="font-size: 12px; color: #666; text-transform: uppercase;">Warnings</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #f39c12;">{{ summary.by_level.warning }}</div>
+                </div>
+                {% endif %}
+                {% if summary.by_level.info %}
+                <div>
+                    <div style="font-size: 12px; color: #666; text-transform: uppercase;">Info</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #17a2b8;">{{ summary.by_level.info }}</div>
+                </div>
+                {% endif %}
+                {% if summary.auto_fixable %}
+                <div>
+                    <div style="font-size: 12px; color: #666; text-transform: uppercase;">Auto-fixable</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #28a745;">{{ summary.auto_fixable }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Categories breakdown -->
+            {% if summary.by_category %}
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+                <div style="font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 8px;">By Category</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    {% for cat, count in summary.by_category.items() %}
+                    <span class="badge" style="background: #6c757d; color: white; padding: 4px 8px; border-radius: 4px;">
+                        {{ cat }}: {{ count }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
             {% endif %}
         </div>
-    </div>
-    
-    {% if recommendations %}
-    <div style="margin-bottom: 15px;">
-        <label>
-            <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
-            Select All
-        </label>
-    </div>
-    
-    <table>
-        <thead>
-            <tr>
-                <th style="width: 40px;">
-                    <input type="checkbox" disabled>
-                </th>
-                <th>Title</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Target</th>
-                <th>Confidence</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for rec in recommendations %}
-            <tr>
-                <td>
-                    <input type="checkbox" class="rec-checkbox" value="{{ rec.id }}" 
-                           {% if rec.status == 'accepted' %}checked{% endif %}>
-                </td>
-                <td class="truncate" title="{{ rec.title }}">{{ rec.title }}</td>
-                <td><span class="badge badge-secondary">{{ rec.type }}</span></td>
-                <td><span class="badge badge-{{ rec.status }}">{{ rec.status }}</span></td>
-                <td class="truncate" title="{{ rec.metadata.target.selector if rec.metadata and rec.metadata.target else 'N/A' }}">
-                    {{ rec.metadata.target.selector if rec.metadata and rec.metadata.target else 'N/A' }}
-                </td>
-                <td>{{ "%.0f"|format(rec.confidence * 100) }}%</td>
-                <td class="actions">
-                    <a href="/dashboard/recommendations/{{ rec.id }}" class="btn btn-primary btn-sm">Review</a>
-                    <button class="btn btn-secondary btn-sm" onclick="copyRecAsJSON('{{ rec.id }}')">Copy JSON</button>
-                </td>
-            </tr>
+        {% endif %}
+
+        <!-- Issues List -->
+        {% if validation.validation_results.formatted_issues %}
+        <div class="issues-list" style="margin-bottom: 20px;">
+            <h4 style="margin-bottom: 15px;">Issues Detail</h4>
+            {% for issue in validation.validation_results.formatted_issues %}
+            <div class="issue-item" style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-bottom: 10px; border-left: 4px solid {% if issue.level == 'critical' %}#dc3545{% elif issue.level == 'error' %}#e74c3c{% elif issue.level == 'warning' %}#f39c12{% else %}#17a2b8{% endif %};">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge" style="background: {% if issue.level == 'critical' %}#dc3545{% elif issue.level == 'error' %}#e74c3c{% elif issue.level == 'warning' %}#f39c12{% else %}#17a2b8{% endif %}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px; text-transform: uppercase;">
+                            {{ issue.level }}
+                        </span>
+                        {% if issue.code %}
+                        <code style="background: #e9ecef; padding: 2px 6px; border-radius: 3px; font-size: 12px; margin-left: 5px;">{{ issue.code }}</code>
+                        {% endif %}
+                        <span class="badge" style="background: #6c757d; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 5px;">{{ issue.category }}</span>
+                    </div>
+                    <div style="font-size: 12px; color: #666;">
+                        {% if issue.line_number %}Line {{ issue.line_number }}{% if issue.column %}:{{ issue.column }}{% endif %}{% endif %}
+                        {% if issue.auto_fixable %}<span class="badge" style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 5px;">Auto-fix</span>{% endif %}
+                    </div>
+                </div>
+                <div style="font-size: 14px; color: #333;">{{ issue.message }}</div>
+                {% if issue.suggestion %}
+                <div style="margin-top: 8px; padding: 8px; background: #e8f5e9; border-radius: 4px; font-size: 13px; color: #2e7d32;">
+                    <strong>Suggestion:</strong> {{ issue.suggestion }}
+                </div>
+                {% endif %}
+                {% if issue.context_snippet %}
+                <div style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 12px; color: #666; overflow-x: auto;">
+                    {{ issue.context_snippet }}
+                </div>
+                {% endif %}
+            </div>
             {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div class="empty-state">
-        <p>No recommendations for this validation</p>
-        <button class="btn btn-primary" onclick="generateRecommendations()">Generate Recommendations</button>
+        </div>
+        {% endif %}
+
+        <!-- Raw JSON (collapsible) -->
+        <details style="margin-top: 15px;">
+            <summary style="cursor: pointer; padding: 10px; background: #f8f9fa; border-radius: 4px; font-weight: bold;">
+                View Raw JSON
+            </summary>
+            <pre style="margin-top: 10px; padding: 15px; background: #f5f5f5; border-radius: 4px; overflow-x: auto;">{{ validation.validation_results | tojson(indent=2) }}</pre>
+        </details>
     </div>
     {% endif %}
 </div>
