@@ -118,7 +118,31 @@ async def initialize_agents():
 @click.option('--mcp-debug', is_flag=True, help='Enable MCP client debug logging')
 @click.pass_context
 def cli(ctx, verbose: bool, config: Optional[str], quiet: bool, mcp_debug: bool):
-    """TBCV Command Line Interface."""
+    """TBCV - Truth-Based Content Validation System.
+
+    A comprehensive CLI for validating, enhancing, and managing content quality
+    using truth-based validation principles and AI-powered recommendations.
+
+    GLOBAL OPTIONS:
+        -v, --verbose: Enable verbose logging for debugging
+        -c, --config: Path to custom configuration file
+        -q, --quiet: Minimal console output
+        --mcp-debug: Enable MCP client debug logging
+
+    EXAMPLES:
+        # Show available commands
+        tbcv --help
+
+        # Enable verbose logging
+        tbcv -v validate-file content.md
+
+        # Use custom configuration
+        tbcv -c config.yaml validate-file content.md
+
+    LEARN MORE:
+        Run 'tbcv COMMAND --help' for detailed options on any command.
+        Run 'tbcv validations --help' to see validation management commands.
+    """
     ctx.ensure_object(dict)
     ctx.obj['verbose'] = verbose
     ctx.obj['quiet'] = quiet
@@ -152,7 +176,36 @@ def cli(ctx, verbose: bool, config: Optional[str], quiet: bool, mcp_debug: bool)
               type=click.Choice(['json', 'text']), help='Output format')
 @with_mcp_client
 def validate_file(file_path: str, family: str, types: Optional[str], output: Optional[str], output_format: str, mcp_client):
-    """Validate a single content file using MCP client."""
+    """Validate a single file for content quality issues.
+
+    Performs comprehensive validation including syntax checking, content quality
+    analysis, and truth-based validation against reference data.
+
+    ARGUMENTS:
+        FILE_PATH: Path to the file to validate (must exist)
+
+    OPTIONS:
+        -f, --family: Plugin family for validation (default: words)
+        -t, --types: Comma-separated validation types (yaml, markdown, Truth, etc.)
+        -o, --output: Save results to specified file
+        --format: Output format - json (default) or text
+
+    EXAMPLES:
+        # Validate a Markdown file
+        tbcv validate-file myfile.md
+
+        # Validate with specific types and save results
+        tbcv validate-file content.md --types markdown,Truth -o results.json
+
+        # Get text output instead of JSON
+        tbcv validate-file myfile.md --format text
+
+        # Validate with custom plugin family
+        tbcv validate-file doc.yaml -f yaml -o report.json
+
+    OUTPUT:
+        Returns validation ID, status, detected issues with severity levels,
+        and confidence scores for each validation type."""
     # Check if content is English before processing
     is_english, reason = is_english_content(file_path)
     if not is_english:
@@ -228,7 +281,43 @@ def validate_file(file_path: str, family: str, types: Optional[str], output: Opt
 @with_mcp_client
 def validate_directory(directory_path: str, pattern: str, family: str, types: Optional[str], workers: int,
                        output: Optional[str], output_format: str, recursive: bool, mcp_client):
-    """Validate all files in a directory using MCP client."""
+    """Batch validate all files in a directory.
+
+    Validates multiple files in parallel using worker threads. Supports recursive
+    directory traversal and glob patterns for selective file validation.
+
+    ARGUMENTS:
+        DIRECTORY_PATH: Path to directory containing files to validate
+
+    OPTIONS:
+        -p, --pattern: Glob pattern for file matching (default: *.md)
+        -f, --family: Plugin family for validation (default: words)
+        -t, --types: Comma-separated validation types
+        -w, --workers: Number of concurrent workers (default: 4)
+        -o, --output: Save results to file
+        --format: Output format - json (default), text, or summary
+        -r, --recursive: Include subdirectories
+
+    EXAMPLES:
+        # Validate all Markdown files in a directory
+        tbcv validate-directory ./docs
+
+        # Recursive validation with custom pattern
+        tbcv validate-directory ./content -p "*.md" -r -w 8
+
+        # Get summary statistics only
+        tbcv validate-directory ./docs --format summary
+
+        # Validate YAML and JSON files with 2 workers
+        tbcv validate-directory ./config -p "*.{yaml,json}" -w 2 -o results.json
+
+    PERFORMANCE TIPS:
+        - Increase --workers for faster processing on multi-core systems
+        - Use --pattern to validate only specific file types
+        - Higher worker count = more CPU/memory usage
+
+    OUTPUT:
+        Detailed validation results for each file, aggregate statistics."""
     try:
         click.echo("Starting directory validation...")
         click.echo(f"Directory: {directory_path}")
@@ -303,7 +392,27 @@ def validate_directory(directory_path: str, pattern: str, family: str, types: Op
               type=click.Choice(['text', 'json']), help='Output format')
 @with_mcp_client
 def check_agents(output_format: str, mcp_client):
-    """Check system status and health via MCP."""
+    """Check system health and agent status.
+
+    Displays operational status of all system components and agents,
+    including resource usage, health metrics, and component details.
+
+    OPTIONS:
+        --format: Output format - text (default) or json
+
+    EXAMPLES:
+        # Get human-readable system status
+        tbcv check-agents
+
+        # Get JSON output for scripting or integration
+        tbcv check-agents --format json
+
+        # Check with verbose output
+        tbcv -v check-agents
+
+    OUTPUT:
+        System status (healthy/degraded/down), component-by-component health,
+        and resource usage metrics (CPU, memory, etc.)."""
     try:
         result = mcp_client.get_system_status()
 
@@ -352,7 +461,49 @@ def check_agents(output_format: str, mcp_client):
 @click.option('--no-cache', is_flag=True, help='Skip cache lookup')
 @click.pass_context
 def validate(ctx, file_path, validation_type, confidence, output, fix, no_cache):
-    """Validate a single file via workflow."""
+    """Run full validation workflow on a file.
+
+    Performs comprehensive validation using the orchestrator workflow, including
+    fuzzy detection, content validation, and LLM-based analysis with confidence scoring.
+
+    ARGUMENTS:
+        FILE_PATH: Path to the file to validate
+
+    OPTIONS:
+        --type: Validation type - basic, full (default), or enhanced
+        --confidence: Confidence threshold 0.0-1.0 (default: 0.6)
+        --output: Output format - table (default), json, or yaml
+        --fix: Apply automatic fixes to detected issues
+        --no-cache: Skip cache lookup for faster fresh validation
+
+    EXAMPLES:
+        # Run full validation with table output
+        tbcv validate myfile.md
+
+        # Run basic validation only
+        tbcv validate myfile.md --type basic
+
+        # Enhanced validation with JSON output
+        tbcv validate myfile.md --type enhanced --output json
+
+        # Validate with high confidence threshold
+        tbcv validate myfile.md --confidence 0.8
+
+        # Apply automatic fixes
+        tbcv validate myfile.md --fix
+
+        # Skip cache for fresh analysis
+        tbcv validate myfile.md --no-cache
+
+    VALIDATION TYPES:
+        basic: Quick syntax and structure checks only
+        full: Comprehensive validation with all agents and analysis
+        enhanced: Full validation plus content enhancement recommendations
+
+    OUTPUT FORMATS:
+        table: Rich formatted table (default, best for terminal)
+        json: JSON formatted output (best for scripting)
+        yaml: YAML formatted output (best for configuration)"""
     asyncio.run(_validate_file(ctx, file_path, validation_type, confidence, output, fix, no_cache))
 
 
@@ -457,7 +608,40 @@ def _display_validation_results_table(result):
 @click.pass_context
 @with_mcp_client
 def batch(ctx, directory_path, pattern, recursive, report_file, summary_only, mcp_client):
-    """Batch process files in a directory using MCP workflow."""
+    """Batch validate files in a directory.
+
+    Creates and executes a batch validation workflow for multiple files.
+    Generates comprehensive reports of validation results with detailed metrics.
+
+    ARGUMENTS:
+        DIRECTORY_PATH: Path to the directory containing files to process
+
+    OPTIONS:
+        --pattern: File glob pattern (default: *.md)
+        -r, --recursive: Recursively process subdirectories
+        --report-file: Save detailed JSON report to file
+        --summary-only: Show only aggregate statistics
+
+    EXAMPLES:
+        # Process all Markdown files
+        tbcv batch ./docs
+
+        # Recursive processing with report
+        tbcv batch ./content -r --report-file report.json
+
+        # Show summary statistics only
+        tbcv batch ./docs --summary-only
+
+        # Process specific file pattern
+        tbcv batch ./src -p "*.py" -r --report-file python_report.json
+
+    REPORTS:
+        Detailed reports include per-file results, aggregate statistics,
+        error counts, and processing timeline.
+
+    WORKFLOW:
+        Creates a batch workflow that processes files in parallel,
+        tracks progress, and generates final report."""
     if not ctx.obj.get('quiet'):
         console.print(f"[blue]Batch processing directory:[/blue] {directory_path}")
         console.print(f"[blue]Recursive:[/blue] {recursive}")
@@ -564,7 +748,43 @@ def _display_batch_summary(workflow_report):
 @click.pass_context
 @with_mcp_client
 def enhance(ctx, validation_ids: tuple, preview: bool, threshold: float, mcp_client):
-    """Enhance approved validations using MCP client."""
+    """Apply enhancements to validated content.
+
+    Applies approved recommendations to enhance content quality based on
+    validation results. Can preview changes before applying them.
+
+    ARGUMENTS:
+        VALIDATION_IDS: One or more validation IDs to enhance
+
+    OPTIONS:
+        --preview: Preview changes without actually applying them
+        --threshold: Confidence threshold for recommendations (default: 0.7)
+
+    EXAMPLES:
+        # Preview enhancement for a validation
+        tbcv enhance abc123def456 --preview
+
+        # Apply enhancement with custom threshold
+        tbcv enhance abc123def456 --threshold 0.8
+
+        # Enhance multiple validations
+        tbcv enhance abc123def456 xyz789uvw012
+
+        # Preview before applying (recommended workflow)
+        tbcv enhance abc123def456 --preview
+        # ... review output ...
+        tbcv enhance abc123def456
+
+    RECOMMENDED WORKFLOW:
+        1. Run validation: tbcv validate myfile.md
+        2. Preview enhancement: tbcv enhance <ID> --preview
+        3. Review the diff output
+        4. Apply enhancement: tbcv enhance <ID>
+
+    CONFIDENCE THRESHOLD:
+        Higher threshold = more conservative (fewer changes)
+        Lower threshold = more aggressive (more changes)
+        Default 0.7 balances safety and improvement"""
     if not ctx.obj.get('quiet'):
         mode = "PREVIEW" if preview else "ENHANCE"
         console.print(f"[blue]{mode} {len(validation_ids)} validation(s)[/blue]")
@@ -629,7 +849,30 @@ def enhance(ctx, validation_ids: tuple, preview: bool, threshold: float, mcp_cli
 @cli.command()
 @click.pass_context
 def test(ctx):
-    """Create and process a test file."""
+    """Run a test validation workflow.
+
+    Creates sample content with various issues and runs full validation
+    to demonstrate the system functionality and verify installation.
+
+    EXAMPLES:
+        # Run test with default output
+        tbcv test
+
+        # Run test with verbose logging
+        tbcv -v test
+
+        # Run test with quiet mode
+        tbcv -q test
+
+    USE CASES:
+        - Testing system installation
+        - Learning the validation workflow
+        - Verifying configuration
+        - Testing after upgrades
+
+    TEST CONTENT:
+        Includes Markdown with YAML frontmatter, code examples,
+        and various content patterns for comprehensive testing."""
     asyncio.run(_run_test(ctx))
 
 
@@ -680,7 +923,21 @@ You can also add watermarks to your documents.
 @cli.command()
 @click.pass_context
 def status(ctx):
-    """Show system status."""
+    """Display detailed system and agent status.
+
+    Shows operational status of all agents, request processing counts,
+    and performance metrics including response times.
+
+    EXAMPLES:
+        # Show agent status
+        tbcv status
+
+        # Show status with verbose output
+        tbcv -v status
+
+    OUTPUT:
+        Agent name, operational status, request count, and average
+        response time for each registered agent."""
     asyncio.run(_show_status(ctx))
 
 
@@ -715,7 +972,41 @@ async def _show_status(ctx):
 @cli.group()
 @click.pass_context
 def recommendations(ctx):
-    """Manage recommendations for content improvements."""
+    """Manage recommendations for content improvements.
+
+    View, approve, reject, and apply recommendations for enhancing content.
+    Recommendations are generated during validation based on detected issues.
+
+    SUBCOMMANDS:
+        list: List recommendations with optional filtering
+        show: Show detailed information about a recommendation
+        approve: Approve one or more recommendations
+        reject: Reject one or more recommendations
+        enhance: Apply approved recommendations to content
+        generate: Generate recommendations for a validation
+        auto-apply: Auto-apply high-confidence recommendations
+        rebuild: Rebuild recommendations for a validation
+        delete: Delete recommendations
+
+    EXAMPLES:
+        # List all pending recommendations
+        tbcv recommendations list --status pending
+
+        # Show details of a specific recommendation
+        tbcv recommendations show REC_ID
+
+        # Approve recommendations
+        tbcv recommendations approve REC_ID1 REC_ID2
+
+        # Auto-apply recommendations with high confidence
+        tbcv recommendations auto-apply VAL_ID --threshold 0.9
+
+    WORKFLOW:
+        1. Get validation ID: tbcv validate myfile.md
+        2. List recommendations: tbcv recommendations list
+        3. Review and approve: tbcv recommendations approve REC_ID
+        4. Apply enhancements: tbcv enhance VAL_ID
+    """
     pass
 
 
@@ -1212,7 +1503,43 @@ async def _auto_apply_recommendations(ctx, validation_id, threshold, dry_run):
 @cli.group()
 @click.pass_context
 def validations(ctx):
-    """Manage validation results."""
+    """Manage validation results and content validation history.
+
+    View, compare, and manage validation results including approval status
+    and content enhancement tracking.
+
+    SUBCOMMANDS:
+        list: List validation results with optional filtering
+        show: Show detailed validation information
+        history: Show validation history for a specific file
+        approve: Approve a validation result
+        reject: Reject a validation result
+        revalidate: Re-validate content from a previous validation
+        diff: Show content diff for an enhanced validation
+        compare: Show comprehensive enhancement comparison
+
+    EXAMPLES:
+        # List recent validations
+        tbcv validations list
+
+        # Show details of a specific validation
+        tbcv validations show VAL_ID
+
+        # Show validation history for a file
+        tbcv validations history myfile.md
+
+        # Approve a validation
+        tbcv validations approve VAL_ID
+
+        # View content diff
+        tbcv validations diff VAL_ID
+
+    WORKFLOW:
+        1. Validate file: tbcv validate myfile.md
+        2. Review results: tbcv validations show VAL_ID
+        3. View history: tbcv validations history myfile.md
+        4. Approve and apply: tbcv validations approve VAL_ID
+    """
     pass
 
 
@@ -1505,7 +1832,40 @@ async def _revalidate(ctx, validation_id):
 @cli.group()
 @click.pass_context
 def workflows(ctx):
-    """Manage workflow execution."""
+    """Manage workflow execution and monitoring.
+
+    View and manage workflow instances including batch operations,
+    validation workflows, and enhancement workflows.
+
+    SUBCOMMANDS:
+        list: List workflows with optional state filtering
+        show: Show detailed workflow information and logs
+
+    EXAMPLES:
+        # List all workflows
+        tbcv workflows list
+
+        # List only completed workflows
+        tbcv workflows list --state completed
+
+        # Show details of a specific workflow
+        tbcv workflows show WORKFLOW_ID
+
+    WORKFLOW STATES:
+        pending: Awaiting execution
+        running: Currently executing
+        paused: Temporarily halted
+        completed: Successfully finished
+        failed: Failed during execution
+        cancelled: Manually cancelled
+
+    EXAMPLES:
+        # Check status of batch operation
+        tbcv workflows show batch-workflow-123
+
+        # List all failed workflows to diagnose issues
+        tbcv workflows list --state failed
+    """
     pass
 
 
@@ -3152,12 +3512,363 @@ def create_checkpoint(ctx, name):
 
 
 # ---------------------------
+# migrate command group (Database Migrations)
+# ---------------------------
+@cli.group()
+@click.pass_context
+def migrate(ctx):
+    """Database migration commands.
+
+    Manage database schema versions and run migrations using Alembic.
+    Use these commands to upgrade or downgrade your database schema.
+
+    SUBCOMMANDS:
+        current: Show the current migration revision
+        history: Show migration history
+        upgrade: Upgrade database to target revision
+        downgrade: Downgrade database to target revision
+        create: Create a new migration
+        stamp: Mark a specific revision as applied
+
+    EXAMPLES:
+        # Check current schema version
+        tbcv migrate current
+
+        # Show all migrations
+        tbcv migrate history
+
+        # Upgrade to latest schema
+        tbcv migrate upgrade
+
+        # See SQL before applying
+        tbcv migrate upgrade --sql
+
+        # Create new migration after model changes
+        tbcv migrate create "add user table"
+
+    WORKFLOW:
+        1. Make model changes in code
+        2. Create migration: tbcv migrate create "description"
+        3. Review generated migration
+        4. Test upgrade: tbcv migrate upgrade --sql
+        5. Apply upgrade: tbcv migrate upgrade
+    """
+    pass
+
+
+@migrate.command('current')
+@click.option('--verbose', '-v', is_flag=True, help='Show verbose output')
+@click.pass_context
+def migrate_current(ctx, verbose):
+    """Show current migration revision.
+
+    Displays the current database schema version and indicates which migration
+    has been most recently applied.
+
+    EXAMPLES:
+        # Show current revision
+        tbcv migrate current
+
+        # Show with detailed information
+        tbcv migrate current -v
+    """
+    from alembic.config import Config
+    from alembic import command
+
+    try:
+        alembic_cfg = Config("alembic.ini")
+        command.current(alembic_cfg, verbose=verbose)
+        console.print("[green][OK] Current revision displayed[/green]")
+    except Exception as e:
+        console.print(f"[red]Error showing current revision: {e}[/red]")
+        if ctx.obj.get('verbose'):
+            console.print_exception()
+        sys.exit(1)
+
+
+@migrate.command('history')
+@click.option('--verbose', '-v', is_flag=True, help='Show verbose output')
+@click.option('--range', '-r', help='Range to show (e.g., base:head)')
+@click.pass_context
+def migrate_history(ctx, verbose, range):
+    """Show migration history.
+
+    Lists all migrations that have been applied to the database schema,
+    including details about each migration revision.
+
+    OPTIONS:
+        -v, --verbose: Show detailed information for each migration
+        -r, --range: Show specific range (e.g., base:head)
+
+    EXAMPLES:
+        # Show all migrations
+        tbcv migrate history
+
+        # Show with detailed info
+        tbcv migrate history -v
+
+        # Show specific range
+        tbcv migrate history -r base:head
+    """
+    from alembic.config import Config
+    from alembic import command
+
+    try:
+        alembic_cfg = Config("alembic.ini")
+        if range:
+            command.history(alembic_cfg, rev_range=range, verbose=verbose)
+        else:
+            command.history(alembic_cfg, verbose=verbose)
+        console.print("[green][OK] Migration history displayed[/green]")
+    except Exception as e:
+        console.print(f"[red]Error showing migration history: {e}[/red]")
+        if ctx.obj.get('verbose'):
+            console.print_exception()
+        sys.exit(1)
+
+
+@migrate.command('upgrade')
+@click.option('--revision', '-r', default='head', help='Target revision (default: head)')
+@click.option('--sql', is_flag=True, help='Show SQL only, do not execute')
+@click.pass_context
+def migrate_upgrade(ctx, revision, sql):
+    """Upgrade database to target revision.
+
+    Applies pending migrations to move the database schema forward to a
+    specified revision (default: latest).
+
+    OPTIONS:
+        -r, --revision: Target revision identifier (default: head for latest)
+        --sql: Preview SQL without executing (useful for review)
+
+    EXAMPLES:
+        # Upgrade to latest schema
+        tbcv migrate upgrade
+
+        # Upgrade to specific revision
+        tbcv migrate upgrade --revision abc123def456
+
+        # Preview SQL before upgrading
+        tbcv migrate upgrade --sql
+
+        # Check what will be upgraded
+        tbcv migrate upgrade --sql | head -20
+    """
+    from alembic.config import Config
+    from alembic import command
+
+    try:
+        alembic_cfg = Config("alembic.ini")
+        if sql:
+            command.upgrade(alembic_cfg, revision, sql=True)
+        else:
+            command.upgrade(alembic_cfg, revision)
+            console.print(f"[green][OK] Database upgraded to {revision}[/green]")
+    except Exception as e:
+        console.print(f"[red]Error upgrading database: {e}[/red]")
+        if ctx.obj.get('verbose'):
+            console.print_exception()
+        sys.exit(1)
+
+
+@migrate.command('downgrade')
+@click.option('--revision', '-r', required=True, help='Target revision')
+@click.option('--sql', is_flag=True, help='Show SQL only, do not execute')
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
+@click.pass_context
+def migrate_downgrade(ctx, revision, sql, yes):
+    """Downgrade database to target revision.
+
+    Reverts migrations to move the database schema backward to a specified
+    revision. USE WITH CAUTION - this may result in data loss.
+
+    OPTIONS:
+        -r, --revision: Target revision (REQUIRED)
+        --sql: Preview SQL without executing
+        -y, --yes: Skip confirmation prompt (use for automation)
+
+    EXAMPLES:
+        # Downgrade to previous version
+        tbcv migrate downgrade --revision abc123def456
+
+        # Preview downgrade SQL
+        tbcv migrate downgrade --revision abc123def456 --sql
+
+        # Auto-confirm downgrade (for scripts)
+        tbcv migrate downgrade --revision abc123def456 --yes
+
+    WARNING:
+        Downgrades may cause data loss. Always backup your database first.
+    """
+    from alembic.config import Config
+    from alembic import command
+
+    if not yes and not sql:
+        if not click.confirm(f"Are you sure you want to downgrade to {revision}?"):
+            console.print("[yellow]Aborted[/yellow]")
+            return
+
+    try:
+        alembic_cfg = Config("alembic.ini")
+        if sql:
+            command.downgrade(alembic_cfg, revision, sql=True)
+        else:
+            command.downgrade(alembic_cfg, revision)
+            console.print(f"[green][OK] Database downgraded to {revision}[/green]")
+    except Exception as e:
+        console.print(f"[red]Error downgrading database: {e}[/red]")
+        if ctx.obj.get('verbose'):
+            console.print_exception()
+        sys.exit(1)
+
+
+@migrate.command('create')
+@click.argument('message')
+@click.option('--autogenerate/--no-autogenerate', default=True, help='Auto-generate migration (default: True)')
+@click.option('--sql', is_flag=True, help='Show SQL only, do not create migration file')
+@click.pass_context
+def migrate_create(ctx, message, autogenerate, sql):
+    """Create a new migration.
+
+    Creates a new migration file based on model changes detected in your code.
+    Alembic will auto-detect schema differences and generate SQL.
+
+    ARGUMENTS:
+        MESSAGE: Description of the migration (e.g., "add user table", "rename column")
+
+    OPTIONS:
+        --autogenerate: Auto-detect changes (default: True)
+        --no-autogenerate: Create empty migration for manual editing
+        --sql: Show generated SQL without creating file
+
+    EXAMPLES:
+        # Create migration for detected model changes
+        tbcv migrate create "add user permissions table"
+
+        # Create empty migration for manual editing
+        tbcv migrate create "complex schema change" --no-autogenerate
+
+        # Preview generated SQL
+        tbcv migrate create "add column" --sql
+
+    WORKFLOW:
+        1. Modify model classes (add/remove fields, etc.)
+        2. Create migration: tbcv migrate create "description"
+        3. Review migration file in migrations/versions/
+        4. Apply: tbcv migrate upgrade
+    """
+    from alembic.config import Config
+    from alembic import command
+
+    try:
+        alembic_cfg = Config("alembic.ini")
+        if sql:
+            if autogenerate:
+                command.revision(alembic_cfg, message=message, autogenerate=True, sql=True)
+            else:
+                console.print("[yellow]--sql flag only works with --autogenerate[/yellow]")
+                return
+        else:
+            if autogenerate:
+                command.revision(alembic_cfg, message=message, autogenerate=True)
+            else:
+                command.revision(alembic_cfg, message=message)
+            console.print(f"[green][OK] Migration created: {message}[/green]")
+            console.print("[blue]Review the migration file in migrations/versions/ before applying[/blue]")
+    except Exception as e:
+        console.print(f"[red]Error creating migration: {e}[/red]")
+        if ctx.obj.get('verbose'):
+            console.print_exception()
+        sys.exit(1)
+
+
+@migrate.command('stamp')
+@click.argument('revision')
+@click.option('--sql', is_flag=True, help='Show SQL only, do not execute')
+@click.pass_context
+def migrate_stamp(ctx, revision, sql):
+    """Stamp the database with a specific revision without running migrations.
+
+    Marks the database as being at a specific migration revision without
+    executing the actual migration. Useful for initializing new databases
+    or correcting revision tracking.
+
+    ARGUMENTS:
+        REVISION: Target revision ID (e.g., 'head', 'base', or specific revision)
+
+    OPTIONS:
+        --sql: Show SQL operations without executing
+
+    EXAMPLES:
+        # Mark database as at latest revision
+        tbcv migrate stamp head
+
+        # Mark as at base (no migrations)
+        tbcv migrate stamp base
+
+        # Mark as at specific revision
+        tbcv migrate stamp abc123def456
+
+    WARNING:
+        Use only if you know what you're doing. This changes version tracking
+        without running migrations, which can cause inconsistencies.
+    """
+    from alembic.config import Config
+    from alembic import command
+
+    try:
+        alembic_cfg = Config("alembic.ini")
+        if sql:
+            command.stamp(alembic_cfg, revision, sql=True)
+        else:
+            command.stamp(alembic_cfg, revision)
+            console.print(f"[green][OK] Database stamped with revision: {revision}[/green]")
+    except Exception as e:
+        console.print(f"[red]Error stamping database: {e}[/red]")
+        if ctx.obj.get('verbose'):
+            console.print_exception()
+        sys.exit(1)
+
+
+# ---------------------------
 # rag command group (RAG/Vector Search)
 # ---------------------------
 @cli.group()
 @click.pass_context
 def rag(ctx):
-    """Manage RAG (Retrieval-Augmented Generation) for semantic truth search."""
+    """Manage RAG (Retrieval-Augmented Generation) for semantic truth search.
+
+    Build and manage semantic indices of truth data for fast similarity searches.
+    RAG enables context-aware recommendations based on semantic matching.
+
+    SUBCOMMANDS:
+        index: Build vector indices for truth families
+        search: Search truth data by semantic similarity
+        status: Show index status and statistics
+        clear: Delete and rebuild indices
+
+    EXAMPLES:
+        # Index all truth data
+        tbcv rag index --all-families
+
+        # Search for similar truth entries
+        tbcv rag search "user permissions"
+
+        # Search with specific family
+        tbcv rag search "validation rules" -f words
+
+        # Check index status
+        tbcv rag status
+
+        # Rebuild indices from scratch
+        tbcv rag clear --confirm
+        tbcv rag index --all-families
+
+    WORKFLOW:
+        1. Index truth data: tbcv rag index --all-families
+        2. Search during validation: tbcv validate myfile.md
+        3. Recommendations use semantic search automatically
+    """
     pass
 
 
@@ -3167,7 +3878,36 @@ def rag(ctx):
 @click.option('--clear', is_flag=True, default=True, help='Clear existing index before indexing')
 @click.pass_context
 def rag_index(ctx, family, all_families, clear):
-    """Index truth data for semantic search."""
+    """Index truth data for semantic search.
+
+    Builds vector indices from truth data to enable fast semantic similarity
+    searches. These indices are used during validation to find relevant truths
+    and generate better recommendations.
+
+    OPTIONS:
+        -f, --family: Index specific truth family (default: words)
+        --all-families: Index all available families
+        --clear: Clear existing index before rebuilding (default: True)
+
+    EXAMPLES:
+        # Index default words family
+        tbcv rag index
+
+        # Index all families
+        tbcv rag index --all-families
+
+        # Index specific family
+        tbcv rag index -f validation_rules
+
+        # Rebuild index without clearing first
+        tbcv rag index --no-clear
+
+    PERFORMANCE NOTES:
+        - First indexing may take several minutes depending on dataset size
+        - Subsequent indexing is incremental and faster
+        - Larger families require more memory and time
+        - Monitor with: tbcv rag status
+    """
     asyncio.run(_rag_index(ctx, family, all_families, clear))
 
 
@@ -3226,7 +3966,42 @@ async def _rag_index(ctx, family, all_families, clear):
               type=click.Choice(['table', 'json']), help='Output format')
 @click.pass_context
 def rag_search(ctx, query, family, top_k, threshold, output_format):
-    """Search truths using semantic similarity."""
+    """Search truths using semantic similarity.
+
+    Find relevant truth entries by semantic similarity to your query.
+    Returns ranked results with confidence scores.
+
+    ARGUMENTS:
+        QUERY: Search query text (e.g., "user permissions", "validation rules")
+
+    OPTIONS:
+        -f, --family: Truth family to search (default: words)
+        -k, --top-k: Number of results to return (default: 5)
+        -t, --threshold: Minimum similarity score 0.0-1.0 (default: 0.7)
+        --format: Output format (table or json)
+
+    EXAMPLES:
+        # Find similar truths
+        tbcv rag search "security validation"
+
+        # Return more results
+        tbcv rag search "content guidelines" -k 10
+
+        # Lower threshold for broader results
+        tbcv rag search "user permissions" -t 0.5
+
+        # Search specific family
+        tbcv rag search "rules" -f validation_rules
+
+        # Get JSON output
+        tbcv rag search "testing" --format json
+
+    SIMILARITY SCORING:
+        - Score 1.0: Exact semantic match
+        - Score 0.7-0.9: Strong similarity
+        - Score 0.5-0.7: Moderate similarity
+        - Below 0.5: Weak or no match
+    """
     asyncio.run(_rag_search(ctx, query, family, top_k, threshold, output_format))
 
 
@@ -3286,7 +4061,25 @@ async def _rag_search(ctx, query, family, top_k, threshold, output_format):
 @rag.command('status')
 @click.pass_context
 def rag_status(ctx):
-    """Show RAG indexing and search status."""
+    """Show RAG indexing and search status.
+
+    Displays the current status of vector indices, including which families
+    are indexed and when they were last updated.
+
+    EXAMPLES:
+        # Show index status
+        tbcv rag status
+
+        # Show with verbose output
+        tbcv -v rag status
+
+    OUTPUT INCLUDES:
+        - Whether RAG is enabled
+        - Which truth families are indexed
+        - Total documents indexed
+        - Last update timestamp
+        - Embedding dimension
+    """
     asyncio.run(_rag_status(ctx))
 
 
@@ -3325,7 +4118,34 @@ async def _rag_status(ctx):
 @click.option('--confirm', is_flag=True, help='Skip confirmation prompt')
 @click.pass_context
 def rag_clear(ctx, family, confirm):
-    """Clear the RAG vector index."""
+    """Clear the RAG vector index.
+
+    Deletes vector indices for one or all truth families. Useful for
+    troubleshooting index corruption or freeing disk space. You can
+    rebuild indices afterward with 'tbcv rag index'.
+
+    OPTIONS:
+        -f, --family: Clear only specific family (default: all families)
+        --confirm: Skip confirmation prompt
+
+    EXAMPLES:
+        # Clear all indices (with confirmation)
+        tbcv rag clear
+
+        # Clear specific family
+        tbcv rag clear -f words
+
+        # Clear all without confirmation
+        tbcv rag clear --confirm
+
+        # Clear and rebuild
+        tbcv rag clear --confirm
+        tbcv rag index --all-families
+
+    WARNING:
+        Clearing indices requires rebuilding them. Until you rebuild,
+        semantic search will use fallback methods and may be slower.
+    """
     asyncio.run(_rag_clear(ctx, family, confirm))
 
 
