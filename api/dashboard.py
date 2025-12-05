@@ -654,3 +654,23 @@ async def dashboard_audit_logs(
     except Exception:
         logger.exception("Failed to load audit logs")
         raise HTTPException(status_code=500, detail="Failed to load audit logs")
+
+
+@router.get("/monitoring", response_class=HTMLResponse)
+async def dashboard_monitoring(request: Request):
+    """Performance monitoring dashboard."""
+    try:
+        return templates.TemplateResponse(
+            "monitoring.html",
+            {
+                "request": request,
+            }
+        )
+    except Exception:
+        logger.exception("Failed to load monitoring dashboard")
+        raise HTTPException(status_code=500, detail="Failed to load monitoring dashboard")
+
+
+# Include monitoring routes
+from api.dashboard import routes_monitoring
+router.include_router(routes_monitoring.router)

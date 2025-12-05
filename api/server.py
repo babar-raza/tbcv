@@ -352,6 +352,13 @@ app.openapi = custom_openapi
 # WebSockets don't use CORS the same way as HTTP requests
 # The middleware will be added later in the file
 
+# Mount static files
+from pathlib import Path
+static_dir = Path("static")
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    logger.info("Mounted static files directory")
+
 # Include dashboard router if available
 try:
     from api.dashboard import router as dashboard_router
@@ -1069,20 +1076,67 @@ def _format_validation_response(validation_result: Dict[str, Any]) -> Dict[str, 
 
 @app.post("/agents/validate")
 async def validate_content(request: ContentValidationRequest):
-    """Validate content using the content validator agent."""
-    validator = agent_registry.get_agent("content_validator")
-    if not validator:
-        raise HTTPException(status_code=500, detail="Content validator agent not available")
+    """
+    Validate content using modular validators via ValidatorRouter.
 
+    This endpoint uses the new modular validator architecture with automatic
+    fallback to ContentValidatorAgent if specific validators are unavailable.
+    """
     try:
-        result = await validator.process_request("validate_content", {
-            "content": request.content,
+        # Use ValidatorRouter to route to modular validators
+        from agents.validators.router import ValidatorRouter
+
+        router = ValidatorRouter(agent_registry=agent_registry)
+
+        # Execute validation using modular validators
+        router_result = await router.execute(
+            validation_types=request.validation_types,
+            content=request.content,
+            context={
+                "file_path": request.file_path,
+                "family": request.family
+            }
+        )
+
+        # Transform router result to expected format
+        validation_results = router_result.get("validation_results", {})
+        routing_info = router_result.get("routing_info", {})
+
+        # Combine all validation results
+        all_issues = []
+        all_metrics = {}
+        total_confidence = 0.0
+        confidence_count = 0
+
+        for val_type, val_result in validation_results.items():
+            if isinstance(val_result, dict):
+                issues = val_result.get("issues", [])
+                all_issues.extend(issues)
+
+                metrics = val_result.get("metrics", {})
+                all_metrics[val_type] = metrics
+
+                confidence = val_result.get("confidence", 0.0)
+                if confidence > 0:
+                    total_confidence += confidence
+                    confidence_count += 1
+
+        # Calculate average confidence
+        avg_confidence = total_confidence / confidence_count if confidence_count > 0 else 0.0
+
+        result = {
+            "confidence": avg_confidence,
+            "issues": all_issues,
+            "auto_fixable_count": sum(1 for issue in all_issues if issue.get("auto_fixable", False)),
+            "metrics": all_metrics,
             "file_path": request.file_path,
             "family": request.family,
-            "validation_types": request.validation_types
-        })
+            "routing_info": routing_info  # Include routing info for debugging
+        }
+
         # Format response with enhanced error summary
         return _format_validation_response(result)
+
     except Exception:
         logger.exception("Content validation failed")
         raise HTTPException(status_code=500, detail="Validation failed")
