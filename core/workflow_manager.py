@@ -115,7 +115,7 @@ class WorkflowManager:
 
     def pause_workflow(self, workflow_id: str) -> WorkflowState:
         """
-        Pause a running workflow.
+        Pause a running or pending workflow.
 
         Args:
             workflow_id: ID of workflow to pause
@@ -127,17 +127,24 @@ class WorkflowManager:
             ValueError: If workflow cannot be paused
         """
         with self._lock:
-            if workflow_id not in self._workflow_control:
-                raise ValueError(f"Workflow {workflow_id} is not running")
-
             workflow = self.db_manager.get_workflow(workflow_id)
-            if workflow.state != WorkflowState.RUNNING:
-                raise ValueError(f"Workflow {workflow_id} is not in running state")
+            if not workflow:
+                raise ValueError(f"Workflow {workflow_id} not found")
 
-            self._workflow_control[workflow_id]["should_pause"] = True
+            # Validate state: only running/pending workflows can be paused
+            if workflow.state not in [WorkflowState.RUNNING, WorkflowState.PENDING]:
+                raise ValueError(
+                    f"Cannot pause workflow in state: {workflow.state}. "
+                    f"Only running/pending workflows can be paused"
+                )
+
+            # Set pause flag if workflow is in control dict (actively running)
+            if workflow_id in self._workflow_control:
+                self._workflow_control[workflow_id]["should_pause"] = True
+
             self.db_manager.update_workflow(workflow_id, state=WorkflowState.PAUSED)
 
-            self.logger.info(f"Workflow {workflow_id} paused")
+            self.logger.info(f"Workflow {workflow_id} paused (previous state: {workflow.state})")
             return WorkflowState.PAUSED
 
     def resume_workflow(self, workflow_id: str) -> WorkflowState:
@@ -155,6 +162,9 @@ class WorkflowManager:
         """
         with self._lock:
             workflow = self.db_manager.get_workflow(workflow_id)
+            if not workflow:
+                raise ValueError(f"Workflow {workflow_id} not found")
+
             if workflow.state != WorkflowState.PAUSED:
                 raise ValueError(f"Workflow {workflow_id} is not paused")
 

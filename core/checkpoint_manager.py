@@ -134,3 +134,140 @@ class CheckpointManager:
             return True
 
         return False
+
+    def validate_checkpoint(self, checkpoint_id: str) -> bool:
+        """
+        Validate checkpoint data integrity.
+
+        This method verifies:
+        - Checkpoint directory exists
+        - Checkpoint metadata file exists and is valid JSON
+        - Required fields are present
+        - Database backup exists if indicated
+        - Cache stats are valid
+
+        Args:
+            checkpoint_id: Checkpoint ID to validate
+
+        Returns:
+            True if checkpoint is valid, False otherwise
+        """
+        try:
+            # Check checkpoint directory exists
+            checkpoint_path = self.checkpoint_dir / checkpoint_id
+            if not checkpoint_path.exists() or not checkpoint_path.is_dir():
+                logger.warning(f"Checkpoint directory not found: {checkpoint_id}")
+                return False
+
+            # Check metadata file exists
+            info_file = checkpoint_path / "checkpoint.json"
+            if not info_file.exists():
+                logger.warning(f"Checkpoint metadata file not found: {checkpoint_id}")
+                return False
+
+            # Load and validate metadata
+            with open(info_file, 'r') as f:
+                checkpoint_info = json.load(f)
+
+            # Verify required fields
+            required_fields = ["id", "created_at"]
+            for field in required_fields:
+                if field not in checkpoint_info:
+                    logger.warning(f"Checkpoint missing required field '{field}': {checkpoint_id}")
+                    return False
+
+            # Verify checkpoint ID matches
+            if checkpoint_info["id"] != checkpoint_id:
+                logger.warning(f"Checkpoint ID mismatch: expected {checkpoint_id}, got {checkpoint_info['id']}")
+                return False
+
+            # Verify created_at is valid ISO format
+            try:
+                datetime.fromisoformat(checkpoint_info["created_at"])
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid created_at timestamp in checkpoint: {checkpoint_id}")
+                return False
+
+            # Verify database backup if indicated
+            if checkpoint_info.get("database_backed_up", False):
+                db_backup = checkpoint_path / "database.db"
+                if not db_backup.exists():
+                    logger.warning(f"Database backup missing for checkpoint: {checkpoint_id}")
+                    return False
+
+            # Verify cache stats if present
+            if "cache_stats" in checkpoint_info:
+                cache_stats = checkpoint_info["cache_stats"]
+                if not isinstance(cache_stats, dict):
+                    logger.warning(f"Invalid cache stats in checkpoint: {checkpoint_id}")
+                    return False
+
+            # Verify metadata if present
+            if "metadata" in checkpoint_info:
+                metadata = checkpoint_info["metadata"]
+                if not isinstance(metadata, dict):
+                    logger.warning(f"Invalid metadata in checkpoint: {checkpoint_id}")
+                    return False
+
+            logger.info(f"Checkpoint validation passed: {checkpoint_id}")
+            return True
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse checkpoint metadata: {checkpoint_id}", error=str(e))
+            return False
+        except Exception as e:
+            logger.error(f"Checkpoint validation failed: {checkpoint_id}", error=str(e))
+            return False
+
+    def recover_from_checkpoint(self, checkpoint_id: str) -> bool:
+        """
+        Recover system state from a checkpoint.
+
+        This method:
+        1. Validates the checkpoint
+        2. Restores database from backup
+        3. Updates cache statistics
+
+        Args:
+            checkpoint_id: Checkpoint ID to recover from
+
+        Returns:
+            True if recovery successful, False otherwise
+        """
+        try:
+            # Validate checkpoint first
+            if not self.validate_checkpoint(checkpoint_id):
+                logger.error(f"Cannot recover from invalid checkpoint: {checkpoint_id}")
+                return False
+
+            checkpoint_info = self.get_checkpoint(checkpoint_id)
+            checkpoint_path = self.checkpoint_dir / checkpoint_id
+
+            # Restore database if backup exists
+            if checkpoint_info.get("database_backed_up", False):
+                db_backup = checkpoint_path / "database.db"
+                if db_backup.exists():
+                    from core.database import DatabaseManager
+                    db_manager = DatabaseManager()
+                    db_path = db_manager.get_database_path()
+
+                    if db_path:
+                        # Create backup of current database
+                        current_db = Path(db_path)
+                        if current_db.exists():
+                            backup_path = current_db.parent / f"{current_db.stem}_backup.db"
+                            shutil.copy2(current_db, backup_path)
+                            logger.info(f"Created backup of current database: {backup_path}")
+
+                        # Restore from checkpoint
+                        shutil.copy2(db_backup, db_path)
+                        logger.info(f"Restored database from checkpoint: {checkpoint_id}")
+                else:
+                    logger.warning(f"Database backup not found in checkpoint: {checkpoint_id}")
+
+            logger.info(f"Successfully recovered from checkpoint: {checkpoint_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to recover from checkpoint: {checkpoint_id}", error=str(e))
+            return False
