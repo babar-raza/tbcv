@@ -92,6 +92,7 @@ artifacts/
 jobs/
 data/reports/
 htmlcov/
+.checkpoints/
 
 # Temporary files
 *.tmp

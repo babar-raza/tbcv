@@ -502,6 +502,68 @@ class DatabaseManager:
             Base.metadata.create_all(bind=self.engine)
             logger.info("Database tables ensured")
 
+    def check_migrations(self) -> bool:
+        """Check if database is up to date with migrations.
+
+        Returns:
+            True if database is up to date, False otherwise
+        """
+        try:
+            from alembic.config import Config
+            from alembic.runtime.migration import MigrationContext
+            from alembic.script import ScriptDirectory
+
+            alembic_cfg = Config("alembic.ini")
+            script = ScriptDirectory.from_config(alembic_cfg)
+
+            with self.engine.begin() as connection:
+                context = MigrationContext.configure(connection)
+                current_rev = context.get_current_revision()
+                head_rev = script.get_current_head()
+
+                if current_rev != head_rev:
+                    logger.warning(
+                        "Database not up to date",
+                        extra={
+                            "current_revision": current_rev,
+                            "head_revision": head_rev
+                        }
+                    )
+                    return False
+
+                logger.info("Database up to date", extra={"revision": current_rev})
+                return True
+        except Exception as e:
+            logger.error(f"Migration check failed: {e}")
+            return False
+
+    def run_migrations(self) -> None:
+        """Run pending migrations to bring database up to date."""
+        try:
+            from alembic.config import Config
+            from alembic import command
+
+            alembic_cfg = Config("alembic.ini")
+            command.upgrade(alembic_cfg, "head")
+            logger.info("Migrations completed successfully")
+        except Exception as e:
+            logger.error(f"Migration failed: {e}")
+            raise
+
+    def initialize_database(self) -> None:
+        """Initialize database - check migrations first, then fallback to create_all."""
+        try:
+            # First, try to check and run migrations
+            if not self.check_migrations():
+                logger.info("Running migrations...")
+                self.run_migrations()
+        except Exception as e:
+            # If migrations fail (e.g., fresh database with no alembic_version table),
+            # fallback to create_all
+            logger.warning(f"Migration check/run failed, falling back to create_all: {e}")
+            Base.metadata.create_all(self.engine)
+            logger.info("Database initialized with create_all")
+
     def get_session(self) -> Session:
         return self.SessionLocal()  # type: ignore
 
