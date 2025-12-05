@@ -1,6 +1,20 @@
 # file: tbcv\agents\content_validator.py
 """
 ContentValidatorAgent - Generic quality and structure validation for content.
+
+DEPRECATED: This agent is deprecated and will be removed in version 2.0.0 (target: 2026-01-01).
+
+Use modular validators instead:
+- YamlValidatorAgent for YAML frontmatter validation
+- MarkdownValidatorAgent for Markdown structure validation
+- CodeValidatorAgent for code block validation
+- LinkValidatorAgent for link validation
+- StructureValidatorAgent for document structure validation
+- TruthValidatorAgent for truth data validation
+- SeoValidatorAgent for SEO validation
+
+See docs/migration/content_validator_migration.md for migration guide.
+
 Rebased fixes:
 - Implement missing public handlers used by message registrations:
   handle_validate_yaml, handle_validate_markdown, handle_validate_code,
@@ -14,6 +28,7 @@ from __future__ import annotations
 
 import re
 import os
+import warnings
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
@@ -78,7 +93,31 @@ class ValidationResult:
         }
 
 class ContentValidatorAgent(BaseAgent):
+    """
+    Legacy content validator (DEPRECATED).
+
+    DEPRECATED: Use modular validators instead:
+    - YamlValidatorAgent for YAML frontmatter validation
+    - MarkdownValidatorAgent for Markdown structure validation
+    - CodeValidatorAgent for code block validation
+    - LinkValidatorAgent for link validation
+    - StructureValidatorAgent for document structure validation
+    - TruthValidatorAgent for truth data validation
+    - SeoValidatorAgent for SEO validation
+
+    This agent will be removed in version 2.0.0 (target: 2026-01-01).
+    See docs/migration/content_validator_migration.md for migration instructions.
+    """
+
     def __init__(self, agent_id: Optional[str] = None):
+        warnings.warn(
+            "ContentValidatorAgent is deprecated and will be removed in version 2.0.0 (2026-01-01). "
+            "Use modular validators instead: YamlValidatorAgent, MarkdownValidatorAgent, "
+            "CodeValidatorAgent, LinkValidatorAgent, StructureValidatorAgent, TruthValidatorAgent, "
+            "SeoValidatorAgent. See docs/migration/content_validator_migration.md for details.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self.validation_rules: Dict[str, Any] = {}
         self.allowed_html_tags = ['code', 'pre', 'em', 'strong', 'a', 'img', 'br', 'p']
         self.shortcode_pattern = re.compile(r'\{\{<\s*(\w+).*?\>\}\}', re.DOTALL)
