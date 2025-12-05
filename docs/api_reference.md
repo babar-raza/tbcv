@@ -2,6 +2,14 @@
 
 Complete REST API documentation for TBCV validation and enhancement system.
 
+## Quick Links
+
+- **[API Examples](./api_examples.md)** - Comprehensive examples with curl, Python, and JavaScript
+- **Interactive Docs**: http://localhost:8080/docs (Swagger UI)
+- **Alternative Docs**: http://localhost:8080/redoc (ReDoc)
+- **[Admin API Reference](./admin_api.md)** - Administrative endpoints
+- **[Checkpoint System](./checkpoints.md)** - State management and disaster recovery
+
 ## Base URL
 
 ```
@@ -206,6 +214,52 @@ Validate content directly (inline validation).
 - `family` (optional): Plugin family (words, cells, slides, pdf)
 - `validation_types` (optional): List of validation types (default: all)
 
+**curl Example**:
+```bash
+curl -X POST http://localhost:8080/api/validate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "---\ntitle: My Doc\n---\n# Title\n\nEnable AutoSave feature.",
+    "file_path": "docs/guide.md",
+    "family": "words",
+    "validation_types": ["yaml", "markdown", "truth"]
+  }'
+```
+
+**Python Example**:
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:8080/api/validate",
+    json={
+        "content": "---\ntitle: My Doc\n---\n# Title\n\nEnable AutoSave feature.",
+        "file_path": "docs/guide.md",
+        "family": "words",
+        "validation_types": ["yaml", "markdown", "truth"]
+    }
+)
+result = response.json()
+print(f"Validation ID: {result['validation_id']}")
+print(f"Status: {result['status']}")
+```
+
+**JavaScript Example**:
+```javascript
+const response = await fetch("http://localhost:8080/api/validate", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    content: "---\ntitle: My Doc\n---\n# Title\n\nEnable AutoSave feature.",
+    file_path: "docs/guide.md",
+    family: "words",
+    validation_types: ["yaml", "markdown", "truth"]
+  })
+});
+const result = await response.json();
+console.log(`Validation ID: ${result.validation_id}`);
+```
+
 **Response**:
 ```json
 {
@@ -260,6 +314,52 @@ Start batch validation workflow for multiple files.
 - `family` (optional): Plugin family
 - `validation_types` (optional): Types of validation
 - `max_workers` (optional): Concurrent workers (default: 4)
+
+**curl Example**:
+```bash
+curl -X POST http://localhost:8080/api/validate/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "files": ["docs/guide1.md", "docs/guide2.md", "docs/tutorial.md"],
+    "family": "words",
+    "validation_types": ["yaml", "markdown", "truth"],
+    "max_workers": 4
+  }'
+```
+
+**Python Example**:
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:8080/api/validate/batch",
+    json={
+        "files": ["docs/guide1.md", "docs/guide2.md", "docs/tutorial.md"],
+        "family": "words",
+        "validation_types": ["yaml", "markdown", "truth"],
+        "max_workers": 4
+    }
+)
+result = response.json()
+print(f"Job ID: {result['job_id']}")
+print(f"Total files to validate: {result['files_total']}")
+```
+
+**JavaScript Example**:
+```javascript
+const response = await fetch("http://localhost:8080/api/validate/batch", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    files: ["docs/guide1.md", "docs/guide2.md", "docs/tutorial.md"],
+    family: "words",
+    validation_types: ["yaml", "markdown", "truth"],
+    max_workers: 4
+  })
+});
+const result = await response.json();
+console.log(`Workflow ID: ${result.workflow_id}`);
+```
 
 **Response**:
 ```json
@@ -802,13 +902,64 @@ Apply approved recommendations to content.
 - `recommendations` (optional): Specific recommendation IDs (default: all approved)
 - `preview` (optional): Preview mode without persisting (default: false)
 
+**curl Example**:
+```bash
+curl -X POST http://localhost:8080/api/enhance \
+  -H "Content-Type: application/json" \
+  -d '{
+    "validation_id": "val-123",
+    "file_path": "docs/tutorial.md",
+    "content": "---\ntitle: Tutorial\n---\n# Tutorial\n\nEnable AutoSave feature for automatic saving.",
+    "recommendations": ["rec-456", "rec-789"],
+    "preview": false
+  }'
+```
+
+**Python Example**:
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:8080/api/enhance",
+    json={
+        "validation_id": "val-123",
+        "file_path": "docs/tutorial.md",
+        "content": "---\ntitle: Tutorial\n---\n# Tutorial\n\nEnable AutoSave feature for automatic saving.",
+        "recommendations": ["rec-456", "rec-789"],
+        "preview": False
+    }
+)
+result = response.json()
+print(f"Success: {result['success']}")
+print(f"Applied: {result['applied_count']} recommendations")
+print(f"\nEnhanced content:\n{result['enhanced_content']}")
+```
+
+**JavaScript Example**:
+```javascript
+const response = await fetch("http://localhost:8080/api/enhance", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    validation_id: "val-123",
+    file_path: "docs/tutorial.md",
+    content: "---\ntitle: Tutorial\n---\n# Tutorial\n\nEnable AutoSave feature for automatic saving.",
+    recommendations: ["rec-456", "rec-789"],
+    preview: false
+  })
+});
+const result = await response.json();
+console.log(`Applied: ${result.applied_count} recommendations`);
+console.log(`Enhanced content length: ${result.enhanced_content.length} chars`);
+```
+
 **Response**:
 ```json
 {
   "success": true,
   "message": "Applied 2 recommendations, skipped 0",
-  "enhanced_content": "Enhanced content with plugin links...",
-  "diff": "--- original\n+++ enhanced\n@@ -15,7 +15,7 @@\n- Enable AutoSave feature\n+ Enable [AutoSave](https://example.com/autosave) feature",
+  "enhanced_content": "---\ntitle: Tutorial\n---\n# Tutorial\n\nEnable [AutoSave](https://example.com/autosave) feature for automatic saving. This provides real-time data protection.",
+  "diff": "--- original\n+++ enhanced\n@@ -4,1 +4,1 @@\n-Enable AutoSave feature for automatic saving.\n+Enable [AutoSave](https://example.com/autosave) feature for automatic saving. This provides real-time data protection.",
   "applied_count": 2,
   "skipped_count": 0,
   "results": [
@@ -1010,6 +1161,83 @@ Control workflow execution (pause, resume, cancel).
 - `200`: Action executed
 - `404`: Workflow not found
 - `400`: Invalid action or state transition
+
+### POST /workflows/{workflow_id}/pause
+
+Pause a running or pending workflow.
+
+**Path Parameters**:
+- `workflow_id`: Workflow identifier
+
+**Response**:
+```json
+{
+  "success": true,
+  "workflow_id": "wf-abc123",
+  "state": "paused",
+  "progress_percent": 45,
+  "current_step": 45,
+  "total_steps": 100,
+  "message": "Workflow paused successfully"
+}
+```
+
+**Status Codes**:
+- `200`: Workflow paused successfully
+- `404`: Workflow not found
+- `400`: Workflow cannot be paused (invalid state)
+
+**Valid State Transitions**:
+- RUNNING → PAUSED
+- PENDING → PAUSED
+
+**Invalid Transitions** (returns 400):
+- COMPLETED → PAUSED
+- FAILED → PAUSED
+- CANCELLED → PAUSED
+- PAUSED → PAUSED (already paused)
+
+### POST /workflows/{workflow_id}/resume
+
+Resume a paused workflow.
+
+**Path Parameters**:
+- `workflow_id`: Workflow identifier
+
+**Response**:
+```json
+{
+  "success": true,
+  "workflow_id": "wf-abc123",
+  "state": "running",
+  "progress_percent": 45,
+  "current_step": 45,
+  "total_steps": 100,
+  "message": "Workflow resumed successfully"
+}
+```
+
+**Status Codes**:
+- `200`: Workflow resumed successfully
+- `404`: Workflow not found
+- `400`: Workflow cannot be resumed (not paused)
+
+**Valid State Transitions**:
+- PAUSED → RUNNING
+
+**Invalid Transitions** (returns 400):
+- RUNNING → RUNNING (already running)
+- COMPLETED → RUNNING (already completed)
+- FAILED → RUNNING (failed)
+- CANCELLED → RUNNING (cancelled)
+
+**Progress Preservation**:
+When resuming, all metrics are preserved:
+- `current_step`: Position where workflow was paused
+- `total_steps`: Total number of steps (unchanged)
+- `progress_percent`: Percentage completed (unchanged)
+- `input_params`: Original parameters (unchanged)
+- `workflow_metadata`: Custom metadata (unchanged)
 
 ### DELETE /workflows/{workflow_id}
 
@@ -1565,37 +1793,429 @@ tbcv_cache_hit_rate{cache_level="l2"} 0.92
 
 ## Error Handling
 
-### Standard Error Response
+TBCV implements a sophisticated **3-layer error handling system**. See [Error Handling Architecture](architecture.md#error-handling-architecture) for complete details on the architecture.
+
+### Error Response Formats
+
+All error responses follow a consistent format with standard fields:
+
+#### MCP Error Response
+
+Returned when domain-level errors occur (validation failures, resource not found, etc.):
 
 ```json
 {
-  "detail": "Validation failed: Missing required field 'family'",
-  "error_code": "VALIDATION_ERROR",
-  "timestamp": "2025-11-19T16:48:00.000Z",
-  "request_id": "req-abc123"
+  "error": "Content validation failed",
+  "type": "MCPValidationError",
+  "code": -32000,
+  "data": {
+    "file_path": "tutorial.md",
+    "issues_count": 5,
+    "issues": [
+      {
+        "level": "error",
+        "category": "yaml",
+        "message": "Invalid YAML frontmatter",
+        "line_number": 2,
+        "suggestion": "Check YAML syntax"
+      }
+    ]
+  },
+  "meta": {
+    "path": "/api/validate",
+    "method": "POST",
+    "timestamp": "2025-12-03T10:30:00Z"
+  }
 }
 ```
 
-### Common HTTP Status Codes
+**Response Fields:**
+- `error` (string): Human-readable error message
+- `type` (string): Error class name (e.g., "MCPValidationError")
+- `code` (integer): JSON-RPC error code (see table below)
+- `data` (object, optional): Additional error context and details
+- `meta` (object): Request metadata
+  - `path` (string): Request path
+  - `method` (string): HTTP method
+  - `timestamp` (string): ISO 8601 timestamp
+
+#### Validation Error Response
+
+Returned when request validation fails (Pydantic validation):
+
+```json
+{
+  "error": "Validation failed",
+  "type": "ValidationError",
+  "validation_errors": [
+    {
+      "loc": ["body", "file_path"],
+      "msg": "field required",
+      "type": "value_error.missing"
+    },
+    {
+      "loc": ["body", "family"],
+      "msg": "invalid choice: must be one of: words, cells, slides, pdf",
+      "type": "value_error.const"
+    }
+  ],
+  "meta": {
+    "path": "/api/validate",
+    "method": "POST",
+    "timestamp": "2025-12-03T10:30:00Z"
+  }
+}
+```
+
+**Response Fields:**
+- `error` (string): "Validation failed"
+- `type` (string): "ValidationError"
+- `validation_errors` (array): List of validation errors
+  - `loc` (array): Location of error (e.g., ["body", "field_name"])
+  - `msg` (string): Error message
+  - `type` (string): Pydantic error type
+- `meta` (object): Request metadata
+
+#### Generic Error Response
+
+Returned for unexpected errors:
+
+```json
+{
+  "error": "An unexpected error occurred",
+  "type": "Exception",
+  "message": "division by zero",
+  "meta": {
+    "path": "/api/validations/process",
+    "method": "POST",
+    "timestamp": "2025-12-03T10:30:00Z"
+  }
+}
+```
+
+### HTTP Status Codes
+
+TBCV uses standard HTTP status codes with specific mappings for MCP errors:
+
+#### Success Codes
 
 - `200 OK`: Request successful
 - `201 Created`: Resource created
-- `202 Accepted`: Request accepted (async processing)
-- `400 Bad Request`: Invalid request parameters
-- `404 Not Found`: Resource not found
-- `422 Unprocessable Entity`: Pydantic validation error
-- `500 Internal Server Error`: Server error
-- `503 Service Unavailable`: Service temporarily unavailable
+- `202 Accepted`: Request accepted (async processing started)
 
-### Error Codes
+#### Client Error Codes
 
-- `VALIDATION_ERROR`: Request validation failed
-- `AGENT_UNAVAILABLE`: Required agent not available
-- `WORKFLOW_TIMEOUT`: Workflow execution timeout
-- `DATABASE_ERROR`: Database operation failed
-- `CACHE_ERROR`: Cache operation failed
-- `INVALID_STATE`: Invalid state transition
-- `RESOURCE_NOT_FOUND`: Requested resource not found
+| Status Code | Status | When Used | Example |
+|-------------|--------|-----------|---------|
+| 400 | Bad Request | Invalid request parameters | MCPInvalidParamsError (-32602) |
+| 404 | Not Found | Resource not found | MCPResourceNotFoundError (-32001) |
+| 422 | Unprocessable Entity | Validation failed | MCPValidationError (-32000), Pydantic ValidationError |
+
+#### Server Error Codes
+
+| Status Code | Status | When Used | Example |
+|-------------|--------|-----------|---------|
+| 500 | Internal Server Error | Unexpected error | MCPInternalError (-32603), generic Exception |
+| 501 | Not Implemented | Method not implemented | MCPMethodNotFoundError (-32601) |
+| 503 | Service Unavailable | Service temporarily unavailable | Database connection failed |
+| 504 | Gateway Timeout | Request timeout | MCPTimeoutError |
+
+### MCP Error Codes
+
+TBCV uses JSON-RPC error codes for domain-level errors:
+
+#### Standard JSON-RPC Codes
+
+| Error Code | Error Class | HTTP Status | Description |
+|------------|-------------|-------------|-------------|
+| -32601 | MCPMethodNotFoundError | 501 | Requested method does not exist |
+| -32602 | MCPInvalidParamsError | 400 | Method parameters are invalid |
+| -32603 | MCPInternalError | 500 | Internal MCP server error |
+
+#### Custom Application Codes
+
+| Error Code | Error Class | HTTP Status | Description |
+|------------|-------------|-------------|-------------|
+| -32000 | MCPValidationError | 422 | Content validation failed |
+| -32001 | MCPResourceNotFoundError | 404 | Requested resource not found |
+| (none) | MCPTimeoutError | 504 | Request timed out |
+
+### Error Response Examples
+
+#### Example 1: Content Validation Failed (422)
+
+**Request:**
+```bash
+POST /api/validate
+Content-Type: application/json
+
+{
+  "content": "---\ntitle: \"Unclosed quote\n---\n# Content",
+  "file_path": "test.md",
+  "family": "words"
+}
+```
+
+**Response:**
+```json
+HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/json
+
+{
+  "error": "Content validation failed",
+  "type": "MCPValidationError",
+  "code": -32000,
+  "data": {
+    "file_path": "test.md",
+    "issues_count": 1,
+    "issues": [
+      {
+        "level": "error",
+        "category": "yaml",
+        "code": "YAML-001",
+        "message": "Invalid YAML frontmatter: unclosed quoted string",
+        "line_number": 2,
+        "column": 8,
+        "suggestion": "Close the quoted string",
+        "auto_fixable": false
+      }
+    ]
+  },
+  "meta": {
+    "path": "/api/validate",
+    "method": "POST",
+    "timestamp": "2025-12-03T10:30:00Z"
+  }
+}
+```
+
+#### Example 2: Resource Not Found (404)
+
+**Request:**
+```bash
+GET /api/validations/invalid-id-12345
+```
+
+**Response:**
+```json
+HTTP/1.1 404 Not Found
+Content-Type: application/json
+
+{
+  "error": "Validation not found",
+  "type": "MCPResourceNotFoundError",
+  "code": -32001,
+  "data": {
+    "validation_id": "invalid-id-12345"
+  },
+  "meta": {
+    "path": "/api/validations/invalid-id-12345",
+    "method": "GET",
+    "timestamp": "2025-12-03T10:30:00Z"
+  }
+}
+```
+
+#### Example 3: Invalid Request Parameters (400)
+
+**Request:**
+```bash
+POST /api/validate
+Content-Type: application/json
+
+{
+  "content": "Test content"
+  // Missing required field: file_path
+}
+```
+
+**Response:**
+```json
+HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/json
+
+{
+  "error": "Validation failed",
+  "type": "ValidationError",
+  "validation_errors": [
+    {
+      "loc": ["body", "file_path"],
+      "msg": "field required",
+      "type": "value_error.missing"
+    }
+  ],
+  "meta": {
+    "path": "/api/validate",
+    "method": "POST",
+    "timestamp": "2025-12-03T10:30:00Z"
+  }
+}
+```
+
+#### Example 4: Request Timeout (504)
+
+**Request:**
+```bash
+POST /api/validate
+Content-Type: application/json
+
+{
+  "content": "Very large content...",
+  "file_path": "large.md",
+  "family": "words"
+}
+```
+
+**Response:**
+```json
+HTTP/1.1 504 Gateway Timeout
+Content-Type: application/json
+
+{
+  "error": "Request timed out after 30 seconds",
+  "type": "MCPTimeoutError",
+  "data": {
+    "timeout_seconds": 30,
+    "operation": "content_validation"
+  },
+  "meta": {
+    "path": "/api/validate",
+    "method": "POST",
+    "timestamp": "2025-12-03T10:30:00Z"
+  }
+}
+```
+
+#### Example 5: Internal Server Error (500)
+
+**Request:**
+```bash
+GET /api/validations/problematic-id
+```
+
+**Response:**
+```json
+HTTP/1.1 500 Internal Server Error
+Content-Type: application/json
+
+{
+  "error": "An unexpected error occurred",
+  "type": "Exception",
+  "message": "Database connection lost",
+  "meta": {
+    "path": "/api/validations/problematic-id",
+    "method": "GET",
+    "timestamp": "2025-12-03T10:30:00Z"
+  }
+}
+```
+
+### Error Handling Best Practices
+
+#### For API Clients
+
+**1. Always Check HTTP Status Code First**
+```javascript
+const response = await fetch('/api/validate', {
+  method: 'POST',
+  body: JSON.stringify(data)
+});
+
+if (!response.ok) {
+  const error = await response.json();
+  console.error(`Error ${response.status}: ${error.error}`);
+
+  // Handle specific error types
+  if (error.type === 'MCPValidationError') {
+    // Show validation issues to user
+    displayValidationIssues(error.data.issues);
+  } else if (error.type === 'ValidationError') {
+    // Show request validation errors
+    displayRequestErrors(error.validation_errors);
+  }
+}
+```
+
+**2. Handle Specific Error Types**
+```python
+import requests
+
+try:
+    response = requests.post('/api/validate', json=data)
+    response.raise_for_status()
+except requests.exceptions.HTTPError as e:
+    error_data = e.response.json()
+
+    if e.response.status_code == 422:
+        # Validation failed
+        issues = error_data.get('data', {}).get('issues', [])
+        print(f"Validation failed with {len(issues)} issues")
+    elif e.response.status_code == 404:
+        # Resource not found
+        print("Resource not found")
+    elif e.response.status_code == 504:
+        # Timeout
+        print("Request timed out, try again")
+```
+
+**3. Use Error Data for User-Friendly Messages**
+```python
+def format_error_message(error_response):
+    """Convert API error to user-friendly message."""
+    error_type = error_response.get('type')
+
+    if error_type == 'MCPValidationError':
+        issues = error_response.get('data', {}).get('issues', [])
+        return f"Validation failed: {len(issues)} issues found"
+    elif error_type == 'MCPResourceNotFoundError':
+        return "The requested resource was not found"
+    elif error_type == 'MCPTimeoutError':
+        return "Request timed out, please try again"
+    else:
+        return error_response.get('error', 'An error occurred')
+```
+
+**4. Retry on Transient Errors**
+```python
+import time
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
+# Retry on 500, 502, 503, 504
+retry_strategy = Retry(
+    total=3,
+    status_forcelist=[500, 502, 503, 504],
+    backoff_factor=1
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session = requests.Session()
+session.mount("http://", adapter)
+session.mount("https://", adapter)
+```
+
+### Unicode Safety
+
+All error handlers implement Unicode safety to prevent crashes when error messages contain non-ASCII characters. This is especially important for:
+- International content with non-English characters
+- Windows console environments with limited encoding support
+- File paths with special characters
+
+The error handling system automatically:
+- Falls back to `repr()` if `str()` fails
+- Logs "(encoding issue)" if Unicode encoding fails
+- Ensures error responses are always returned even with encoding problems
+
+### Troubleshooting
+
+For common error handling issues, see:
+- [Troubleshooting Guide - Error Handling](troubleshooting.md#error-handling-issues)
+- [Error Handling Architecture](architecture.md#error-handling-architecture)
+
+### Related Documentation
+
+- [Error Handling Architecture](architecture.md#error-handling-architecture) - Complete 3-layer error system
+- [MCP Exceptions](architecture.md#layer-1-mcp-errors-domain-layer) - Domain error types
+- [Error Formatters](architecture.md#layer-3-error-formatters-presentation-layer) - Output formatting
 
 ## Rate Limiting
 

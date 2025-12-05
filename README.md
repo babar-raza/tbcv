@@ -33,10 +33,20 @@ TBCV is an intelligent **content validation and enhancement system** for technic
 
 ## Key Features
 
-### Multi-Agent Architecture
-TBCV uses specialized agents coordinating through workflows:
+### Dual-Layer Access Control System
+TBCV enforces the MCP-first architecture through a comprehensive security system:
+- **Import-Time Guard**: Prevents unauthorized module imports using Python's `sys.meta_path` hooks
+- **Runtime Access Guard**: Protects business logic functions with `@guarded_operation` decorator and stack inspection
+- **Enforcement Modes**: DISABLED (dev), WARN (staging), BLOCK (production)
+- **Protected Modules**: All agents and core business logic protected from direct CLI/API access
+- **Violation Tracking**: Complete audit trail of all access violations
 
-**Core Agents** (11 agents):
+See [Security Documentation](docs/security.md) for complete details.
+
+### Multi-Agent Architecture
+TBCV uses **19 specialized agents** coordinating through workflows (9 core + 3 pipeline + 7 validators):
+
+**Core Agents** (9 agents):
 - **OrchestratorAgent** - Workflow coordination with concurrency control
 - **TruthManagerAgent** - Plugin truth data management with multi-level indexing
 - **FuzzyDetectorAgent** - Pattern matching and fuzzy plugin detection
@@ -45,11 +55,14 @@ TBCV uses specialized agents coordinating through workflows:
 - **LLMValidatorAgent** - Optional semantic validation via Ollama (disabled by default)
 - **CodeAnalyzerAgent** - Code quality and security analysis
 - **RecommendationAgent** - Actionable recommendation generation
-- **EnhancementAgent** - Applies approved recommendations
-- **EditValidatorAgent** - Validates before/after enhancement
-- **RecommendationEnhancerAgent** - Recommendation application engine
+- **EnhancementAgent** - Applies approved recommendations (facade over ContentEnhancerAgent)
 
-**Modular Validator Agents** (7-8 validators):
+**Enhancement Pipeline Agents** (3 agents):
+- **EditValidator** - Validates content changes before/after enhancement
+- **RecommendationEnhancer** - Advanced surgical enhancement with safety validation
+- **RecommendationCriticAgent** - Validates recommendation quality and consistency
+
+**Modular Validator Agents** (7 validators):
 - **YamlValidatorAgent** - YAML frontmatter validation
 - **MarkdownValidatorAgent** - Markdown syntax validation
 - **CodeValidatorAgent** - Code block validation
@@ -209,6 +222,7 @@ Enhanced Markdown + Audit Trail
 
 ### Core Concepts
 - [Architecture](docs/architecture.md) - System design and components
+- [Security](docs/security.md) - Dual-layer access control system
 - [Agents](docs/agents.md) - Detailed agent descriptions and capabilities
 - [Modular Validators](docs/modular_validators.md) - Validator architecture and customization
 - [Workflows](docs/workflows.md) - Validation and enhancement workflows
@@ -519,14 +533,27 @@ performance:
 
 ## Security
 
+TBCV implements multiple security layers to ensure safe and controlled access to business logic:
+
+### Dual-Layer Access Control
+- **Import-Time Guard** (`core/import_guard.py`): Python `sys.meta_path` hooks prevent unauthorized module imports
+- **Runtime Access Guard** (`core/access_guard.py`): `@guarded_operation` decorator with stack inspection prevents unauthorized function calls
+- **Enforcement Modes**: DISABLED, WARN, BLOCK - configurable per environment
+- **MCP-First Architecture**: All CLI/API access must go through MCP Server layer
+- **Violation Tracking**: Complete audit trail with statistics and logging
+
+### Additional Security Measures
 - **Input validation**: All user input validated via Pydantic models
 - **HTML sanitization**: Bleach library for safe HTML processing
+- **Path validation**: Directory traversal prevention and system path protection
 - **Link validation**: Timeout-protected HTTP requests
 - **Code analysis**: Security scanning for common vulnerabilities
 - **SQL injection protection**: SQLAlchemy parameterized queries
 - **CORS**: Configurable allowed origins
 - **File system access**: Restricted to configured directories
 - **English-only enforcement**: Language detection prevents non-English content
+
+See [Security Documentation](docs/security.md) for complete architecture, configuration, and best practices.
 
 ---
 

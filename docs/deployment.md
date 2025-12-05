@@ -26,9 +26,373 @@ pip install -r requirements.txt -e .[performance]
 ```
 
 ### External Services
-- **Ollama** (optional): For local LLM processing
-- **PostgreSQL** (optional): For production database
-- **Redis** (optional): For distributed caching
+
+All external services are **optional**. TBCV works with SQLite and no LLM by default.
+
+| Service | Status | Version | Purpose | Required |
+|---------|--------|---------|---------|----------|
+| **Ollama** | Active | 0.4.4+ | Local LLM inference | Optional |
+| **ChromaDB** | Active | 0.6.3 | Vector database for RAG | Optional |
+| **PostgreSQL** | Supported | Any | Production database | Optional (SQLite default) |
+| **Redis** | Optional | 5.0.1 | Distributed L2 cache (multi-node only) | Optional (SQLite L2 default) |
+| **LangChain** | Installed (unused) | Latest | LLM framework | No (custom RAG) |
+| **Prometheus** | Planned | N/A | Metrics collection | Optional |
+| **Sentry** | Optional | Latest | Error tracking | Optional |
+| **Google GenAI** | Supported | 1.39.1 | Gemini API fallback | Optional |
+
+### Detailed External Services Configuration
+
+#### Ollama (Active)
+**Purpose**: Local LLM inference for semantic validation
+**Status**: Active, optional
+**Version**: 0.4.4+
+**Configuration**:
+```yaml
+llm_validator:
+  enabled: true
+  ollama_base_url: "http://localhost:11434"
+  model: "qwen2.5:latest"
+```
+
+**Setup**:
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull model
+ollama pull qwen2.5:latest
+
+# Start Ollama
+ollama serve
+```
+
+**When to use**: Enable for semantic validation of plugin usage in documentation. Improves detection accuracy but requires running Ollama service.
+
+---
+
+#### ChromaDB (Active)
+**Purpose**: Vector database for RAG (truth data retrieval)
+**Status**: Active, optional
+**Version**: 0.6.3
+**Configuration**:
+```yaml
+rag:
+  enabled: true
+  chroma_db_path: "./data/chroma"
+```
+
+**When to use**: Enable for RAG-enhanced truth validation. Allows semantic search over plugin definitions to find relevant documentation snippets.
+
+---
+
+#### PostgreSQL (Supported)
+**Purpose**: Production database (alternative to SQLite)
+**Status**: Supported, optional (SQLite default)
+**Version**: Any recent version (tested with 12+)
+**Configuration**:
+```bash
+export DATABASE_URL=postgresql://user:pass@host:5432/dbname
+```
+
+**When to use**: Use for production deployments, multi-node setups, or when requiring advanced database features. Recommended for high-volume validation scenarios.
+
+---
+
+#### Redis (Optional - Not Default)
+**Purpose**: Distributed L2 cache for multi-node deployments
+**Status**: Optional (SQLite L2 cache is default)
+**Version**: 5.0.1
+**Current Implementation**: SQLite L2 cache (sufficient for most deployments)
+
+##### Default: SQLite L2 Cache
+TBCV uses **SQLite for the L2 cache by default**. This approach:
+- Requires no external services
+- Works perfectly for single-node deployments
+- Provides adequate performance for typical validation workloads
+- Simplifies deployment and reduces operational overhead
+
+**Default Configuration**:
+```yaml
+caching:
+  l2:
+    backend: sqlite  # Default
+    max_size_mb: 2048
+    ttl_seconds: 3600
+    database_path: "data/cache.db"
+```
+
+##### When to Use Redis Instead
+
+Use Redis L2 cache **only** when:
+1. **Multi-Node Deployments**: Multiple TBCV instances running in parallel
+   - Allows shared cache across all instances
+   - Reduces redundant validation computations
+   - Improves system-wide performance
+
+2. **High-Performance Requirements**: Load-balanced setups with many concurrent requests
+   - Centralized cache improves cache hit ratio
+   - Reduces per-node memory usage
+   - Better for containerized/Kubernetes deployments
+
+3. **Cache Persistence Across Restarts**: Need cache to survive instance restarts
+   - SQLite cache is tied to instance
+   - Redis maintains cache independently
+
+##### When to Keep SQLite L2 Cache
+
+Keep SQLite L2 cache (default) for:
+1. **Single-Node Deployments**: Standalone server or single Docker container
+2. **Development & Testing**: Local development environments
+3. **Cost Optimization**: Avoid additional infrastructure (Redis server)
+4. **Simplicity**: Fewer moving parts to manage and monitor
+
+##### Redis Setup Guide
+
+**Step 1: Install Redis**
+
+```bash
+# macOS with Homebrew
+brew install redis
+brew services start redis
+
+# Linux (Ubuntu/Debian)
+sudo apt-get install redis-server
+sudo systemctl start redis-server
+
+# Docker (Recommended for production)
+docker run -d \
+  --name tbcv-redis \
+  -p 6379:6379 \
+  redis:7-alpine
+
+# Windows (via WSL2)
+wsl
+sudo apt-get install redis-server
+sudo service redis-server start
+```
+
+**Step 2: Verify Redis Installation**
+
+```bash
+redis-cli ping
+# Expected output: PONG
+```
+
+**Step 3: Configure TBCV to Use Redis**
+
+Update `config/main.yaml`:
+```yaml
+caching:
+  l2:
+    backend: redis  # Switch from sqlite
+    redis_url: "redis://localhost:6379"
+    max_connections: 10
+    timeout_seconds: 5
+    ttl_seconds: 3600
+    key_prefix: "tbcv:"
+```
+
+Or set environment variable:
+```bash
+export TBCV_CACHING_L2_BACKEND=redis
+export TBCV_CACHING_L2_REDIS_URL=redis://localhost:6379
+```
+
+**Step 4: Restart TBCV Application**
+
+```bash
+# If using systemd
+sudo systemctl restart tbcv
+
+# If using Docker Compose
+docker-compose restart tbcv
+```
+
+##### Redis Configuration Examples
+
+**Basic Local Setup**:
+```yaml
+caching:
+  l2:
+    backend: redis
+    redis_url: "redis://localhost:6379"
+    db: 0  # Use database 0
+```
+
+**Multi-Node Deployment (Recommended)**:
+```yaml
+caching:
+  l2:
+    backend: redis
+    redis_url: "redis://redis-cluster:6379"
+    max_connections: 20
+    timeout_seconds: 5
+    connection_pool_size: 10
+    retry_on_timeout: true
+    retry_attempts: 3
+```
+
+**Docker Compose with Redis**:
+```yaml
+version: '3.8'
+
+services:
+  tbcv:
+    build: .
+    container_name: tbcv-app
+    ports:
+      - "8080:8080"
+    environment:
+      - TBCV_CACHING_L2_BACKEND=redis
+      - TBCV_CACHING_L2_REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: tbcv-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis_data:
+```
+
+**Production Setup (AWS ElastiCache)**:
+```yaml
+caching:
+  l2:
+    backend: redis
+    redis_url: "redis://your-cluster.xxxxx.ng.0001.use1.cache.amazonaws.com:6379"
+    ssl: true
+    ssl_certfile: "/etc/ssl/certs/ca-bundle.crt"
+    max_connections: 50
+```
+
+##### Redis vs SQLite: Performance Comparison
+
+| Aspect | SQLite L2 Cache | Redis |
+|--------|----------------|-------|
+| **Setup Complexity** | ✓ Simple (no extra service) | Requires Redis server |
+| **Cache Sharing** | Per-instance only | Shared across all instances |
+| **Memory Usage** | Per-instance | Centralized |
+| **Persistence** | Instance restart loses cache | Survives restarts |
+| **Multi-Node Support** | No | Yes |
+| **Performance (single-node)** | Excellent | Excellent |
+| **Performance (multi-node)** | Poor (duplicated) | Excellent (shared) |
+| **Operational Cost** | Minimal | Moderate (Redis infrastructure) |
+| **Scaling** | Limited | Excellent |
+
+**Recommendation**: Start with SQLite L2 cache (default). Switch to Redis only when you have:
+- Multiple TBCV instances, OR
+- Strict performance requirements, OR
+- Cache persistence requirements
+
+##### Monitoring Redis Cache
+
+```bash
+# Check Redis connection
+redis-cli ping
+
+# Monitor cache operations
+redis-cli MONITOR
+
+# Check memory usage
+redis-cli INFO memory
+
+# Clear all cache (use with caution)
+redis-cli FLUSHDB
+
+# View cache keys
+redis-cli KEYS "tbcv:*"
+
+# Check specific cache entry
+redis-cli GET "tbcv:validation:result:abc123"
+```
+
+##### Fallback & Failover
+
+TBCV implements graceful degradation when Redis is unavailable:
+- Cache operations fall back to SQLite if Redis unreachable
+- System continues working (without distributed cache benefit)
+- Errors logged for monitoring
+- Consider Redis as **optional optimization, not critical dependency**
+
+---
+
+---
+
+#### LangChain (Installed but Unused for RAG)
+**Purpose**: LLM application framework
+**Status**: In dependencies but NOT used for RAG implementation
+**Version**: 0.3.21+
+**Why**: Custom RAG implementation provides more flexibility and better control over plugin detection logic
+**Configuration**: N/A
+
+**Detailed Rationale:**
+1. **Simplified Architecture**: Custom RAG with TruthManagerAgent, FuzzyDetectorAgent, and LLMValidatorAgent provides precise control
+2. **Performance**: Direct ChromaDB integration optimized for TBCV's plugin detection workflow
+3. **Maintainability**: Custom logic is easier to debug and modify without framework abstractions
+4. **Hybrid Approach**: Combines fuzzy string matching (Levenshtein, Jaro-Winkler) with semantic search
+5. **Reduced Complexity**: Avoids unnecessary abstractions from LangChain
+
+**Custom RAG Components:**
+- `agents/truth_manager.py`: Indexes 6,000+ plugins with 6 specialized indexes
+- `agents/fuzzy_detector.py`: Implements specialized matching algorithms with context windows
+- `agents/llm_validator.py`: Optional semantic validation using direct API calls
+- ChromaDB: Direct vector DB access without framework wrapping
+
+**Future Potential Uses:**
+- Advanced multi-step agent orchestration with tool use
+- Complex prompt engineering and few-shot learning patterns
+- Cross-document semantic analysis
+- Multi-provider LLM fallback chains
+
+**Current Status**: TBCV successfully meets all production RAG requirements with custom implementation. LangChain remains in dependencies as a reserved dependency for future feature expansion without requiring additional installation steps.
+
+---
+
+#### Prometheus (Planned)
+**Purpose**: Metrics collection and monitoring
+**Status**: Configured but not implemented (see TASK-HIGH-003)
+**Version**: N/A
+**Configuration**: See config/main.yaml monitoring section
+
+**Workaround**: Use structured logging + external log aggregation for monitoring until Prometheus is fully implemented.
+
+---
+
+#### Sentry (Optional)
+**Purpose**: Error tracking and monitoring
+**Status**: Optional (implementation depends on TASK-HIGH-004 decision)
+**Version**: Latest (1.38.0+)
+**Configuration**:
+```bash
+export SENTRY_DSN=your-sentry-dsn-here
+```
+
+See production_readiness.md for deployment configuration details.
+
+---
+
+#### Google GenAI (Supported)
+**Purpose**: Gemini API for LLM fallback
+**Status**: Supported, optional
+**Version**: 1.39.1
+**Configuration**:
+```bash
+export GOOGLE_API_KEY=your-api-key
+```
+
+**When to use**: Fallback when Ollama unavailable (not implemented yet). Provides alternative LLM capability using Google's Gemini API.
 
 ## Local Development
 
@@ -414,6 +778,76 @@ tail -f data/logs/tbcv.log
 jq . data/logs/tbcv.log | head -10
 ```
 
+### Error Tracking
+
+Error tracking is implemented via **structured JSON logging** with optional log shipping to external services.
+
+**Approach:**
+- All errors logged to `logs/tbcv.log` with full context and stack traces
+- Logs can be shipped to external error tracking services
+- No external error tracking SDK (Sentry removed to reduce dependencies)
+
+**Shipping Logs to External Services:**
+
+**Option 1: Filebeat (Recommended)**
+```bash
+# Install Filebeat
+curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-8.11.0-linux-x86_64.tar.gz
+tar xzvf filebeat-8.11.0-linux-x86_64.tar.gz
+
+# Configure filebeat.yml
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /opt/tbcv/logs/tbcv.log
+    json.message_key: msg
+    json.keys_under_root: true
+
+output.datadog:
+  api_key: ${DATADOG_API_KEY}
+  site: datadoghq.com
+
+# Start Filebeat
+./filebeat -c filebeat.yml
+```
+
+**Option 2: Cloud Provider Native Logging**
+- AWS CloudWatch: EC2 CloudWatch agent
+- Google Cloud: Cloud Logging agent
+- Azure: Azure Monitor Agent
+
+**Option 3: Open Source ELK Stack**
+```yaml
+# docker-compose.yml with ELK
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    ports:
+      - "5000:5000"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    ports:
+      - "5601:5601"
+```
+
+**Alternative Error Tracking Services:**
+- **Datadog APM** - Full observability platform
+- **New Relic** - Enterprise APM and error tracking
+- **Splunk** - Enterprise logging and security
+- **CloudWatch** (AWS) - Native AWS error tracking
+- **Stackdriver** (Google Cloud) - Native GCP error tracking
+
 ### Metrics
 ```bash
 # Prometheus metrics
@@ -424,8 +858,74 @@ curl http://localhost:8080/admin/status
 ```
 
 ### Monitoring Setup
+
+#### Current Status: Monitoring (Planned for Future Release)
+
+**Note**: Prometheus metrics collection is currently **planned but not yet implemented**. The monitoring configuration is present in `config/main.yaml` but the `/metrics` endpoint is not yet functional.
+
+#### Current Monitoring Options (Workaround)
+
+Use the following approaches for production monitoring until Prometheus metrics are implemented:
+
+**1. Structured Logging with Log Aggregation**:
+```bash
+# View JSON logs
+tail -f data/logs/tbcv.log | jq .
+
+# Export logs to external services (Datadog, New Relic, Splunk, CloudWatch)
+# Use a log shipper agent or cloud native log aggregation service
+```
+
+**2. Health Check Endpoints**:
+```bash
+# Liveness probe (is service running?)
+curl http://localhost:8080/health/live
+
+# Readiness probe (is service ready to handle requests?)
+curl http://localhost:8080/health/ready
+
+# Detailed health status
+curl http://localhost:8080/health
+
+# System status and statistics
+curl http://localhost:8080/admin/status
+```
+
+**3. Database Metrics Table**:
+```bash
+# Query custom application metrics from database
+sqlite3 data/tbcv.db "SELECT * FROM metrics WHERE timestamp > datetime('now', '-1 hour');"
+```
+
+**4. Log-Based Monitoring Example**:
+```bash
+# Monitor validation success rate
+grep "validations_total" data/logs/tbcv.log | jq .
+
+# Track API response times
+grep "processing_time_ms" data/logs/tbcv.log | jq '.processing_time_ms' | awk '{sum+=$1; count++} END {print "Average:", sum/count, "ms"}'
+
+# Monitor error rates
+grep "ERROR" data/logs/tbcv.log | wc -l
+```
+
+**5. Container-Based Monitoring**:
 ```yaml
-# prometheus.yml
+# Docker Health Check (used in deployment)
+healthcheck:
+  test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health/live').raise_for_status()"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+```
+
+#### Future: Prometheus Metrics (Planned Implementation)
+
+When Prometheus metrics are implemented in a future release, use this configuration:
+
+```yaml
+# prometheus.yml (future)
 scrape_configs:
   - job_name: 'tbcv'
     static_configs:

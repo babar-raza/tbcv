@@ -425,9 +425,17 @@ curl -X POST http://localhost:8080/workflows/wf-123/control \
   -d '{"action": "cancel"}'
 ```
 
-## Checkpoints
+## Checkpoints and Recovery
 
-Workflows support checkpointing for recovery:
+Workflows support comprehensive checkpointing and recovery mechanisms to ensure work is not lost due to failures, crashes, or interruptions.
+
+### Checkpoint Types
+
+TBCV uses two types of checkpoints:
+
+#### 1. Workflow Checkpoints (Database)
+
+Stored in the database and track workflow execution state:
 
 ```yaml
 workflows:
@@ -442,10 +450,251 @@ workflows:
     - "workflow_complete"
 ```
 
-Checkpoints store workflow state for:
-- Recovery after crash
-- Debugging workflow progress
-- Performance analysis
+Each checkpoint includes:
+- Workflow ID and type
+- Current step number
+- Serialized state data
+- Validation hash for integrity
+- Timestamp
+- Resume capability flag
+
+#### 2. System Checkpoints (File-based)
+
+Complete system snapshots including:
+- Full database backup
+- Cache statistics
+- System metadata
+- Creation timestamp
+
+### Creating Checkpoints
+
+#### Automatic Checkpoints
+
+Workflows automatically create checkpoints at key stages:
+
+```python
+# Checkpoint created automatically after each major step
+db_manager.create_checkpoint(
+    workflow_id=workflow_id,
+    name="step_1_complete",
+    step_number=1,
+    state_data=serialized_state,
+    validation_hash=compute_hash(state)
+)
+```
+
+#### Manual Checkpoints
+
+Create system checkpoints manually:
+
+```bash
+# CLI
+python -m tbcv system checkpoints create --name "pre_upgrade_backup"
+
+# API
+curl -X POST http://localhost:8080/api/checkpoints \
+  -d '{"name": "manual_checkpoint", "metadata": {"reason": "before_maintenance"}}'
+```
+
+### Recovery Operations
+
+#### List Available Checkpoints
+
+```bash
+# List workflow checkpoints
+python -m tbcv workflow checkpoints <workflow_id>
+
+# API
+curl http://localhost:8080/api/workflows/<workflow_id>/checkpoints
+```
+
+Response:
+```json
+{
+  "workflow_id": "wf-123",
+  "checkpoints": [
+    {
+      "id": "cp-001",
+      "name": "step_1_complete",
+      "step_number": 1,
+      "created_at": "2024-01-15T10:30:00Z",
+      "can_resume_from": true
+    }
+  ]
+}
+```
+
+#### Recover from Checkpoint
+
+```bash
+# CLI - Recover from specific checkpoint
+python -m tbcv workflow recover <workflow_id> --checkpoint-id <checkpoint_id>
+
+# CLI - Auto-resume from latest checkpoint
+python -m tbcv workflow resume <workflow_id>
+
+# API
+curl -X POST http://localhost:8080/api/workflows/<workflow_id>/recover \
+  -d '{"checkpoint_id": "cp-002"}'
+```
+
+#### Rollback to Previous State
+
+```bash
+# Rollback to earlier checkpoint
+python -m tbcv workflow rollback <workflow_id> --checkpoint-id <checkpoint_id>
+
+# API
+curl -X POST http://localhost:8080/api/workflows/<workflow_id>/rollback \
+  -d '{"checkpoint_id": "cp-001"}'
+```
+
+### Recovery Scenarios
+
+#### Scenario 1: System Crash During Workflow
+
+```bash
+# 1. Identify failed workflow
+python -m tbcv workflow list --state failed
+
+# 2. List available checkpoints
+python -m tbcv workflow checkpoints wf-123
+
+# 3. Resume from latest checkpoint
+python -m tbcv workflow resume wf-123
+```
+
+#### Scenario 2: Workflow Error at Specific Step
+
+```bash
+# 1. Check workflow status
+python -m tbcv workflow status wf-123
+
+# 2. Find checkpoint before failure
+python -m tbcv workflow checkpoints wf-123
+
+# 3. Recover from checkpoint before error
+python -m tbcv workflow recover wf-123 --checkpoint-id cp-002
+```
+
+#### Scenario 3: Need to Revert Changes
+
+```bash
+# 1. List checkpoints to find desired state
+python -m tbcv workflow checkpoints wf-123
+
+# 2. Rollback to earlier checkpoint
+python -m tbcv workflow rollback wf-123 --checkpoint-id cp-001
+
+# 3. Continue from that point
+python -m tbcv workflow resume wf-123
+```
+
+### Checkpoint Validation
+
+Always validate checkpoints before recovery:
+
+```python
+from core.checkpoint_manager import CheckpointManager
+
+checkpoint_mgr = CheckpointManager()
+
+# Validate checkpoint integrity
+if checkpoint_mgr.validate_checkpoint(checkpoint_id):
+    # Safe to recover
+    checkpoint_mgr.recover_from_checkpoint(checkpoint_id)
+else:
+    # Try previous checkpoint or report error
+    print("Checkpoint validation failed")
+```
+
+### Checkpoint Management
+
+#### Cleanup Old Checkpoints
+
+```python
+# Keep only last 3 checkpoints
+with db_manager.get_session() as session:
+    checkpoints = session.query(Checkpoint).filter(
+        Checkpoint.workflow_id == workflow_id
+    ).order_by(Checkpoint.step_number).all()
+
+    # Delete all but last 3
+    for cp in checkpoints[:-3]:
+        session.delete(cp)
+    session.commit()
+```
+
+#### Checkpoint Retention Policy
+
+```yaml
+# config/main.yaml
+checkpoints:
+  retention:
+    keep_completed: 3        # Keep 3 most recent for completed workflows
+    keep_failed: 10          # Keep 10 most recent for failed workflows
+    max_age_days: 30         # Delete checkpoints older than 30 days
+    auto_cleanup: true       # Automatically cleanup old checkpoints
+```
+
+### Recovery Best Practices
+
+1. **Checkpoint Frequently**: Create checkpoints after expensive operations
+   ```python
+   # After processing a batch
+   if processed_count % batch_size == 0:
+       create_checkpoint(workflow_id, f"batch_{batch_num}")
+   ```
+
+2. **Validate Before Recovery**: Always validate checkpoint integrity
+   ```python
+   if checkpoint_mgr.validate_checkpoint(cp_id):
+       checkpoint_mgr.recover_from_checkpoint(cp_id)
+   ```
+
+3. **Keep Recent Checkpoints**: Don't delete until workflow completes
+   ```python
+   if workflow.state == WorkflowState.COMPLETED:
+       cleanup_old_checkpoints(workflow_id, keep_last=3)
+   ```
+
+4. **Test Recovery**: Periodically test recovery process
+   ```bash
+   pytest tests/workflows/test_checkpoint_recovery.py -v
+   ```
+
+5. **Monitor Recovery Success**: Track recovery metrics
+   ```python
+   recovery_metrics = {
+       "total_recoveries": 100,
+       "successful_recoveries": 95,
+       "success_rate": 95.0
+   }
+   ```
+
+### Recovery Troubleshooting
+
+**Checkpoint Not Found:**
+- List all checkpoints: `python -m tbcv workflow checkpoints <workflow_id>`
+- Verify checkpoint ID is correct
+- Check database connectivity
+- Try earlier checkpoint
+
+**Corrupted Checkpoint:**
+- Try previous checkpoint
+- Restore from system checkpoint
+- Check disk integrity
+- Restart workflow if necessary
+
+**Recovery Fails:**
+- Check workflow state: `python -m tbcv workflow status <workflow_id>`
+- Verify database connection
+- Check system logs
+- Reset workflow: `python -m tbcv workflow reset <workflow_id>`
+
+For detailed recovery procedures and troubleshooting, see:
+- [Workflow Recovery Guide](workflow_recovery.md) - Complete recovery documentation
+- [Troubleshooting Guide](troubleshooting.md) - General troubleshooting
 
 ## Error Handling
 
@@ -514,6 +763,156 @@ validation:
 # Or increase timeout for thorough analysis
 llm_validator:
   timeout_seconds: 60
+```
+
+## Workflow Control: Pause and Resume
+
+Long-running workflows can be paused and resumed at any time, allowing you to manage system resources and control workflow execution.
+
+### Pause a Workflow
+
+Pauses an active (running or pending) workflow. The workflow progress is preserved and can be resumed later.
+
+**API Endpoint:**
+```bash
+POST /api/workflows/{workflow_id}/pause
+```
+
+**Example:**
+```bash
+curl -X POST http://localhost:8080/api/workflows/wf-abc123/pause
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "workflow_id": "wf-abc123",
+  "state": "paused",
+  "progress_percent": 45,
+  "current_step": 45,
+  "total_steps": 100,
+  "message": "Workflow paused successfully"
+}
+```
+
+**CLI Example:**
+```bash
+python -m cli.main workflow pause wf-abc123
+```
+
+### Resume a Workflow
+
+Resumes a paused workflow from where it left off. All progress metrics are preserved.
+
+**API Endpoint:**
+```bash
+POST /api/workflows/{workflow_id}/resume
+```
+
+**Example:**
+```bash
+curl -X POST http://localhost:8080/api/workflows/wf-abc123/resume
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "workflow_id": "wf-abc123",
+  "state": "running",
+  "progress_percent": 45,
+  "current_step": 45,
+  "total_steps": 100,
+  "message": "Workflow resumed successfully"
+}
+```
+
+**CLI Example:**
+```bash
+python -m cli.main workflow resume wf-abc123
+```
+
+### Supported States
+
+**Can be paused:**
+- RUNNING - Currently executing
+- PENDING - Queued and waiting to start
+
+**Cannot be paused:**
+- COMPLETED - Already finished
+- FAILED - Execution failed
+- CANCELLED - Already cancelled
+- PAUSED - Already paused (idempotent)
+
+**Can be resumed:**
+- PAUSED - Currently paused
+
+**Cannot be resumed:**
+- RUNNING - Already running
+- COMPLETED - Already finished
+- FAILED - Execution failed
+- CANCELLED - Already cancelled
+
+### Progress Preservation
+
+When a workflow is paused and resumed:
+
+- **Progress metrics preserved:** current_step, total_steps, progress_percent
+- **Metadata preserved:** input_params, workflow_metadata, created_at
+- **State preserved:** No data loss during pause/resume cycle
+- **Results preserved:** Partial results already computed are retained
+
+### Concurrent Pause/Resume
+
+Multiple workflows can be paused and resumed concurrently. Each operation is thread-safe and atomic.
+
+**Example - Pause all running workflows:**
+```bash
+# Get all running workflows
+workflows=$(curl http://localhost:8080/api/workflows?state=running | jq -r '.[].id')
+
+# Pause each one
+for wf_id in $workflows; do
+  curl -X POST http://localhost:8080/api/workflows/$wf_id/pause &
+done
+wait
+
+# All workflows are now paused
+```
+
+**Example - Resume all paused workflows:**
+```bash
+# Get all paused workflows
+workflows=$(curl http://localhost:8080/api/workflows?state=paused | jq -r '.[].id')
+
+# Resume each one
+for wf_id in $workflows; do
+  curl -X POST http://localhost:8080/api/workflows/$wf_id/resume &
+done
+wait
+
+# All workflows are now running
+```
+
+### Error Handling
+
+**Invalid state transitions:**
+```json
+{
+  "success": false,
+  "error": "Cannot pause workflow in state: completed. Only running/pending workflows can be paused",
+  "workflow_id": "wf-abc123"
+}
+```
+
+**Workflow not found:**
+```json
+{
+  "success": false,
+  "error": "Workflow wf-notfound not found",
+  "workflow_id": "wf-notfound"
+}
 ```
 
 ## Monitoring Workflows

@@ -342,6 +342,66 @@ python scripts/restore_database.py backup/tbcv.db.backup
 - [ ] Database migrations non-blocking
 - [ ] Service restart procedures tested
 
+#### Optional Services Configuration
+- [ ] Ollama configuration validated (if using LLM validation)
+- [ ] ChromaDB configuration validated (if using RAG)
+- [ ] PostgreSQL configuration validated (if using for production)
+- [ ] Redis configuration validated (if using distributed cache)
+- [ ] Prometheus configuration validated (if implemented)
+- [ ] Sentry configuration validated (if using error tracking)
+- [ ] Google GenAI configuration validated (if using LLM fallback)
+
+**Service Selection Guide**:
+
+All external services are **optional**. Choose based on your deployment scenario:
+
+| Scenario | Ollama | ChromaDB | PostgreSQL | Redis | Prometheus | Sentry |
+|----------|--------|----------|------------|-------|------------|--------|
+| **Local Development** | Optional | Optional | No | No | No | No |
+| **Single-node Production** | Optional | Optional | Recommended | No | Recommended | Recommended |
+| **Multi-node Production** | Optional | Optional | Required | Required | Required | Required |
+| **High-volume Validation** | Recommended | Recommended | Required | Required | Required | Required |
+
+**Configuration Examples**:
+
+Local development (defaults):
+```bash
+# No special configuration needed - uses SQLite, no LLM
+python main.py --mode api
+```
+
+Single-node production with SQLite:
+```bash
+export TBCV_SYSTEM_ENVIRONMENT=production
+export TBCV_SYSTEM_LOG_LEVEL=info
+# Optional: Enable LLM validation
+export TBCV_LLM_VALIDATOR__ENABLED=true
+export TBCV_LLM_VALIDATOR__MODEL=qwen2.5:latest
+```
+
+Multi-node production with PostgreSQL and Redis:
+```bash
+export DATABASE_URL=postgresql://user:pass@host:5432/tbcv
+export TBCV_CACHING__L2__BACKEND=redis
+export TBCV_CACHING__L2__REDIS_URL=redis://host:6379
+export TBCV_SYSTEM_ENVIRONMENT=production
+export TBCV_PROMETHEUS__ENABLED=true
+```
+
+High-volume with all optional services:
+```bash
+export DATABASE_URL=postgresql://user:pass@host:5432/tbcv
+export TBCV_CACHING__L2__BACKEND=redis
+export TBCV_CACHING__L2__REDIS_URL=redis://host:6379
+export TBCV_LLM_VALIDATOR__ENABLED=true
+export TBCV_LLM_VALIDATOR__MODEL=qwen2.5:latest
+export TBCV_RAG__ENABLED=true
+export TBCV_PROMETHEUS__ENABLED=true
+export GOOGLE_API_KEY=your-google-api-key
+export TBCV_SYSTEM_ENVIRONMENT=production
+# Error tracking via structured logging to external service (see Error Tracking section)
+```
+
 ---
 
 ### Monitoring
@@ -361,19 +421,85 @@ python scripts/restore_database.py backup/tbcv.db.backup
 
 **Validation**: Review log files for completeness and format.
 
-#### Metrics Collection
-- [ ] Performance metrics collected
-- [ ] Operation metrics collected (counts, durations)
-- [ ] Error metrics collected
-- [ ] Business metrics collected (validations, recommendations)
-- [ ] Resource metrics collected (CPU, memory, disk)
+#### Error Tracking
 
-**Key Metrics**:
+**Approach:** Structured logging to external service
+
+**Rationale:**
+- Sentry SDK removed to reduce dependencies and complexity
+- Structured JSON logging (core/logging.py) provides comprehensive error tracking
+- JSON logs can be shipped to any log aggregation service
+- Simpler maintenance and fewer external service dependencies
+
+**Alternative Approaches:**
+- Datadog APM - Full observability platform with APM, logs, and metrics
+- New Relic - Enterprise APM with error tracking and performance monitoring
+- Elasticsearch + Kibana (ELK Stack) - Open source log aggregation and analysis
+- Splunk - Enterprise log aggregation and security monitoring
+
+**Setup with Log Shipping:**
+```bash
+# Export logs to external service using Filebeat
+filebeat -c filebeat.yml
+
+# Example: Ship logs to Datadog
+# filebeat.yml
+output.datadog:
+  api_key: ${DATADOG_API_KEY}
+  site: datadoghq.com
+```
+
+**Current Logging Setup:**
+- All errors logged to `logs/tbcv.log` in JSON format
+- Structured logging includes context, stack traces, and metadata
+- Logs rotated daily and archived
+- Access guard violations logged separately to `logs/access_violations.log`
+
+**For Production Error Tracking:**
+1. Configure log shipping to external service (Datadog, New Relic, Splunk)
+2. Set up alerts for ERROR and CRITICAL level logs
+3. Configure dashboards to monitor error patterns
+4. Implement log retention policy (minimum 30 days)
+5. Test error scenarios and verify logs appear in external service
+
+#### Metrics Collection (Planned)
+- [ ] Performance metrics collected (planned for future release)
+- [ ] Operation metrics collected (counts, durations) (planned for future release)
+- [ ] Error metrics collected (planned for future release)
+- [ ] Business metrics collected (validations, recommendations) (planned for future release)
+- [ ] Resource metrics collected (CPU, memory, disk) (planned for future release)
+
+**Status**: Planned for future release. Prometheus monitoring infrastructure is configured but not yet implemented.
+
+**Current State**:
+- Configuration present in `config/main.yaml` (monitoring section)
+- prometheus-client package installed as dependency
+- Implementation pending
+
+**Workaround**:
+Use structured JSON logging (see Logging section below) and export logs to external monitoring services:
+- Export logs to Datadog, New Relic, Splunk, or CloudWatch
+- Use database.metrics table for custom application metrics
+- Monitor via API health endpoints at `/health/live`, `/health/ready`, `/health/detailed`
+- Use admin endpoint `/admin/status` for system status checks
+
+**Key Metrics** (planned for future):
 - MCP operation count and duration
 - Validation success/failure rates
 - API response times
 - Database query times
 - Cache hit rates
+- Agent performance metrics
+- System metrics (CPU, memory, disk)
+
+**Planned Monitoring Features**:
+- `/metrics` endpoint for Prometheus scraping
+- Application metrics (validation counts, success rates, processing times)
+- System metrics (CPU, memory, disk via psutil)
+- Agent metrics (calls, latency, errors per agent)
+- Cache metrics (hit rate, size, evictions)
+- Database metrics (query count, latency, pool size)
+- Custom metrics via PerformanceLogger integration
 
 #### Alerting
 - [ ] Critical alerts configured
@@ -402,10 +528,57 @@ python scripts/restore_database.py backup/tbcv.db.backup
 - [ ] Alert dashboard created
 - [ ] Dashboards accessible to ops team
 
-**Dashboard URLs** (example):
-- `/dashboard` - System overview
-- `/dashboard/performance` - Performance metrics
-- `/dashboard/validations` - Validation metrics
+**Dashboard URLs**:
+- `/dashboard` - System overview with recent validations, recommendations, and workflows
+- `/dashboard/monitoring` - **Performance Monitoring Dashboard** (newly implemented)
+  - Real-time system metrics (CPU, memory, disk usage)
+  - Validation throughput and agent performance
+  - Cache hit rates and database query times
+  - Historical charts for trend analysis
+  - Configurable alert thresholds
+  - Export functionality (CSV, JSON)
+  - Mobile-responsive design
+- `/dashboard/validations` - Validation list and details
+- `/dashboard/recommendations` - Recommendation list and details
+- `/dashboard/workflows` - Workflow management
+- `/dashboard/audit` - Audit logs
+
+**Performance Monitoring Dashboard Features**:
+- **Real-time Metrics**: Auto-refresh every 5 seconds
+  - Validation throughput (validations per minute)
+  - Agent average response time
+  - Cache hit rate percentage
+  - Database average query time
+  - System resources (CPU, memory, disk)
+
+- **Historical Graphs**: 4 interactive charts using Chart.js
+  - Validation throughput over time
+  - Response times (agent and database)
+  - System resource utilization
+  - Error rate and success rate
+
+- **Detailed Tables**:
+  - Agent performance breakdown by agent type
+  - Database operation metrics with percentiles (P95, P99)
+  - Cache performance statistics
+
+- **Alert Configuration**:
+  - Configurable thresholds for all metrics
+  - Alert cooldown periods
+  - Recent alerts log with timestamps
+  - Visual indicators for threshold violations
+
+- **Export Capabilities**:
+  - JSON export with full metrics
+  - CSV export for spreadsheet analysis
+  - Timestamped downloads
+
+**Usage**:
+1. Start the server: `python main.py --mode api`
+2. Access dashboard: `http://localhost:8080/dashboard/monitoring`
+3. Configure alert thresholds via the dashboard UI
+4. Monitor real-time metrics and historical trends
+5. Export data for analysis or reporting
 
 ---
 

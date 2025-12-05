@@ -4,39 +4,48 @@ This document provides comprehensive documentation for all agents in the TBCV sy
 
 ## Overview
 
-TBCV uses a multi-agent architecture with two categories:
+TBCV uses a multi-agent architecture with **19 total agents** organized into three categories (9 core + 3 pipeline + 7 validators):
 
-### Core Agents (11 agents)
+### Core Agents (9 agents)
 Specialized agents in `agents/` directory that communicate via message passing:
 
 1. **OrchestratorAgent** (`orchestrator.py`) - Workflow coordination with concurrency control
 2. **TruthManagerAgent** (`truth_manager.py`) - Plugin truth data management and indexing
 3. **FuzzyDetectorAgent** (`fuzzy_detector.py`) - Pattern matching and plugin detection
-4. **ContentValidatorAgent** (`content_validator.py`) - Multi-scope content validation (legacy, being replaced by modular validators)
+4. **ContentValidatorAgent** (`content_validator.py`) - **DEPRECATED** Multi-scope content validation (replaced by modular validators, will be removed in v2.0.0 - 2026-01-01)
 5. **LLMValidatorAgent** (`llm_validator.py`) - Semantic LLM validation via Ollama
 6. **ContentEnhancerAgent** (`content_enhancer.py`) - Content enhancement with safety gating
 7. **RecommendationAgent** (`recommendation_agent.py`) - Actionable recommendation generation
 8. **CodeAnalyzerAgent** (`code_analyzer.py`) - Code quality and security analysis
-9. **EnhancementAgent** (`enhancement_agent.py`) - Apply approved recommendations to content
-10. **RuleManager** (`rule_manager.py`) - Configuration rule management
-11. **BaseAgent** (`base.py`) - Abstract base class with agent registry
+9. **EnhancementAgent** (`enhancement_agent.py`) - Apply approved recommendations to content (facade over ContentEnhancerAgent)
 
-### Modular Validator Agents (7-8 validators)
-New modular architecture in `agents/validators/` replacing monolithic ContentValidatorAgent:
+### Enhancement and Recommendation Pipeline Agents (3 agents)
+Supporting agents for the recommendation-to-enhancement pipeline:
 
-- **BaseValidatorAgent** - Abstract base for all validators
-- **ValidatorRouter** - Routes validation requests to appropriate validators
-- **YamlValidatorAgent** - YAML frontmatter validation
-- **MarkdownValidatorAgent** - Markdown structure validation
-- **CodeValidatorAgent** - Code block validation
-- **LinkValidatorAgent** - Link and URL validation
-- **StructureValidatorAgent** - Document structure validation
-- **TruthValidatorAgent** - Truth data validation
-- **SeoValidatorAgent** - SEO and heading size validation
+1. **EditValidator** (`edit_validator.py`) - Validates edits before/after enhancement, compares content changes
+2. **RecommendationEnhancer** (`recommendation_enhancer.py`) - Advanced surgical content enhancement with safety validation and rollback capability
+3. **RecommendationCriticAgent** (`recommendation_critic.py`) - Validates recommendation quality, detects contradictions and redundancy
+
+### Modular Validator Agents (7 validators)
+Specialized validators in `agents/validators/` replacing monolithic ContentValidatorAgent:
+
+1. **YamlValidatorAgent** (`yaml_validator.py`) - YAML frontmatter validation
+2. **MarkdownValidatorAgent** (`markdown_validator.py`) - Markdown structure validation
+3. **CodeValidatorAgent** (`code_validator.py`) - Code block validation
+4. **LinkValidatorAgent** (`link_validator.py`) - Link and URL validation
+5. **StructureValidatorAgent** (`structure_validator.py`) - Document structure validation
+6. **TruthValidatorAgent** (`truth_validator.py`) - Truth data validation
+7. **SeoValidatorAgent** (`seo_validator.py`) - SEO and heading size validation
+
+Plus supporting classes:
+- **BaseValidatorAgent** (`base_validator.py`) - Abstract base for all validators
+- **ValidatorRouter** (`router.py`) - Routes validation requests to appropriate validators
 
 All agents inherit from `BaseAgent` (agents/base.py) and implement the MCP message passing pattern.
 
 ## Agent Communication Pattern
+
+All agents in TBCV follow the MCP-first architecture pattern and are protected by the dual-layer access control system.
 
 ```python
 # All agents follow this pattern:
@@ -50,6 +59,26 @@ class MyAgent(BaseAgent):
     def get_status(self) -> dict:
         """Return agent health and statistics"""
 ```
+
+### Access Control
+
+Agents are protected by TBCV's **dual-layer access control system**:
+
+1. **Import-Time Guard** (`core/import_guard.py`): Prevents API/CLI from importing agent modules
+2. **Runtime Access Guard** (`core/access_guard.py`): Prevents API/CLI from calling agent methods directly
+
+**Allowed Access:**
+- MCP Server (`svc/mcp_server.py`)
+- MCP Methods (`svc/mcp_methods/*`)
+- Tests (`tests/*`)
+
+**Blocked Access:**
+- API endpoints (`api/*`)
+- CLI commands (`cli/*`)
+
+See [Security Documentation](security.md) for complete details on the access control system, including configuration, enforcement modes, and troubleshooting.
+
+---
 
 ## 1. OrchestratorAgent
 
@@ -201,7 +230,20 @@ fuzzy_detector:
 }
 ```
 
-## 4. ContentValidatorAgent
+## 4. ContentValidatorAgent (DEPRECATED)
+
+> **DEPRECATION NOTICE**: ContentValidatorAgent is deprecated and will be removed in version 2.0.0 (target: 2026-01-01).
+>
+> **Use modular validators instead:**
+> - `YamlValidatorAgent` for YAML frontmatter validation
+> - `MarkdownValidatorAgent` for Markdown structure validation
+> - `CodeValidatorAgent` for code block validation
+> - `LinkValidatorAgent` for link validation
+> - `StructureValidatorAgent` for document structure validation
+> - `TruthValidatorAgent` for truth data validation
+> - `SeoValidatorAgent` for SEO validation
+>
+> **Migration Guide**: See [docs/migration/content_validator_migration.md](../migration/content_validator_migration.md)
 
 **Location**: `agents/content_validator.py`
 **Purpose**: Multi-scope content validation (YAML, Markdown, code, links, truth) with optional LLM semantic validation
@@ -575,6 +617,179 @@ async def register_agents():
     # ... existing agents ...
     my_custom = MyCustomAgent("my_custom")
     agent_registry.register_agent(my_custom)
+```
+
+## Usage Examples
+
+### Using Orchestrator Agent
+
+```python
+import asyncio
+from agents.orchestrator import OrchestratorAgent
+
+async def run_validation_workflow():
+    """Run a complete validation workflow using OrchestratorAgent."""
+    orchestrator = OrchestratorAgent()
+
+    # Validate single file
+    result = await orchestrator.process_request(
+        method="validate_file",
+        params={
+            "file_path": "docs/tutorial.md",
+            "content": "# Tutorial\n\nContent here",
+            "family": "words",
+            "validation_types": ["yaml", "markdown", "truth"]
+        }
+    )
+
+    return result
+
+# Run the workflow
+result = asyncio.run(run_validation_workflow())
+print(f"Validation ID: {result['validation_id']}")
+print(f"Status: {result['status']}")
+print(f"Issues: {len(result['issues'])}")
+```
+
+### Using TruthManager Agent
+
+```python
+import asyncio
+from agents.truth_manager import TruthManagerAgent
+
+async def load_plugins():
+    """Load and search plugin definitions."""
+    truth_manager = TruthManagerAgent()
+
+    # Load truth data for 'words' family
+    result = await truth_manager.process_request(
+        method="load_truth_data",
+        params={"family": "words"}
+    )
+
+    plugins = result['plugins']
+    print(f"Loaded {len(plugins)} plugins")
+
+    # Search for specific plugin
+    search_result = await truth_manager.process_request(
+        method="search_plugins",
+        params={
+            "family": "words",
+            "query": "AutoSave"
+        }
+    )
+
+    return search_result
+
+# Run
+results = asyncio.run(load_plugins())
+```
+
+### Using Fuzzy Detector Agent
+
+```python
+import asyncio
+from agents.fuzzy_detector import FuzzyDetectorAgent
+
+async def detect_plugins_in_content():
+    """Detect plugin mentions using fuzzy matching."""
+    detector = FuzzyDetectorAgent()
+
+    content = """
+    The Document plugin enables loading Word files.
+    Use AutoSave to prevent data loss.
+    The PDF converter creates output.
+    """
+
+    result = await detector.process_request(
+        method="detect_plugins",
+        params={
+            "content": content,
+            "family": "words",
+            "context_window_chars": 200
+        }
+    )
+
+    detections = result['detections']
+    print(f"Detected {len(detections)} plugin mentions:")
+    for detection in detections:
+        print(f"  - {detection['plugin_id']}: {detection['confidence']:.2%}")
+
+# Run
+asyncio.run(detect_plugins_in_content())
+```
+
+### Using Content Validator Agent
+
+```python
+import asyncio
+from agents.content_validator import ContentValidatorAgent
+
+async def validate_content_comprehensive():
+    """Run comprehensive content validation."""
+    validator = ContentValidatorAgent()
+
+    content = """---
+title: Tutorial
+description: A tutorial document
+---
+
+# Tutorial
+
+Enable AutoSave feature for automatic saves.
+"""
+
+    result = await validator.process_request(
+        method="validate_content",
+        params={
+            "content": content,
+            "file_path": "tutorial.md",
+            "family": "words",
+            "validation_types": ["yaml", "markdown", "truth"]
+        }
+    )
+
+    print(f"Status: {result['status']}")
+    print(f"Issues found: {len(result['issues'])}")
+    for issue in result['issues']:
+        print(f"  - [{issue['level']}] {issue['message']}")
+
+# Run
+asyncio.run(validate_content_comprehensive())
+```
+
+### Querying Agent Status
+
+```python
+import requests
+
+def get_all_agents_status():
+    """Get status of all registered agents."""
+    response = requests.get('http://localhost:8080/agents')
+    agents = response.json()['agents']
+
+    print(f"Total agents: {len(agents)}\n")
+    for agent in agents:
+        print(f"Agent: {agent['agent_id']}")
+        print(f"  Type: {agent['agent_type']}")
+        print(f"  Status: {agent['status']}")
+        print(f"  Capabilities: {len(agent['contract']['capabilities'])}")
+
+def get_specific_agent(agent_id: str):
+    """Get details for specific agent."""
+    response = requests.get(f'http://localhost:8080/agents/{agent_id}')
+    agent = response.json()
+
+    print(f"Agent: {agent['agent_id']}")
+    print(f"Type: {agent['agent_type']}")
+    print(f"Status: {agent['status']}")
+    print("\nCapabilities:")
+    for capability in agent['contract']['capabilities']:
+        print(f"  - {capability['name']}: {capability['description']}")
+
+# Usage
+get_all_agents_status()
+get_specific_agent('fuzzy_detector')
 ```
 
 ## Troubleshooting

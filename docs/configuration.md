@@ -198,6 +198,304 @@ batch_processing:
     - "*.markdown"
   exclude_patterns:
     - ".git/*"
+```
+
+## Usage Examples
+
+### Loading Configuration in Code
+
+```python
+from core.config_loader import ConfigLoader
+
+def get_system_config():
+    """Load and access system configuration."""
+    loader = ConfigLoader()
+    config = loader.load_config('config/main.yaml')
+
+    # Access nested configuration
+    host = config['server']['host']
+    port = config['server']['port']
+    enable_cors = config['server']['enable_cors']
+
+    fuzzy_threshold = config['agents']['fuzzy_detector']['similarity_threshold']
+    link_timeout = config['agents']['content_validator']['link_timeout_seconds']
+
+    return {
+        'server': {'host': host, 'port': port},
+        'cors': enable_cors,
+        'fuzzy': {'threshold': fuzzy_threshold},
+        'validation': {'link_timeout': link_timeout}
+    }
+
+# Usage
+config = get_system_config()
+print(f"Server: {config['server']['host']}:{config['server']['port']}")
+print(f"Fuzzy threshold: {config['fuzzy']['threshold']}")
+```
+
+### Environment Variable Overrides
+
+```python
+import os
+from core.config_loader import ConfigLoader
+
+def config_with_environment_overrides():
+    """Get configuration with environment variable overrides."""
+    # Environment variables use TBCV_ prefix
+    os.environ['TBCV_SERVER_PORT'] = '9090'
+    os.environ['TBCV_AGENTS_FUZZY_DETECTOR_ENABLED'] = 'true'
+    os.environ['TBCV_AGENTS_FUZZY_DETECTOR_SIMILARITY_THRESHOLD'] = '0.9'
+
+    loader = ConfigLoader()
+    config = loader.load_config('config/main.yaml')
+
+    # Environment overrides take precedence
+    port = config['server']['port']  # Will be 9090 (from env)
+    threshold = config['agents']['fuzzy_detector']['similarity_threshold']  # Will be 0.9 (from env)
+
+    return config
+
+# Usage
+config = config_with_environment_overrides()
+```
+
+### Configuration for Different Environments
+
+```yaml
+# config/main.yaml - development
+system:
+  environment: "development"
+  debug: true
+  log_level: "DEBUG"
+
+server:
+  port: 8080
+  enable_cors: true
+  cors_origins:
+    - "http://localhost:3000"
+
+agents:
+  fuzzy_detector:
+    similarity_threshold: 0.75  # More lenient in dev
+  content_validator:
+    link_validation: false  # Skip external links in dev
+
+cache:
+  l2:
+    enabled: false  # Disable disk cache in dev
+```
+
+```yaml
+# config/main.yaml - production
+system:
+  environment: "production"
+  debug: false
+  log_level: "INFO"
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  enable_cors: true
+  cors_origins:
+    - "https://yourdomain.com"
+
+agents:
+  fuzzy_detector:
+    similarity_threshold: 0.85  # Stricter in production
+  content_validator:
+    link_validation: true  # Validate external links
+    link_timeout_seconds: 5
+
+cache:
+  l2:
+    enabled: true
+    max_size_mb: 2048
+    compression_enabled: true
+
+database:
+  pool_size: 50
+  max_overflow: 50
+```
+
+### Setting Agent-Specific Configuration
+
+```python
+from core.config_loader import ConfigLoader
+
+def configure_agents():
+    """Configure individual agents."""
+    loader = ConfigLoader()
+    config = loader.load_config('config/main.yaml')
+
+    # Fuzzy detector config
+    fuzzy_config = config['agents']['fuzzy_detector']
+    fuzzy_threshold = fuzzy_config['similarity_threshold']
+    fuzzy_algorithms = fuzzy_config['fuzzy_algorithms']
+
+    # Content validator config
+    validator_config = config['agents']['content_validator']
+    link_validation_enabled = validator_config['link_validation']
+    link_timeout = validator_config['link_timeout_seconds']
+
+    # Content enhancer config
+    enhancer_config = config['agents']['content_enhancer']
+    rewrite_threshold = enhancer_config['rewrite_ratio_threshold']
+    blocked_topics = enhancer_config['blocked_topics']
+
+    return {
+        'fuzzy_detector': {
+            'threshold': fuzzy_threshold,
+            'algorithms': fuzzy_algorithms
+        },
+        'content_validator': {
+            'link_validation': link_validation_enabled,
+            'timeout': link_timeout
+        },
+        'content_enhancer': {
+            'rewrite_threshold': rewrite_threshold,
+            'blocked_topics': blocked_topics
+        }
+    }
+
+# Usage
+agent_configs = configure_agents()
+for agent, config in agent_configs.items():
+    print(f"{agent}: {config}")
+```
+
+### Configuring Database Connection
+
+```python
+from core.config_loader import ConfigLoader
+from core.database import db_manager
+
+def setup_database():
+    """Configure database connection."""
+    loader = ConfigLoader()
+    config = loader.load_config('config/main.yaml')
+
+    db_config = config['database']
+    url = db_config['url']
+    pool_size = db_config['pool_size']
+    max_overflow = db_config['max_overflow']
+    pool_timeout = db_config['pool_timeout']
+
+    # Initialize with configuration
+    db_manager.init_database(
+        database_url=url,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+        pool_timeout=pool_timeout
+    )
+
+    # Verify connection
+    if db_manager.is_connected():
+        print("Database connected successfully")
+        return True
+    return False
+
+# Usage
+success = setup_database()
+```
+
+### Configuring Caching
+
+```python
+from core.config_loader import ConfigLoader
+from core.cache import CacheManager
+
+def setup_caching():
+    """Configure L1 and L2 caches."""
+    loader = ConfigLoader()
+    config = loader.load_config('config/main.yaml')
+
+    cache_config = config['cache']
+
+    # L1 cache configuration
+    l1_config = cache_config['l1']
+    l1_enabled = l1_config['enabled']
+    l1_max_entries = l1_config['max_entries']
+    l1_ttl = l1_config['ttl_seconds']
+
+    # L2 cache configuration
+    l2_config = cache_config['l2']
+    l2_enabled = l2_config['enabled']
+    l2_db_path = l2_config['database_path']
+    l2_compression = l2_config['compression_enabled']
+
+    cache = CacheManager(
+        l1_enabled=l1_enabled,
+        l1_max_entries=l1_max_entries,
+        l1_ttl=l1_ttl,
+        l2_enabled=l2_enabled,
+        l2_db_path=l2_db_path,
+        l2_compression=l2_compression
+    )
+
+    print(f"L1 Cache: {'enabled' if l1_enabled else 'disabled'}")
+    print(f"L2 Cache: {'enabled' if l2_enabled else 'disabled'}")
+
+    return cache
+
+# Usage
+cache = setup_caching()
+```
+
+### Configuring Logging
+
+```python
+from core.config_loader import ConfigLoader
+import logging.config
+
+def setup_logging():
+    """Configure structured logging."""
+    loader = ConfigLoader()
+    config = loader.load_config('config/main.yaml')
+
+    log_config = config['logging']
+    log_level = log_config['level']
+    log_format = log_config['format']
+    log_file = log_config['file_path']
+    backup_count = log_config['backup_count']
+
+    # Configure Python logging
+    logging_config = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'standard': {
+                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            },
+            'json': {
+                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            }
+        },
+        'handlers': {
+            'file': {
+                'class': 'logging.handlers.RotatingFileHandler',
+                'filename': log_file,
+                'maxBytes': 100 * 1024 * 1024,  # 100MB
+                'backupCount': backup_count,
+                'formatter': log_format
+            },
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'standard'
+            }
+        },
+        'root': {
+            'level': log_level,
+            'handlers': ['file', 'console']
+        }
+    }
+
+    logging.config.dictConfig(logging_config)
+    return logging.getLogger(__name__)
+
+# Usage
+logger = setup_logging()
+logger.info("Logging configured successfully")
+```
     - "node_modules/*"
     - "*.tmp"
     - "*~"

@@ -4,6 +4,7 @@ This document describes the SQLite database schema used by TBCV.
 
 **Location**: `data/tbcv.db` (default)
 **ORM**: SQLAlchemy (`core/database.py`)
+**Total Tables**: 7 (workflows, validation_results, recommendations, checkpoints, audit_logs, cache_entries, metrics)
 
 ## Entity Relationship Diagram
 
@@ -40,12 +41,16 @@ This document describes the SQLite database schema used by TBCV.
                          └────────────────────┘
 
 ┌──────────────────┐     ┌──────────────────┐
-│   CacheEntry     │     │   MetricEntry    │
+│   CacheEntry     │     │    Metrics       │
 │                  │     │                  │
 │  cache_key (PK)  │     │  id (PK)         │
-│  agent_id        │     │  name            │
+│  agent_id        │     │  name (indexed)  │
 │  method_name     │     │  value           │
-│  result_data     │     │  metadata        │
+│  result_data     │     │  created_at      │
+│  expires_at      │     │  metadata        │
+│  access_count    │     │                  │
+│  last_accessed   │     │                  │
+│  size_bytes      │     │                  │
 └──────────────────┘     └──────────────────┘
 ```
 
@@ -202,19 +207,75 @@ Stores L2 persistent cache entries for validation results and LLM responses.
 
 ### metrics
 
-Stores system performance metrics.
+Stores application performance metrics for monitoring, alerting, and performance analysis.
 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
 | id | VARCHAR(36) | No | Primary key (UUID) |
-| name | VARCHAR(100) | Yes | Metric name |
-| value | FLOAT | Yes | Metric value |
-| metadata | JSON | Yes | Additional context |
-| created_at | DATETIME | Yes | Timestamp |
+| name | VARCHAR(100) | No | Metric name (e.g., "validation_duration", "cache_hit_rate", "agent_execution_time") |
+| value | FLOAT | No | Metric value (numeric measurement) |
+| created_at | DATETIME | No | Timestamp when metric was recorded |
+| metadata | JSON | Yes | Additional context (tags, labels, dimensions, source) |
 
 **Indexes**:
-- Index on `name`
-- Index on `created_at`
+- `idx_metrics_name` (name)
+- `idx_metrics_created` (created_at)
+
+**Purpose**:
+- Store application performance metrics for real-time monitoring
+- Track validation processing times and throughput
+- Monitor cache hit rates and performance
+- Record agent execution times and resource usage
+- Support performance alerting and anomaly detection
+- Enable performance trend analysis and capacity planning
+
+**Example Queries**:
+
+```sql
+-- Get average validation duration over last hour
+SELECT AVG(value)
+FROM metrics
+WHERE name = 'validation_duration'
+  AND created_at >= datetime('now', '-1 hour');
+
+-- Get cache hit rate for last 24 hours
+SELECT
+  SUM(CASE WHEN name = 'cache_hit' THEN value ELSE 0 END) /
+  (SUM(CASE WHEN name = 'cache_hit' THEN value ELSE 0 END) +
+   SUM(CASE WHEN name = 'cache_miss' THEN value ELSE 0 END)) as hit_rate
+FROM metrics
+WHERE created_at >= datetime('now', '-1 day')
+  AND name IN ('cache_hit', 'cache_miss');
+
+-- Get top 10 agents by average execution time
+SELECT
+  metadata->>'$.agent_id' as agent_id,
+  AVG(value) as avg_execution_time,
+  COUNT(*) as sample_count
+FROM metrics
+WHERE name = 'agent_execution_time'
+  AND created_at >= datetime('now', '-7 days')
+GROUP BY metadata->>'$.agent_id'
+ORDER BY avg_execution_time DESC
+LIMIT 10;
+
+-- Get metrics recorded in last 24 hours grouped by type
+SELECT
+  name,
+  COUNT(*) as count,
+  MIN(value) as min_val,
+  AVG(value) as avg_val,
+  MAX(value) as max_val
+FROM metrics
+WHERE created_at >= datetime('now', '-1 day')
+GROUP BY name
+ORDER BY count DESC;
+```
+
+**Data Retention**:
+- Metrics are retained for 30 days by default
+- Older metrics can be archived for long-term analysis
+- Configurable via application settings
 
 ## Enums
 
@@ -280,23 +341,154 @@ if db_manager.is_connected():
 
 ```python
 from core.database import db_manager, ValidationResult, Recommendation
+from core.database import RecommendationStatus, Workflow, WorkflowState
+from sqlalchemy import func, and_
 
 # Get validation by ID
 with db_manager.get_session() as session:
-    validation = session.query(ValidationResult).filter_by(id=val_id).first()
+    validation = session.query(ValidationResult).filter_by(id='val-123').first()
+    if validation:
+        print(f"File: {validation.file_path}")
+        print(f"Status: {validation.status}")
 
-# Get recommendations for validation
+# Get recommendations for validation with specific status
 with db_manager.get_session() as session:
-    recs = session.query(Recommendation).filter_by(
-        validation_id=val_id,
-        status=RecommendationStatus.PENDING
+    recs = session.query(Recommendation).filter(
+        Recommendation.validation_id == 'val-123',
+        Recommendation.status == RecommendationStatus.PENDING
     ).all()
 
-# Count by status
+    print(f"Found {len(recs)} pending recommendations")
+
+# Count recommendations by status
 with db_manager.get_session() as session:
-    pending_count = session.query(Recommendation).filter_by(
-        status=RecommendationStatus.PENDING
-    ).count()
+    status_counts = session.query(
+        Recommendation.status,
+        func.count(Recommendation.id).label('count')
+    ).group_by(Recommendation.status).all()
+
+    for status, count in status_counts:
+        print(f"{status.value}: {count}")
+
+# Get recent validations (last 7 days)
+from datetime import datetime, timedelta, timezone
+
+with db_manager.get_session() as session:
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    recent = session.query(ValidationResult).filter(
+        ValidationResult.created_at >= week_ago
+    ).order_by(ValidationResult.created_at.desc()).limit(50).all()
+
+    print(f"Found {len(recent)} validations in the last 7 days")
+
+# Get validations by file path pattern
+with db_manager.get_session() as session:
+    docs = session.query(ValidationResult).filter(
+        ValidationResult.file_path.like('docs/%')
+    ).all()
+
+    print(f"Found {len(docs)} validations in docs/")
+
+# Get high-confidence recommendations
+with db_manager.get_session() as session:
+    high_conf = session.query(Recommendation).filter(
+        Recommendation.confidence >= 0.9
+    ).all()
+
+    print(f"Found {len(high_conf)} high-confidence recommendations")
+
+# Get validations with most issues
+with db_manager.get_session() as session:
+    problematic = session.query(ValidationResult).filter(
+        ValidationResult.severity.in_(['error', 'critical'])
+    ).order_by(ValidationResult.created_at.desc()).limit(10).all()
+
+    print("Most problematic validations:")
+    for val in problematic:
+        print(f"  - {val.file_path}: {val.severity}")
+```
+
+### Advanced Query Examples
+
+```python
+from core.database import db_manager, ValidationResult, Recommendation
+from core.database import AuditLog, Workflow, WorkflowState
+from sqlalchemy import func, and_, or_
+
+# Get validation statistics
+with db_manager.get_session() as session:
+    stats = session.query(
+        ValidationResult.status,
+        func.count(ValidationResult.id).label('count'),
+        func.avg(func.length(ValidationResult.file_path)).label('avg_file_length')
+    ).group_by(ValidationResult.status).all()
+
+    for status, count, avg_len in stats:
+        print(f"{status}: {count} validations (avg file length: {avg_len:.1f})")
+
+# Get workflow progress statistics
+with db_manager.get_session() as session:
+    workflow_stats = session.query(
+        Workflow.type,
+        Workflow.state,
+        func.count(Workflow.id).label('count'),
+        func.avg(Workflow.progress_percent).label('avg_progress')
+    ).filter(
+        Workflow.state != WorkflowState.CANCELLED
+    ).group_by(Workflow.type, Workflow.state).all()
+
+    for wf_type, state, count, avg_progress in workflow_stats:
+        print(f"{wf_type} ({state}): {count} workflows, {avg_progress:.1f}% avg progress")
+
+# Get recommendations with audit trail
+with db_manager.get_session() as session:
+    rec = session.query(Recommendation).filter_by(id='rec-123').first()
+
+    if rec:
+        audit = session.query(AuditLog).filter_by(
+            recommendation_id=rec.id
+        ).order_by(AuditLog.created_at).all()
+
+        print(f"Recommendation {rec.id}:")
+        for entry in audit:
+            print(f"  {entry.created_at}: {entry.action} by {entry.actor}")
+
+# Find recommendations that haven't been applied yet
+with db_manager.get_session() as session:
+    unapplied = session.query(Recommendation).filter(
+        Recommendation.status.in_([
+            RecommendationStatus.PROPOSED,
+            RecommendationStatus.APPROVED
+        ])
+    ).order_by(Recommendation.confidence.desc()).limit(20).all()
+
+    print(f"Unapplied recommendations: {len(unapplied)}")
+
+# Get files with most validations
+with db_manager.get_session() as session:
+    top_files = session.query(
+        ValidationResult.file_path,
+        func.count(ValidationResult.id).label('validation_count')
+    ).group_by(ValidationResult.file_path).order_by(
+        func.count(ValidationResult.id).desc()
+    ).limit(10).all()
+
+    print("Files with most validations:")
+    for file_path, count in top_files:
+        print(f"  {file_path}: {count} validations")
+
+# Get cache entry statistics
+with db_manager.get_session() as session:
+    cache_stats = session.query(
+        CacheEntry.agent_id,
+        func.count(CacheEntry.cache_key).label('entries'),
+        func.sum(CacheEntry.size_bytes).label('total_size'),
+        func.avg(CacheEntry.access_count).label('avg_accesses')
+    ).group_by(CacheEntry.agent_id).all()
+
+    for agent_id, entries, total_size, avg_access in cache_stats:
+        print(f"{agent_id}: {entries} entries, {total_size/1024:.1f}KB, "
+              f"{avg_access:.1f} avg accesses")
 ```
 
 ### Database Maintenance
